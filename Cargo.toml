@@ -11,3 +11,4 @@ publish = false
 [dependencies]
 gtk = { package = "gtk4", version = "0.11", features = ["v4_14"] }
 adw = { package = "libadwaita", version = "0.9", features = ["v1_5"] }
+gettext-rs = { version = "0.8", features = ["gettext-system"] }
