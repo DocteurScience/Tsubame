@@ -1,0 +1,62 @@
+/* Couleurs nommées de libadwaita uniquement : le thème clair ou sombre et la
+   couleur d'accent suivent le système. */
+
+.post-list {
+  background: none;
+}
+
+.post-list > row {
+  padding: 0;
+  margin-bottom: 12px;
+  border-radius: 12px;
+  background: none;
+}
+
+.post-list > row:selected .post-card {
+  box-shadow: 0 0 0 2px @accent_color;
+}
+
+.post-card {
+  padding: 12px 14px;
+}
+
+.post-detail {
+  padding: 16px;
+}
+
+.post-detail-text {
+  font-size: 1.15em;
+}
+
+.post-stats {
+  margin-top: 4px;
+  margin-left: -8px;
+}
+
+.post-media-frame {
+  margin-top: 6px;
+  border-radius: 8px;
+}
+
+.post-media {
+  background-color: alpha(currentColor, 0.08);
+}
+
+.alt-badge {
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: smaller;
+  font-weight: bold;
+  color: white;
+  background-color: alpha(black, 0.7);
+}
+
+.sidebar-badge {
+  min-width: 20px;
+  padding: 0 6px;
+  border-radius: 10px;
+  font-size: smaller;
+  font-weight: bold;
+  color: @accent_fg_color;
+  background-color: @accent_bg_color;
+}
