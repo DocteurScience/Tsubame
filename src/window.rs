@@ -376,31 +376,62 @@ impl State {
     }
 
     /// Les rangées des colonnes ouvertes se réordonnent par glisser-déposer.
+    /// Pendant le survol, un trait marque l'endroit du dépôt : au-dessus de
+    /// la rangée dans sa moitié haute, en dessous dans sa moitié basse.
     fn make_draggable(self: &Rc<Self>, row: &gtk::ListBoxRow, kind: ColumnKind) {
         let source = gtk::DragSource::new();
         source.set_actions(gtk::gdk::DragAction::MOVE);
         source.connect_prepare(move |_, _, _| {
             Some(gtk::gdk::ContentProvider::for_value(&kind.id().to_value()))
         });
-        let dragged = row.downgrade();
-        source.connect_drag_begin(move |source, _| {
-            if let Some(row) = dragged.upgrade() {
+        source.connect_drag_begin(|source, _| {
+            if let Some(row) = source.widget() {
                 source.set_icon(Some(&gtk::WidgetPaintable::new(Some(&row))), 0, 0);
+                row.add_css_class("dragged");
+            }
+        });
+        source.connect_drag_end(|source, _, _| {
+            if let Some(row) = source.widget() {
+                row.remove_css_class("dragged");
             }
         });
         row.add_controller(source);
 
         let target = gtk::DropTarget::new(glib::Type::STRING, gtk::gdk::DragAction::MOVE);
+        // Lire la colonne glissée dès le survol, pour ne rien marquer là où
+        // le dépôt ne changerait rien.
+        target.set_preload(true);
+
         let state = Rc::downgrade(self);
-        target.connect_drop(move |_, value, _, _| {
-            let dropped = value
-                .get::<String>()
-                .ok()
-                .and_then(|id| ColumnKind::from_id(&id));
-            let (Some(state), Some(dropped)) = (state.upgrade(), dropped) else {
+        target.connect_motion(move |target, _, y| {
+            let Some(row) = target.widget() else {
+                return gtk::gdk::DragAction::empty();
+            };
+            let destination = state
+                .upgrade()
+                .and_then(|state| state.drop_destination(target.value().as_ref(), kind, &row, y));
+            show_drop_marker(&row, destination.map(|(_, _, after)| after));
+            match destination {
+                Some(_) => gtk::gdk::DragAction::MOVE,
+                None => gtk::gdk::DragAction::empty(),
+            }
+        });
+        target.connect_leave(|target| {
+            if let Some(row) = target.widget() {
+                show_drop_marker(&row, None);
+            }
+        });
+
+        let state = Rc::downgrade(self);
+        target.connect_drop(move |target, value, _, y| {
+            let Some(row) = target.widget() else {
                 return false;
             };
-            let Some(to) = state.column_index(kind) else {
+            show_drop_marker(&row, None);
+            let Some(state) = state.upgrade() else {
+                return false;
+            };
+            let Some((dropped, to, _)) = state.drop_destination(Some(value), kind, &row, y) else {
                 return false;
             };
             // La barre latérale est reconstruite : attendre la fin du dépôt.
@@ -408,6 +439,26 @@ impl State {
             true
         });
         row.add_controller(target);
+    }
+
+    /// Où irait la colonne glissée (`value`) si on la déposait à la hauteur
+    /// `y` de la rangée de `kind` : la colonne, son nouvel indice et si le
+    /// dépôt se fait après la rangée. `None` quand rien ne changerait.
+    fn drop_destination(
+        &self,
+        value: Option<&glib::Value>,
+        kind: ColumnKind,
+        row: &gtk::Widget,
+        y: f64,
+    ) -> Option<(ColumnKind, usize, bool)> {
+        let dragged = value
+            .and_then(|v| v.get::<String>().ok())
+            .and_then(|id| ColumnKind::from_id(&id))?;
+        let from = self.column_index(dragged)?;
+        let over = self.column_index(kind)?;
+        let after = y > f64::from(row.height()) / 2.0;
+        let to = drop_index(from, over, after)?;
+        Some((dragged, to, after))
     }
 
     /// Met la sélection de la barre latérale en accord avec ce qui est
@@ -502,6 +553,32 @@ impl State {
             self.nav.pop_to_tag("main");
         }
     }
+}
+
+/// Nouvel indice d'une colonne glissée depuis `from` et déposée avant ou
+/// après la colonne d'indice `over`, ou `None` si elle ne bouge pas.
+fn drop_index(from: usize, over: usize, after: bool) -> Option<usize> {
+    let insert_at = over + usize::from(after);
+    // Retirer la colonne décale celles qui la suivent.
+    let to = if from < insert_at {
+        insert_at - 1
+    } else {
+        insert_at
+    };
+    (to != from).then_some(to)
+}
+
+/// Trait de dépôt au-dessus (`Some(false)`) ou en dessous (`Some(true)`)
+/// d'une rangée, ou aucun.
+fn show_drop_marker(row: &gtk::Widget, after: Option<bool>) {
+    row.set_css_classes(
+        &row.css_classes()
+            .iter()
+            .map(|c| c.as_str())
+            .filter(|c| *c != "drop-before" && *c != "drop-after")
+            .chain(after.map(|after| if after { "drop-after" } else { "drop-before" }))
+            .collect::<Vec<_>>(),
+    );
 }
 
 fn install_actions(window: &adw::ApplicationWindow, state: &Rc<State>) {
@@ -811,4 +888,28 @@ pub fn build(app: &adw::Application) -> adw::ApplicationWindow {
     app.set_accels_for_action("win.move-current-right", &["<Control><Shift>Page_Down"]);
     app.set_accels_for_action("win.move-current-left", &["<Control><Shift>Page_Up"]);
     window
+}
+
+#[cfg(test)]
+mod tests {
+    use super::drop_index;
+
+    #[test]
+    fn dropping_moves_to_the_marked_place() {
+        // Colonnes A B C D ; on glisse A (0).
+        assert_eq!(drop_index(0, 2, false), Some(1)); // avant C : B A C D
+        assert_eq!(drop_index(0, 2, true), Some(2)); // après C : B C A D
+        assert_eq!(drop_index(0, 3, true), Some(3)); // après D : B C D A
+        // On glisse D (3).
+        assert_eq!(drop_index(3, 0, false), Some(0)); // avant A : D A B C
+        assert_eq!(drop_index(3, 1, true), Some(2)); // après B : A B D C
+    }
+
+    #[test]
+    fn dropping_next_to_itself_changes_nothing() {
+        assert_eq!(drop_index(1, 1, false), None);
+        assert_eq!(drop_index(1, 1, true), None);
+        assert_eq!(drop_index(1, 0, true), None); // après la précédente
+        assert_eq!(drop_index(1, 2, false), None); // avant la suivante
+    }
 }

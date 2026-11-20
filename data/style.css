@@ -76,3 +76,16 @@ columnsview > .column headerbar {
 .add-column {
   margin: 0 6px;
 }
+
+/* Glisser-déposer des colonnes dans la barre latérale. */
+.navigation-sidebar > row.dragged {
+  opacity: 0.4;
+}
+
+.navigation-sidebar > row.drop-before {
+  box-shadow: inset 0 2px @accent_color;
+}
+
+.navigation-sidebar > row.drop-after {
+  box-shadow: inset 0 -2px @accent_color;
+}
