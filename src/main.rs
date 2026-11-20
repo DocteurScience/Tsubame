@@ -2,11 +2,13 @@ use adw::prelude::*;
 use gettextrs::gettext;
 use gtk::{gio, glib};
 
+mod auth;
 mod card;
 mod column;
 mod columns;
 mod data;
 mod i18n;
+mod runtime;
 mod settings;
 mod thread;
 mod window;

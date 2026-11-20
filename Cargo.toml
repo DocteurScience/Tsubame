@@ -2,7 +2,7 @@
 name = "tsubame"
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.92"
+rust-version = "1.95"
 description = "Client Bluesky pour GNOME"
 license = "GPL-3.0-or-later"
 repository = "https://github.com/DocteurScience/Tsubame"
@@ -12,6 +12,16 @@ publish = false
 gtk = { package = "gtk4", version = "0.11", features = ["v4_14"] }
 adw = { package = "libadwaita", version = "0.9", features = ["v1_5"] }
 gettext-rs = { version = "0.8", features = ["gettext-system"] }
+atrium-oauth = "0.2"
+tokio = { version = "1", features = ["rt-multi-thread", "net", "io-util", "time", "macros"] }
+atrium-identity = "0.2"
+atrium-common = "0.1"
+atrium-api = "0.26"
+oo7 = "0.7"
+hickory-resolver = "0.26"
+serde_json = "1"
+serde_html_form = "0.2"
+serde = { version = "1", features = ["derive"] }
 
 [build-dependencies]
 glib-build-tools = "0.22"

@@ -1,5 +1,8 @@
 data/io.github.DocteurScience.Tsubame.desktop.in
 data/io.github.DocteurScience.Tsubame.metainfo.xml.in
+src/auth/keyring.rs
+src/auth/loopback.rs
+src/auth/mod.rs
 src/card.rs
 src/column.rs
 src/data.rs
