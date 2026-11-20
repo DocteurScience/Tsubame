@@ -231,14 +231,20 @@ impl Column {
         self.header.set_show_end_title_buttons(true);
     }
 
-    /// Adapte l'en-tête selon qu'il est seul à l'écran (paliers étroits) ou
-    /// à côté d'autres colonnes et du volet.
+    /// Aux paliers étroits, une seule colonne est visible : son titre
+    /// devient un menu pour passer aux autres.
+    /// Le bouton de fermeture laisse alors la place au titre : « Fermer la
+    /// colonne » reste dans le menu d'options.
     pub fn set_alone(&self, alone: bool) {
         self.title.set_visible(!alone);
         self.switcher.set_visible(alone);
-        // Seule, la colonne porte les boutons de la fenêtre ; sinon c'est
-        // le volet de discussion, à droite.
-        self.header.set_show_end_title_buttons(alone);
+        self.close.set_visible(!alone && self.options.get_visible());
+    }
+
+    /// Montre les boutons de la fenêtre dans l'en-tête, quand la colonne est
+    /// la plus à droite de la fenêtre.
+    pub fn set_window_controls(&self, visible: bool) {
+        self.header.set_show_end_title_buttons(visible);
     }
 
     /// Donne le focus à la carte sélectionnée, ou à la première.

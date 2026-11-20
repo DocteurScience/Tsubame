@@ -6,5 +6,8 @@
     <file>style.css</file>
     <file alias="icons/scalable/apps/io.github.DocteurScience.Tsubame.svg">icons/hicolor/scalable/apps/io.github.DocteurScience.Tsubame.svg</file>
     <file alias="icons/scalable/apps/io.github.DocteurScience.Tsubame-symbolic.svg">icons/hicolor/symbolic/apps/io.github.DocteurScience.Tsubame-symbolic.svg</file>
+    <file alias="icons/scalable/actions/tsubame-pane-right-symbolic.svg">icons/scalable/actions/tsubame-pane-right-symbolic.svg</file>
+    <file alias="icons/scalable/actions/tsubame-pane-below-symbolic.svg">icons/scalable/actions/tsubame-pane-below-symbolic.svg</file>
+    <file alias="icons/scalable/actions/tsubame-pane-hidden-symbolic.svg">icons/scalable/actions/tsubame-pane-hidden-symbolic.svg</file>
   </gresource>
 </gresources>

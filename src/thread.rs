@@ -1,7 +1,8 @@
 //! Vue d'une discussion : le post ouvert en grand, puis ses réponses.
 //!
-//! La fenêtre en crée deux : une dans le volet à droite des colonnes, une dans
-//! la page empilée des paliers étroits. Les deux montrent le même post.
+//! La fenêtre en crée deux : une dans le volet à côté des colonnes, une dans
+//! la page empilée (paliers étroits, volet masqué). Les deux montrent le même
+//! post.
 
 use adw::prelude::*;
 use gettextrs::{gettext, ngettext};
@@ -11,8 +12,40 @@ use crate::data::Post;
 
 pub struct ThreadView {
     pub root: adw::ToolbarView,
+    header: adw::HeaderBar,
+    selector: gtk::Box,
     stack: gtk::Stack,
     content: gtk::Box,
+}
+
+/// Sélecteur de position du volet de lecture : trois boutons liés à l'action
+/// à état `win.pane-position`, qui coche celui de la position courante.
+///
+/// À remplacer par `AdwToggleGroup` quand la version minimale de libadwaita
+/// passera à 1.7.
+fn pane_selector() -> gtk::Box {
+    let selector = gtk::Box::builder()
+        .accessible_role(gtk::AccessibleRole::Group)
+        .css_classes(["linked"])
+        .build();
+    selector.update_property(&[gtk::accessible::Property::Label(&gettext(
+        "Disposition du volet de lecture",
+    ))]);
+    for (position, label) in [
+        ("right", gettext("Volet à droite")),
+        ("below", gettext("Volet en dessous")),
+        ("hidden", gettext("Volet masqué")),
+    ] {
+        let button = gtk::ToggleButton::builder()
+            .icon_name(format!("tsubame-pane-{position}-symbolic"))
+            .action_name("win.pane-position")
+            .action_target(&position.to_variant())
+            .tooltip_text(&label)
+            .build();
+        button.update_property(&[gtk::accessible::Property::Label(&label)]);
+        selector.append(&button);
+    }
+    selector
 }
 
 impl ThreadView {
@@ -45,17 +78,31 @@ impl ThreadView {
         );
         stack.add_named(&scroll, Some("thread"));
 
+        let selector = pane_selector();
+        let header = adw::HeaderBar::builder()
+            .title_widget(&adw::WindowTitle::new(&gettext("Discussion"), ""))
+            .build();
+        header.pack_start(&selector);
         let root = adw::ToolbarView::builder().content(&stack).build();
-        root.add_top_bar(
-            &adw::HeaderBar::builder()
-                .title_widget(&adw::WindowTitle::new(&gettext("Discussion"), ""))
-                .build(),
-        );
+        root.add_top_bar(&header);
         Self {
             root,
+            header,
+            selector,
             stack,
             content,
         }
+    }
+
+    /// Le sélecteur n'a de sens que sur grand écran.
+    pub fn set_selector_visible(&self, visible: bool) {
+        self.selector.set_visible(visible);
+    }
+
+    /// Le volet porte les boutons de la fenêtre seulement quand il est à
+    /// droite ; en dessous, ils sont sur la dernière colonne.
+    pub fn set_window_controls(&self, visible: bool) {
+        self.header.set_show_end_title_buttons(visible);
     }
 
     pub fn show(&self, post: Option<&Post>) {

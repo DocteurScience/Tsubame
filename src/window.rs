@@ -17,7 +17,7 @@ use gettextrs::gettext;
 use gtk::{gio, glib};
 
 use crate::column::{Column, ColumnKind};
-use crate::columns::ColumnsView;
+use crate::columns::{ColumnsView, Layout};
 use crate::data::Post;
 use crate::thread::ThreadView;
 
@@ -174,8 +174,13 @@ struct State {
     stacked: ThreadView,
     /// Colonne de la page Notifications de la barre du bas (palier compact).
     compact_notifications: Column,
-    /// Colonnes ouvertes et leur ordre, retrouvés au lancement suivant.
+    /// Colonnes ouvertes et leur ordre, position du volet : retrouvés au
+    /// lancement suivant.
     settings: gio::Settings,
+    window: glib::WeakRef<adw::ApplicationWindow>,
+    compact: adw::Breakpoint,
+    /// Indices des colonnes affichées par `ColumnsView`.
+    visible_columns: RefCell<std::ops::Range<usize>>,
 }
 
 impl State {
@@ -187,8 +192,79 @@ impl State {
         self.columns.borrow().iter().position(|c| c.kind == kind)
     }
 
+    /// Un palier étroit ou compact s'applique-t-il ?
+    fn narrow(&self) -> bool {
+        self.window
+            .upgrade()
+            .is_some_and(|w| w.current_breakpoint().is_some())
+    }
+
+    fn compact(&self) -> bool {
+        self.window
+            .upgrade()
+            .and_then(|w| w.current_breakpoint())
+            .is_some_and(|b| b == self.compact)
+    }
+
+    /// Disposition à appliquer : colonne unique aux paliers étroits, sinon
+    /// la position du volet choisie par l'utilisateur.
+    fn layout(&self) -> Layout {
+        if self.narrow() {
+            return Layout::Single;
+        }
+        match self.settings.string("pane-position").as_str() {
+            "below" => Layout::Below,
+            "hidden" => Layout::Hidden,
+            _ => Layout::Right,
+        }
+    }
+
     fn pane_hidden(&self) -> bool {
-        !self.pane.root.get_visible()
+        matches!(self.layout(), Layout::Single | Layout::Hidden)
+    }
+
+    /// Appelé quand un palier s'applique ou se retire, et quand la position
+    /// du volet change.
+    fn update_layout(&self) {
+        let layout = self.layout();
+        let narrow = layout == Layout::Single;
+        self.columns_view.set_layout(layout);
+        self.pane
+            .root
+            .set_visible(matches!(layout, Layout::Right | Layout::Below));
+        self.pane.set_window_controls(layout == Layout::Right);
+        self.pane.set_selector_visible(!narrow);
+        self.stacked.set_selector_visible(!narrow);
+        for column in self.columns.borrow().iter() {
+            column.set_alone(narrow);
+        }
+        self.update_window_controls();
+        // Cibles tactiles agrandies en palier compact (voir style.css).
+        if self.compact() {
+            self.outer_split.add_css_class("compact");
+        } else {
+            self.outer_split.remove_css_class("compact");
+        }
+        if !self.pane_hidden() {
+            // Le volet reprend la discussion : retirer la page empilée.
+            self.nav.pop_to_tag("main");
+        }
+    }
+
+    /// Les boutons de la fenêtre vont dans l'en-tête le plus à droite, en
+    /// haut : le volet s'il est à droite, sinon la dernière colonne affichée.
+    fn update_window_controls(&self) {
+        let layout = self.layout();
+        let last = self.visible_columns.borrow().end.checked_sub(1);
+        for (index, column) in self.columns.borrow().iter().enumerate() {
+            column.set_window_controls(match layout {
+                Layout::Single => true,
+                Layout::Right => false,
+                Layout::Below | Layout::Hidden => Some(index) == last,
+            });
+        }
+        self.no_columns_header
+            .set_show_end_title_buttons(layout != Layout::Right);
     }
 
     fn connect_column(self: &Rc<Self>, column: &Column) {
@@ -209,7 +285,7 @@ impl State {
     fn open_column(self: &Rc<Self>, kind: ColumnKind) {
         if !self.is_open(kind) {
             let column = Column::new(kind, &self.columns_menu);
-            column.set_alone(self.pane_hidden());
+            column.set_alone(self.layout() == Layout::Single);
             self.connect_column(&column);
             if self.columns.borrow().is_empty() {
                 self.columns_view.remove_column(&self.no_columns);
@@ -311,6 +387,7 @@ impl State {
         for (index, column) in self.columns.borrow().iter().enumerate() {
             column.set_position(index, count);
         }
+        self.update_window_controls();
         self.columns_menu.remove_all();
         for column in self.columns.borrow().iter() {
             self.columns_menu.append(
@@ -540,19 +617,6 @@ impl State {
             self.nav.push(&self.thread_page);
         }
     }
-
-    /// Appelé quand un palier s'applique ou se retire.
-    fn layout_changed(&self) {
-        let hidden = self.pane_hidden();
-        for column in self.columns.borrow().iter() {
-            column.set_alone(hidden);
-        }
-        self.no_columns_header.set_show_end_title_buttons(hidden);
-        if !hidden {
-            // Le volet reprend la discussion : retirer la page empilée.
-            self.nav.pop_to_tag("main");
-        }
-    }
 }
 
 /// Nouvel indice d'une colonne glissée depuis `from` et déposée avant ou
@@ -770,6 +834,10 @@ pub fn build(app: &adw::Application) -> adw::ApplicationWindow {
         .content(&outer_split)
         .build();
 
+    let narrow = adw::Breakpoint::new(adw::BreakpointCondition::parse(NARROW_BREAKPOINT).unwrap());
+    let compact =
+        adw::Breakpoint::new(adw::BreakpointCondition::parse(COMPACT_BREAKPOINT).unwrap());
+
     let state = Rc::new(State {
         stack: stack.clone(),
         outer_split: outer_split.clone(),
@@ -791,9 +859,31 @@ pub fn build(app: &adw::Application) -> adw::ApplicationWindow {
         stacked,
         compact_notifications,
         settings: crate::settings::settings(),
+        window: window.downgrade(),
+        compact: compact.clone(),
+        visible_columns: RefCell::default(),
     });
     state.connect_column(&state.compact_notifications);
     install_actions(&window, &state);
+
+    // Position du volet : action à état liée au réglage, que les boutons du
+    // sélecteur reflètent d'eux-mêmes.
+    window.add_action(&state.settings.create_action("pane-position"));
+    let weak = Rc::downgrade(&state);
+    state
+        .settings
+        .connect_changed(Some("pane-position"), move |_, _| {
+            if let Some(state) = weak.upgrade() {
+                state.update_layout();
+            }
+        });
+    let weak = Rc::downgrade(&state);
+    columns_view.connect_visible_changed(move |visible| {
+        if let Some(state) = weak.upgrade() {
+            *state.visible_columns.borrow_mut() = visible;
+            state.update_window_controls();
+        }
+    });
 
     // En-têtes de section : « Colonnes ouvertes » puis « Ailleurs ».
     let weak = Rc::downgrade(&state);
@@ -828,11 +918,6 @@ pub fn build(app: &adw::Application) -> adw::ApplicationWindow {
 
     // Paliers d'adaptation. Un seul point de rupture s'applique à la fois :
     // le dernier ajouté parmi ceux qui correspondent, d'où la répétition.
-    let narrow = adw::Breakpoint::new(adw::BreakpointCondition::parse(NARROW_BREAKPOINT).unwrap());
-    narrow.add_setter(&state.pane.root, "visible", Some(&false.to_value()));
-    let compact =
-        adw::Breakpoint::new(adw::BreakpointCondition::parse(COMPACT_BREAKPOINT).unwrap());
-    compact.add_setter(&state.pane.root, "visible", Some(&false.to_value()));
     compact.add_setter(&outer_split, "collapsed", Some(&true.to_value()));
     compact.add_setter(&outer_split, "show-sidebar", Some(&false.to_value()));
     compact.add_setter(&switcher_bar, "reveal", Some(&true.to_value()));
@@ -849,7 +934,7 @@ pub fn build(app: &adw::Application) -> adw::ApplicationWindow {
             let weak = weak.clone();
             glib::idle_add_local_once(move || {
                 if let Some(state) = weak.upgrade() {
-                    state.layout_changed();
+                    state.update_layout();
                 }
             });
         };
@@ -875,6 +960,8 @@ pub fn build(app: &adw::Application) -> adw::ApplicationWindow {
     if let Some(first) = saved.first() {
         state.show_column(*first);
     }
+
+    state.update_layout();
 
     // Les gestionnaires ne gardent qu'une référence faible à l'état ; la
     // fenêtre garde la seule référence forte, libérée avec elle.
