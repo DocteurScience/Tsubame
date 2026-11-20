@@ -12,21 +12,19 @@ Lire d'abord `docs/design.md` : il décrit les écrans, les widgets à utiliser,
 - Les posts s'affichent en cartes (une carte par post), comme dans Tegami Mail (https://github.com/DocteurScience/Tegami_Mail). Un volet de lecture affiche la discussion.
 - Sur grand écran, plusieurs colonnes de cartes côte à côte plutôt qu'une colonne étirée.
 - Objectif fonctionnel : couvrir toutes les fonctions de Bluesky (voir la table de couverture dans `docs/design.md`).
-
-## À confirmer avec l'utilisateur avant de coder
-
-- Authentification : mot de passe d'application ou OAuth.
-- Bibliothèque pour le protocole AT en Rust : évaluer l'état actuel des crates existantes (maintenance, couverture des lexicons `app.bsky.*`, messagerie) avant de choisir.
-- Internationalisation : prévoir ou non d'autres langues que le français.
-- Distribution : Flatpak envisagé, à confirmer.
-- Le nombre de colonnes sur grand écran s'ouvre-t-il automatiquement ou se compose-t-il à la main ? Proposition : composition manuelle, avec Following et Notifications ouverts par défaut.
+- Authentification : OAuth (crate `atrium-oauth`). Les jetons vont dans le trousseau système (libsecret).
+- Protocole AT : famille `atrium` (`atrium-api`, `bsky-sdk`, `atrium-oauth`), licence MIT, couvre `app.bsky.*` et `chat.bsky.*`.
+- Internationalisation : prévue dès le départ avec gettext (`gettext-rs`). Le français est la langue source des chaînes.
+- Distribution : Flatpak, build Meson qui appelle Cargo.
+- Colonnes sur grand écran : composition manuelle par l'utilisateur, avec Following et Notifications ouverts par défaut.
+- Textes d'interface : vouvoiement.
 
 ## Principes d'interface
 
 - Suivre la GNOME HIG (https://developer.gnome.org/hig/) et utiliser les widgets libadwaita plutôt que des composants maison : `AdwNavigationSplitView`, `AdwOverlaySplitView`, `AdwViewSwitcherBar`, `AdwDialog`, `AdwPreferencesDialog`, `AdwToggleGroup`, `AdwBreakpoint`, `AdwAboutDialog`.
 - Les maquettes (`docs/mockups/source/*.dc.html`) utilisent des couleurs en dur pour être autonomes. Dans l'application, ne rien coder en dur : utiliser les couleurs nommées de libadwaita (accent, fond de fenêtre, fond de carte) et les polices du système. Le thème clair et sombre et la couleur d'accent suivent le système.
 - Accessibilité : tout bouton qui n'a qu'une icône porte un nom accessible. Cibles tactiles d'au moins 44 px en mobile. Navigation complète au clavier. Texte alternatif des images affiché et modifiable.
-- Textes d'interface : phrases courtes, voir la section « Writing Style » de la HIG. Le choix entre tutoiement et vouvoiement reste à faire.
+- Textes d'interface : phrases courtes, voir la section « Writing Style » de la HIG. Vouvoiement.
 
 ## Marque et ressources graphiques
 
