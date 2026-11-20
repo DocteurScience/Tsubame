@@ -21,6 +21,24 @@ meson install -C _build
 
 `meson test -C _build` valide le fichier `.desktop` et les métadonnées AppStream.
 
+## Flatpak
+
+Le manifeste est dans `build-aux/`. Il utilise le runtime GNOME 51 et l'extension `rust-stable`, à installer depuis Flathub :
+
+```bash
+flatpak install flathub org.gnome.Sdk//51 org.freedesktop.Sdk.Extension.rust-stable//26.08
+```
+
+```bash
+flatpak-builder --user --install --force-clean build-dir build-aux/io.github.DocteurScience.Tsubame.json
+```
+
+Le build se fait hors ligne : les crates viennent de `build-aux/cargo-sources.json`. Après chaque modification de `Cargo.lock`, régénérer ce fichier :
+
+```bash
+python3 build-aux/cargo-sources.py
+```
+
 ## Licence
 
 GPL-3.0 ou ultérieure, voir `LICENSE`.
