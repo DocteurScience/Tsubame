@@ -1,3 +1,5 @@
+data/io.github.DocteurScience.Tsubame.desktop.in
+data/io.github.DocteurScience.Tsubame.metainfo.xml.in
 src/card.rs
 src/data.rs
 src/main.rs

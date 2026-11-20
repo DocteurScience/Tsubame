@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=Tsubame
+Comment=Client Bluesky pour GNOME
+# Traducteurs : mots-clés séparés par des points-virgules, sans traduire « Tsubame ».
+Keywords=Bluesky;réseau social;AT Protocol;microblog;
+Exec=tsubame
+Icon=io.github.DocteurScience.Tsubame
+Terminal=false
+Type=Application
+Categories=GTK;GNOME;Network;Chat;InstantMessaging;
+StartupNotify=true
