@@ -1,0 +1,13 @@
+[package]
+name = "tsubame"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+description = "Client Bluesky pour GNOME"
+license = "GPL-3.0-or-later"
+repository = "https://github.com/DocteurScience/Tsubame"
+publish = false
+
+[dependencies]
+gtk = { package = "gtk4", version = "0.11", features = ["v4_14"] }
+adw = { package = "libadwaita", version = "0.9", features = ["v1_5"] }
