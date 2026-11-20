@@ -12,6 +12,7 @@ use std::rc::Rc;
 
 use adw::prelude::*;
 use gettextrs::gettext;
+use gtk::gio;
 
 use crate::card;
 use crate::data::{self, Feed, Post};
@@ -316,7 +317,7 @@ fn build_home(
     let thread_stack = gtk::Stack::new();
     thread_stack.add_named(
         &adw::StatusPage::builder()
-            .icon_name("chat-message-new-symbolic")
+            .icon_name(format!("{}-symbolic", crate::APP_ID))
             .title(gettext("Aucun post ouvert"))
             .description(gettext("Choisissez un post pour afficher la discussion."))
             .build(),
@@ -433,11 +434,20 @@ pub fn build(app: &adw::Application) -> adw::ApplicationWindow {
         _ => row.set_header(None::<&gtk::Widget>),
     });
     let sidebar_view = adw::ToolbarView::new();
-    sidebar_view.add_top_bar(
-        &adw::HeaderBar::builder()
-            .title_widget(&adw::WindowTitle::new("Tsubame", ""))
-            .build(),
-    );
+    let menu = gio::Menu::new();
+    menu.append(Some(&gettext("À propos de Tsubame")), Some("app.about"));
+    let menu_button = gtk::MenuButton::builder()
+        .icon_name("open-menu-symbolic")
+        .menu_model(&menu)
+        .primary(true)
+        .tooltip_text(gettext("Menu principal"))
+        .build();
+    menu_button.update_property(&[gtk::accessible::Property::Label(&gettext("Menu principal"))]);
+    let sidebar_header = adw::HeaderBar::builder()
+        .title_widget(&adw::WindowTitle::new("Tsubame", ""))
+        .build();
+    sidebar_header.pack_end(&menu_button);
+    sidebar_view.add_top_bar(&sidebar_header);
     sidebar_view.set_content(Some(
         &gtk::ScrolledWindow::builder()
             .hscrollbar_policy(gtk::PolicyType::Never)

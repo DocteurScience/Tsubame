@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- libadwaita charge style.css et GTK ajoute icons/ au thème d'icônes
+     automatiquement, à partir du chemin de base de l'application. -->
+<gresources>
+  <gresource prefix="/io/github/DocteurScience/Tsubame">
+    <file>style.css</file>
+    <file alias="icons/scalable/apps/io.github.DocteurScience.Tsubame.svg">icons/hicolor/scalable/apps/io.github.DocteurScience.Tsubame.svg</file>
+    <file alias="icons/scalable/apps/io.github.DocteurScience.Tsubame-symbolic.svg">icons/hicolor/symbolic/apps/io.github.DocteurScience.Tsubame-symbolic.svg</file>
+  </gresource>
+</gresources>
