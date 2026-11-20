@@ -60,3 +60,19 @@
   color: @accent_fg_color;
   background-color: @accent_bg_color;
 }
+
+/* Colonne de cartes à côté d'autres colonnes (voir columns.rs). */
+columnsview > .column {
+  border-radius: 12px;
+  border: 1px solid @borders;
+  background-color: mix(@window_bg_color, @view_bg_color, 0.5);
+}
+
+columnsview > .column headerbar {
+  background: none;
+  box-shadow: none;
+}
+
+.add-column {
+  margin: 0 6px;
+}

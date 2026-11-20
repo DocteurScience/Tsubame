@@ -151,6 +151,9 @@ fn card_frame(avatar_size: i32, name: &str) -> (gtk::Box, gtk::Box) {
 /// Carte d'un post dans le fil.
 pub fn post_card(post: &Post) -> gtk::Box {
     let (card, body) = card_frame(AVATAR_SIZE, post.name);
+    if let Some(context) = post.context {
+        body.append(&label(&gettext(context), &["dim-label", "caption"]));
+    }
     body.append(&meta(post.name, post.time));
     body.append(&label(post.text, &[]));
     if let Some(alt) = post.image_alt {

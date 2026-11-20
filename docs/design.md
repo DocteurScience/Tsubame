@@ -33,6 +33,13 @@ Une seule colonne étirée serait mauvaise sur un grand écran. Le nombre de col
 
 `AdwBreakpoint` gère les changements de disposition de la barre latérale et de la barre du bas. Le nombre de colonnes est du code à écrire : on divise la largeur disponible par la largeur d'une colonne.
 
+Dans le code (`src/columns.rs`, `src/window.rs`) :
+
+- Le widget `ColumnsView` place les colonnes ouvertes puis le volet de discussion. Il garde au volet au moins 440 px et affiche autant de colonnes de 380 à 480 px que le reste le permet. Le volet prend la place restante. Les colonnes qui ne tiennent pas sont masquées. La colonne choisie dans la barre latérale, ou avec Ctrl+Page suivante et Ctrl+Page précédente, reste toujours visible.
+- Sous 1120 sp, la barre latérale, une colonne et le volet ne tiennent plus côte à côte : il ne reste qu'une colonne et la discussion s'ouvre en page empilée (`AdwNavigationView`). Ce seuil est un palier intermédiaire entre « compact » et « moyen ».
+- Sous 480 sp (compact), la barre latérale disparaît au profit de la barre du bas (Accueil, Explorer, Notifications, Messages). Le titre de la colonne devient un menu pour changer de colonne, comme « Following ▾ » dans `Mobile.dc.html`.
+- Les colonnes se composent à la main : Following et Notifications sont ouvertes au départ, et la barre latérale permet d'en ajouter. Chaque colonne a un bouton de fermeture. Leur ordre ne se modifie pas encore et n'est pas encore enregistré.
+
 ## Cartes
 
 - Une carte par post : fond de carte, bords arrondis (12 px dans la maquette), légère ombre, avatar rond de 40 px à gauche.

@@ -3,8 +3,11 @@ use gettextrs::gettext;
 use gtk::{gio, glib};
 
 mod card;
+mod column;
+mod columns;
 mod data;
 mod i18n;
+mod thread;
 mod window;
 
 const APP_ID: &str = "io.github.DocteurScience.Tsubame";

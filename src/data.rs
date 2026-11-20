@@ -13,6 +13,9 @@ pub enum Feed {
 
 #[derive(Debug, Clone)]
 pub struct Post {
+    /// Contexte affiché au-dessus du nom, pour les notifications
+    /// (« a répondu à votre post »).
+    pub context: Option<&'static str>,
     pub name: &'static str,
     pub handle: &'static str,
     /// Heure relative affichée sur la carte.
@@ -48,6 +51,7 @@ fn post(
     likes: u32,
 ) -> Post {
     Post {
+        context: None,
         name,
         handle,
         time,
@@ -271,4 +275,69 @@ pub fn posts(feed: Feed) -> Vec<Post> {
             ),
         ],
     }
+}
+
+/// Notifications : posts précédés d'un contexte, comme dans la maquette
+/// `Colonnes.dc.html`.
+pub fn notifications() -> Vec<Post> {
+    let notification = |context, post: Post| Post {
+        context: Some(context),
+        ..post
+    };
+    vec![
+        notification(
+            "a répondu à votre post",
+            post(
+                "Aya Koné",
+                "aya.example.social",
+                "2 min",
+                "20 nov., 14:57",
+                "Super nouvelle. Le raccourci pour ouvrir le dossier parent est-il \
+                 documenté ?",
+                0,
+                0,
+                3,
+            ),
+        ),
+        notification(
+            "vous a mentionné",
+            post(
+                "Lucie Morel",
+                "lucie.example.social",
+                "18 min",
+                "20 nov., 14:41",
+                "Test de la bêta de GNOME 49 sur mon portable : le sélecteur de fichiers, \
+                 c'est du bon.",
+                2,
+                1,
+                12,
+            ),
+        ),
+        notification(
+            "a aimé et reposté votre post",
+            post(
+                "Pierre Delmas",
+                "pierre.example.social",
+                "40 min",
+                "20 nov., 14:19",
+                "Rappel : ajoutez un texte alternatif à vos captures d'écran.",
+                1,
+                5,
+                20,
+            ),
+        ),
+        notification(
+            "a répondu à votre post",
+            post(
+                "Romain Bailly",
+                "romain.example.social",
+                "2 h",
+                "20 nov., 12:59",
+                "Merci pour la capture, elle m'a bien aidé.",
+                0,
+                0,
+                4,
+            ),
+        ),
+    ]
 }
