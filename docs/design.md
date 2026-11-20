@@ -91,6 +91,17 @@ Liste établie à partir des écrans déclarés dans `src/Navigation.tsx` du dé
 - Apparence, langues, accessibilité, intégrations externes : préférences, thème et accent du système.
 - Aide et mentions légales : `AdwAboutDialog`.
 
+## Connexion
+
+Pas de maquette : l'écran suit les motifs de la HIG (icône, titre, champ, bouton en pilule).
+
+- Écran de connexion au lancement s'il n'y a pas de session dans le trousseau : identifiant (`AdwEntryRow`), « Se connecter », puis attente pendant que le navigateur s'ouvre (« Rouvrir le navigateur », « Annuler »). Les erreurs s'affichent sous le champ et sont annoncées aux lecteurs d'écran.
+- Protocole : OAuth du protocole AT avec `atrium-oauth` (`src/auth/`). Tsubame ouvre un petit serveur sur 127.0.0.1, le navigateur y revient après la connexion, puis Tsubame échange le code contre des jetons. La session (jetons, clé DPoP) va dans le trousseau avec `oo7` : Secret Service hors Flatpak, portail Secret dans Flatpak.
+- L'identifiant du compte s'affiche sous le titre de la barre latérale. « Se déconnecter… » dans le menu principal demande confirmation, révoque les jetons si le serveur répond, et retire la session du trousseau.
+- Les builds de développement proposent « Continuer avec les posts de démonstration », tant que les fils ne sont pas branchés sur le réseau.
+
+**Point ouvert : client OAuth de production.** Tsubame utilise pour l'instant le client de développement « localhost » du protocole AT, qui ne demande rien de publié mais n'est pas fait pour une version distribuée. Il faudra publier les métadonnées du client en https (par exemple sur GitHub Pages) et utiliser leur adresse comme `client_id`, avec une URI de redirection adaptée à une application native.
+
 ## Limites de la proposition
 
 - Les maquettes sont statiques et n'ont pas été testées sur de vrais appareils.

@@ -16,9 +16,12 @@ use adw::prelude::*;
 use gettextrs::gettext;
 use gtk::{gio, glib};
 
+use crate::auth::{self, Account};
 use crate::column::{Column, ColumnKind};
 use crate::columns::{ColumnsView, Layout};
 use crate::data::Post;
+use crate::login::LoginPage;
+use crate::runtime::runtime;
 use crate::thread::ThreadView;
 
 /// Sous cette largeur, une seule colonne et la discussion en page empilée :
@@ -181,6 +184,12 @@ struct State {
     compact: adw::Breakpoint,
     /// Indices des colonnes affichées par `ColumnsView`.
     visible_columns: RefCell<std::ops::Range<usize>>,
+    root_stack: gtk::Stack,
+    login: Rc<LoginPage>,
+    sidebar_title: adw::WindowTitle,
+    /// Compte connecté ; `None` avec les posts de démonstration.
+    account: RefCell<Option<Account>>,
+    logout_action: gio::SimpleAction,
 }
 
 impl State {
@@ -241,9 +250,9 @@ impl State {
         self.update_window_controls();
         // Cibles tactiles agrandies en palier compact (voir style.css).
         if self.compact() {
-            self.outer_split.add_css_class("compact");
+            self.root_stack.add_css_class("compact");
         } else {
-            self.outer_split.remove_css_class("compact");
+            self.root_stack.remove_css_class("compact");
         }
         if !self.pane_hidden() {
             // Le volet reprend la discussion : retirer la page empilée.
@@ -367,6 +376,95 @@ impl State {
         if let Err(error) = self.settings.set_strv("columns", ids) {
             glib::g_warning!("tsubame", "Colonnes non enregistrées : {error}");
         }
+    }
+
+    /// Passe à l'application, avec le compte connecté ou sans (posts de
+    /// démonstration).
+    fn enter(&self, account: Option<Account>) {
+        self.sidebar_title.set_subtitle(
+            &account
+                .as_ref()
+                .map(|a| format!("@{}", a.handle))
+                .unwrap_or_default(),
+        );
+        self.logout_action.set_enabled(account.is_some());
+        self.account.replace(account);
+        self.root_stack.set_visible_child_name("main");
+        if let Some(column) = self.columns.borrow().get(self.current.get()) {
+            column.focus();
+        }
+    }
+
+    /// Revient à l'écran de connexion.
+    fn leave(&self, message: Option<&str>) {
+        self.account.replace(None);
+        self.logout_action.set_enabled(false);
+        self.sidebar_title.set_subtitle("");
+        self.login.show_form(message);
+        self.root_stack.set_visible_child_name("login");
+    }
+
+    /// Demande confirmation, puis déconnecte le compte.
+    fn confirm_logout(self: &Rc<Self>, window: &adw::ApplicationWindow) {
+        let Some(account) = self.account.borrow().clone() else {
+            return;
+        };
+        let dialog = adw::AlertDialog::new(
+            Some(&gettext("Se déconnecter ?")),
+            Some(
+                &gettext("La session de @{} sera retirée de cet ordinateur.")
+                    .replace("{}", &account.handle),
+            ),
+        );
+        dialog.add_responses(&[
+            ("cancel", &gettext("Annuler")),
+            ("logout", &gettext("Se déconnecter")),
+        ]);
+        dialog.set_response_appearance("logout", adw::ResponseAppearance::Destructive);
+        dialog.set_default_response(Some("cancel"));
+        dialog.set_close_response("cancel");
+        let weak = Rc::downgrade(self);
+        dialog.connect_response(Some("logout"), move |_, _| {
+            let Some(state) = weak.upgrade() else { return };
+            let account = account.clone();
+            let task = runtime().spawn(async move { auth::logout(&account).await });
+            let weak = Rc::downgrade(&state);
+            glib::spawn_future_local(async move {
+                let result = task.await;
+                let Some(state) = weak.upgrade() else { return };
+                let message = match result {
+                    Ok(Ok(())) => None,
+                    Ok(Err(error)) => Some(error.message()),
+                    Err(_) => Some(gettext("La déconnexion a échoué.")),
+                };
+                state.leave(message.as_deref());
+            });
+        });
+        dialog.present(Some(window));
+    }
+
+    /// Au lancement : session gardée dans le trousseau, ou écran de
+    /// connexion.
+    fn restore_session(self: &Rc<Self>) {
+        self.login.show_checking();
+        self.root_stack.set_visible_child_name("login");
+        let task = runtime().spawn(auth::stored_account());
+        let weak = Rc::downgrade(self);
+        glib::spawn_future_local(async move {
+            let result = task.await;
+            let Some(state) = weak.upgrade() else { return };
+            match result {
+                Ok(Ok(Some(account))) => state.enter(Some(account)),
+                Ok(Ok(None)) => state.leave(None),
+                Ok(Err(error)) => {
+                    // Sans trousseau, on peut se connecter, mais la session
+                    // ne sera pas gardée : le signaler dans le journal.
+                    glib::g_warning!("tsubame", "{}", error.message());
+                    state.leave(None);
+                }
+                Err(_) => state.leave(None),
+            }
+        });
     }
 
     /// Montre la colonne voisine (Ctrl+Page suivante, Ctrl+Page précédente).
@@ -646,6 +744,16 @@ fn show_drop_marker(row: &gtk::Widget, after: Option<bool>) {
 }
 
 fn install_actions(window: &adw::ApplicationWindow, state: &Rc<State>) {
+    let weak = Rc::downgrade(state);
+    let win = window.downgrade();
+    state.logout_action.connect_activate(move |_, _| {
+        if let (Some(state), Some(window)) = (weak.upgrade(), win.upgrade()) {
+            state.confirm_logout(&window);
+        }
+    });
+    state.logout_action.set_enabled(false);
+    window.add_action(&state.logout_action);
+
     fn kind_action(
         name: &str,
         state: &Rc<State>,
@@ -796,7 +904,12 @@ pub fn build(app: &adw::Application) -> adw::ApplicationWindow {
         .build();
     sidebar_list.update_property(&[gtk::accessible::Property::Label(&gettext("Navigation"))]);
     let menu = gio::Menu::new();
-    menu.append(Some(&gettext("À propos de Tsubame")), Some("app.about"));
+    let account_section = gio::Menu::new();
+    account_section.append(Some(&gettext("Se déconnecter…")), Some("win.logout"));
+    menu.append_section(None, &account_section);
+    let about_section = gio::Menu::new();
+    about_section.append(Some(&gettext("À propos de Tsubame")), Some("app.about"));
+    menu.append_section(None, &about_section);
     let menu_button = gtk::MenuButton::builder()
         .icon_name("open-menu-symbolic")
         .menu_model(&menu)
@@ -804,8 +917,10 @@ pub fn build(app: &adw::Application) -> adw::ApplicationWindow {
         .tooltip_text(gettext("Menu principal"))
         .build();
     menu_button.update_property(&[gtk::accessible::Property::Label(&gettext("Menu principal"))]);
+    // Le sous-titre affiche le compte connecté.
+    let sidebar_title = adw::WindowTitle::new("Tsubame", "");
     let sidebar_header = adw::HeaderBar::builder()
-        .title_widget(&adw::WindowTitle::new("Tsubame", ""))
+        .title_widget(&sidebar_title)
         .build();
     sidebar_header.pack_end(&menu_button);
     let sidebar_view = adw::ToolbarView::new();
@@ -831,8 +946,16 @@ pub fn build(app: &adw::Application) -> adw::ApplicationWindow {
         .default_height(800)
         .width_request(360)
         .height_request(294)
-        .content(&outer_split)
         .build();
+
+    // À la racine : l'écran de connexion ou l'application.
+    let login = LoginPage::new();
+    let root_stack = gtk::Stack::builder()
+        .transition_type(gtk::StackTransitionType::Crossfade)
+        .build();
+    root_stack.add_named(&login.root, Some("login"));
+    root_stack.add_named(&outer_split, Some("main"));
+    window.set_content(Some(&root_stack));
 
     let narrow = adw::Breakpoint::new(adw::BreakpointCondition::parse(NARROW_BREAKPOINT).unwrap());
     let compact =
@@ -862,6 +985,11 @@ pub fn build(app: &adw::Application) -> adw::ApplicationWindow {
         window: window.downgrade(),
         compact: compact.clone(),
         visible_columns: RefCell::default(),
+        root_stack: root_stack.clone(),
+        login: login.clone(),
+        sidebar_title,
+        account: RefCell::default(),
+        logout_action: gio::SimpleAction::new("logout", None),
     });
     state.connect_column(&state.compact_notifications);
     install_actions(&window, &state);
@@ -962,6 +1090,14 @@ pub fn build(app: &adw::Application) -> adw::ApplicationWindow {
     }
 
     state.update_layout();
+
+    let weak = Rc::downgrade(&state);
+    login.connect_logged_in(move |account| {
+        if let Some(state) = weak.upgrade() {
+            state.enter(account);
+        }
+    });
+    state.restore_session();
 
     // Les gestionnaires ne gardent qu'une référence faible à l'état ; la
     // fenêtre garde la seule référence forte, libérée avec elle.

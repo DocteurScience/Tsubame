@@ -6,6 +6,7 @@ src/auth/mod.rs
 src/card.rs
 src/column.rs
 src/data.rs
+src/login.rs
 src/main.rs
 src/thread.rs
 src/window.rs

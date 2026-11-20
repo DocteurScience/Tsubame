@@ -93,7 +93,8 @@ columnsview > .column headerbar {
 /* Palier compact : cibles tactiles d'au moins 44 px (voir CLAUDE.md). */
 .compact .post-stat,
 .compact .post-detail button,
-.compact headerbar button:not(.minimize):not(.maximize):not(.close) {
+.compact headerbar button:not(.minimize):not(.maximize):not(.close),
+.compact .pill {
   min-height: 44px;
   min-width: 44px;
 }

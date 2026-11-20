@@ -3,7 +3,7 @@ Client Bluesky natif pour GNOME, en Rust avec GTK 4 et libadwaita. En cours de d
 
 ## Compiler
 
-Dépendances : Rust 1.92 ou plus, GTK 4.14 ou plus, libadwaita 1.5 ou plus, gettext. Sur Debian ou Ubuntu : `libgtk-4-dev libadwaita-1-dev gettext`.
+Dépendances : Rust 1.95 ou plus, GTK 4.14 ou plus, libadwaita 1.5 ou plus, gettext. Sur Debian ou Ubuntu : `libgtk-4-dev libadwaita-1-dev libssl-dev gettext`. La connexion garde la session dans le trousseau du système (GNOME Trousseau ou tout service Secret Service).
 
 Pour lancer l'application pendant le développement :
 

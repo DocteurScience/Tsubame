@@ -8,6 +8,7 @@ mod column;
 mod columns;
 mod data;
 mod i18n;
+mod login;
 mod runtime;
 mod settings;
 mod thread;
