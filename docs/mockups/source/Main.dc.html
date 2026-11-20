@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Accueil, flux Following</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;background:transparent}
+*{box-sizing:border-box}
+.win{width:1280px;height:800px;display:flex;background:#fafafb;color:#2e3436;font-family:"Adwaita Sans",Cantarell,Inter,system-ui,sans-serif;font-size:14px;line-height:1.4;border-radius:12px;overflow:hidden;border:1px solid rgba(0,0,0,.2)}
+.hb{height:47px;flex:none;display:flex;align-items:center;gap:6px;padding:0 6px;background:#ebebeb;border-bottom:1px solid #d6d6d6}
+.hb h1{flex:1;margin:0;text-align:center;font-size:14px;font-weight:700}
+.ib{width:34px;height:34px;flex:none;display:inline-flex;align-items:center;justify-content:center;border:0;border-radius:6px;background:transparent;color:#2e3436;padding:0;cursor:pointer}
+.ib:hover{background:rgba(0,0,0,.07)}
+.ib svg,.nav svg,.act svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.sug{background:#1c71d8;color:#fff}.sug:hover{background:#1a65c2}
+.side{width:240px;flex:none;background:#ebebeb;border-right:1px solid #d6d6d6;display:flex;flex-direction:column}
+.cap{margin:14px 14px 4px;font-size:11px;font-weight:700;color:#5e5c64;letter-spacing:.04em;text-transform:uppercase}
+.nav{display:flex;align-items:center;gap:10px;height:36px;margin:1px 6px;padding:0 10px;border-radius:6px;color:#2e3436;text-decoration:none}
+.nav:hover{background:rgba(0,0,0,.05)}
+.nav.on{background:rgba(0,0,0,.09)}
+.nav span{flex:1}
+.badge{flex:none!important;min-width:20px;height:20px;border-radius:10px;background:#1c71d8;color:#fff;font-size:11px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;padding:0 6px}
+.mid{flex:1;min-width:0;display:flex;flex-direction:column;position:relative;background:#fafafb}
+.pane{width:400px;flex:none;border-left:1px solid #d6d6d6;display:flex;flex-direction:column;background:#fafafb}
+.post{display:flex;gap:12px;padding:14px 16px;border-bottom:1px solid #e3e3e3}
+.post.sel{background:rgba(28,113,216,.07)}
+.av{width:40px;height:40px;flex:none;border-radius:50%;color:#fff;font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:center}
+.dim{color:#5e5c64}
+.nm{font-weight:700}
+.act{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 8px;border:0;border-radius:6px;background:transparent;color:#5e5c64;font:inherit;font-size:13px;cursor:pointer}
+.act:hover{background:rgba(0,0,0,.06)}
+.img{position:relative;margin-top:10px;height:210px;border-radius:12px;background:#d5dde6;border:1px solid rgba(0,0,0,.08)}
+.alt{position:absolute;left:8px;bottom:8px;padding:2px 7px;border-radius:5px;background:rgba(0,0,0,.72);color:#fff;font-size:11px;font-weight:700}
+.link{margin-top:10px;border:1px solid #d6d6d6;border-radius:12px;overflow:hidden;background:#fff}
+.pill{position:absolute;top:58px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:6px;height:34px;padding:0 14px;border-radius:17px;background:rgba(36,36,36,.92);color:#fff;font-weight:700;font-size:13px;border:0}
+</style>
+</helmet>
+<div class="win">
+
+<!-- Volet 1 : barre latérale (AdwNavigationSplitView, sidebar) -->
+<aside class="side">
+  <div class="hb">
+    <button class="ib" aria-label="Menu principal"><svg viewBox="0 0 16 16"><path d="M2.5 4h11M2.5 8h11M2.5 12h11"/></svg></button>
+    <h1>Tsubame</h1>
+    <button class="ib sug" aria-label="Nouveau post (Ctrl+N)"><svg viewBox="0 0 16 16"><path d="M3 13l.6-3.2L11 2.4 13.6 5 6.2 12.4z"/></svg></button>
+  </div>
+  <div style="flex:1;overflow:hidden">
+    <div class="cap" style="margin-top:12px">Accueil</div>
+    <a class="nav on" href="#"><svg viewBox="0 0 16 16"><path d="M2.5 7.5L8 3l5.5 4.5V13a.5.5 0 0 1-.5.5H3a.5.5 0 0 1-.5-.5z"/></svg><span>Following</span></a>
+    <a class="nav" href="#"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.5"/><path d="M10.5 5.5L9 9 5.5 10.5 7 7z"/></svg><span>Discover</span></a>
+    <a class="nav" href="#"><svg viewBox="0 0 16 16"><circle cx="5.5" cy="6" r="2"/><circle cx="10.8" cy="6.5" r="1.7"/><path d="M2 13c0-2.2 1.6-3.6 3.5-3.6S9 10.8 9 13M10 9.8c2 0 4 1 4 3.2"/></svg><span>Mutuals</span></a>
+    <a class="nav" href="#"><svg viewBox="0 0 16 16"><path d="M3 3a10 10 0 0 1 10 10M3 7a6 6 0 0 1 6 6"/><path d="M3.6 12.4h.01" stroke-width="2.6"/></svg><span>Linux et libre</span></a>
+    <a class="nav" href="#"><svg viewBox="0 0 16 16"><path d="M3 3a10 10 0 0 1 10 10M3 7a6 6 0 0 1 6 6"/><path d="M3.6 12.4h.01" stroke-width="2.6"/></svg><span>Photo nature</span></a>
+    <div class="cap">Naviguer</div>
+    <a class="nav" href="#"><svg viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5L14 14"/></svg><span>Explorer</span></a>
+    <a class="nav" href="#"><svg viewBox="0 0 16 16"><path d="M4 11V7a4 4 0 0 1 8 0v4l1 1.5H3zM6.5 14h3"/></svg><span>Notifications</span><i class="badge">3</i></a>
+    <a class="nav" href="#"><svg viewBox="0 0 16 16"><path d="M2.5 3.5h11v7h-5l-3 3v-3h-3z"/></svg><span>Messages</span><i class="badge">2</i></a>
+    <a class="nav" href="#"><svg viewBox="0 0 16 16"><path d="M4 2.5h8v11L8 10.5 4 13.5z"/></svg><span>Signets</span></a>
+    <a class="nav" href="#"><svg viewBox="0 0 16 16"><path d="M5 4h8M5 8h8M5 12h8M2.5 4h.01M2.5 8h.01M2.5 12h.01"/></svg><span>Listes</span></a>
+    <a class="nav" href="#"><svg viewBox="0 0 16 16"><circle cx="8" cy="5.5" r="2.5"/><path d="M3 13.5a5 5 0 0 1 10 0"/></svg><span>Profil</span></a>
+  </div>
+  <div style="padding:8px;border-top:1px solid #d6d6d6">
+    <a class="nav" href="#" style="height:48px;margin:0"><i class="av" style="width:32px;height:32px;font-size:12px;background:#1a5fb4;font-style:normal">CD</i><span style="line-height:1.2"><b>Camille Durand</b><br><small class="dim">@camille.bsky.social</small></span><svg viewBox="0 0 16 16" style="width:14px;height:14px"><path d="M4 6l4 4 4-4"/></svg></a>
+  </div>
+</aside>
+
+<!-- Volet 2 : contenu, le fil -->
+<main class="mid">
+  <div class="hb">
+    <button class="ib" aria-label="Actualiser le fil"><svg viewBox="0 0 16 16"><path d="M13 8a5 5 0 1 1-1.5-3.5M13 2.5v3h-3"/></svg></button>
+    <h1>Following</h1>
+    <button class="ib" aria-label="Options du fil"><svg viewBox="0 0 16 16"><circle cx="3.5" cy="8" r="1" fill="currentColor"/><circle cx="8" cy="8" r="1" fill="currentColor"/><circle cx="12.5" cy="8" r="1" fill="currentColor"/></svg></button>
+  </div>
+  <button class="pill"><svg viewBox="0 0 16 16" style="width:14px;height:14px;fill:none;stroke:#fff;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round"><path d="M8 13V3M4 7l4-4 4 4"/></svg>12 nouveaux posts</button>
+  <div style="flex:1;overflow:hidden">
+   <div style="max-width:640px;margin:0 auto">
+    <sc-for list="{{posts}}" as="p" hint-placeholder-count="4">
+      <article class="post" style="{{p.selStyle}}">
+        <i class="av" style="background:{{p.color}};font-style:normal">{{p.ini}}</i>
+        <div style="flex:1;min-width:0">
+          <sc-if value="{{p.repostBy}}" hint-placeholder-val="{{ false }}">
+            <div class="dim" style="font-size:12px;margin:-2px 0 4px;display:flex;align-items:center;gap:6px"><svg viewBox="0 0 16 16" style="width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round"><path d="M3 7V6a1.5 1.5 0 0 1 1.5-1.5H12L10 2.5M13 9v1a1.5 1.5 0 0 1-1.5 1.5H4L6 13.5"/></svg>{{p.repostBy}} a reposté</div>
+          </sc-if>
+          <div style="display:flex;align-items:baseline;gap:6px"><span class="nm">{{p.name}}</span><span class="dim" style="font-size:13px">{{p.handle}} · {{p.time}}</span></div>
+          <div style="margin-top:2px;font-size:14.5px;line-height:1.45;text-wrap:pretty">{{p.text}}</div>
+          <sc-if value="{{p.image}}" hint-placeholder-val="{{ false }}">
+            <div class="img"><span class="alt">ALT</span></div>
+          </sc-if>
+          <sc-if value="{{p.linkTitle}}" hint-placeholder-val="{{ false }}">
+            <div class="link"><div style="height:120px;background:#dfe3d8"></div><div style="padding:10px 12px"><div class="nm" style="font-size:13.5px">{{p.linkTitle}}</div><div class="dim" style="font-size:12px">{{p.linkHost}}</div></div></div>
+          </sc-if>
+          <div style="display:flex;justify-content:space-between;margin:8px 0 -6px -8px;max-width:400px">
+            <button class="act" aria-label="Répondre"><svg viewBox="0 0 16 16"><path d="M2.5 3.5h11v7h-5l-3 3v-3h-3z"/></svg>{{p.r}}</button>
+            <button class="act" aria-label="Reposter ou citer"><svg viewBox="0 0 16 16"><path d="M3 7V6a1.5 1.5 0 0 1 1.5-1.5H12L10 2.5M13 9v1a1.5 1.5 0 0 1-1.5 1.5H4L6 13.5"/></svg>{{p.rp}}</button>
+            <button class="act" aria-label="J'aime"><svg viewBox="0 0 16 16"><path d="M8 13.5S2.5 10 2.5 6.2A2.7 2.7 0 0 1 8 5a2.7 2.7 0 0 1 5.5 1.2C13.5 10 8 13.5 8 13.5z"/></svg>{{p.l}}</button>
+            <button class="act" aria-label="Ajouter aux signets"><svg viewBox="0 0 16 16"><path d="M4 2.5h8v11L8 10.5 4 13.5z"/></svg></button>
+            <button class="act" aria-label="Plus d'actions"><svg viewBox="0 0 16 16"><circle cx="3.5" cy="8" r="1" fill="currentColor"/><circle cx="8" cy="8" r="1" fill="currentColor"/><circle cx="12.5" cy="8" r="1" fill="currentColor"/></svg></button>
+          </div>
+        </div>
+      </article>
+    </sc-for>
+   </div>
+  </div>
+</main>
+
+<!-- Volet 3 : volet utilitaire, fil de discussion -->
+<section class="pane">
+  <div class="hb">
+    <button class="ib" aria-label="Fermer le volet"><svg viewBox="0 0 16 16"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>
+    <h1>Discussion</h1>
+    <button class="ib" aria-label="Options de la discussion"><svg viewBox="0 0 16 16"><circle cx="3.5" cy="8" r="1" fill="currentColor"/><circle cx="8" cy="8" r="1" fill="currentColor"/><circle cx="12.5" cy="8" r="1" fill="currentColor"/></svg></button>
+  </div>
+  <div style="flex:1;overflow:hidden">
+    <div style="padding:16px 16px 12px;border-bottom:1px solid #e3e3e3">
+      <div style="display:flex;gap:10px;align-items:center"><i class="av" style="background:#613583;font-style:normal">LM</i><div style="line-height:1.25"><div class="nm">Lucie Morel</div><div class="dim" style="font-size:13px">@lucie.example.social</div></div></div>
+      <div style="margin-top:12px;font-size:16px;line-height:1.45;text-wrap:pretty">Notes de version de GNOME 49 : le nouveau sélecteur de fichiers est enfin utilisable au clavier de bout en bout. Merci à celles et ceux qui ont testé la bêta.</div>
+      <div class="dim" style="margin-top:10px;font-size:13px">20 nov. 2026, 14:32 · Traduire</div>
+      <div style="display:flex;gap:16px;margin-top:10px;padding:10px 0;border-top:1px solid #e3e3e3;border-bottom:1px solid #e3e3e3;font-size:13px"><span><b>12</b> reposts</span><span><b>3</b> citations</span><span><b>48</b> j'aime</span></div>
+      <div style="display:flex;justify-content:space-around;margin-top:4px">
+        <button class="act" aria-label="Répondre"><svg viewBox="0 0 16 16"><path d="M2.5 3.5h11v7h-5l-3 3v-3h-3z"/></svg></button>
+        <button class="act" aria-label="Reposter"><svg viewBox="0 0 16 16"><path d="M3 7V6a1.5 1.5 0 0 1 1.5-1.5H12L10 2.5M13 9v1a1.5 1.5 0 0 1-1.5 1.5H4L6 13.5"/></svg></button>
+        <button class="act" aria-label="J'aime"><svg viewBox="0 0 16 16"><path d="M8 13.5S2.5 10 2.5 6.2A2.7 2.7 0 0 1 8 5a2.7 2.7 0 0 1 5.5 1.2C13.5 10 8 13.5 8 13.5z"/></svg></button>
+        <button class="act" aria-label="Signet"><svg viewBox="0 0 16 16"><path d="M4 2.5h8v11L8 10.5 4 13.5z"/></svg></button>
+        <button class="act" aria-label="Partager"><svg viewBox="0 0 16 16"><path d="M8 10V2.5M5 5l3-2.5L11 5M3.5 8v5h9V8"/></svg></button>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid #e3e3e3">
+      <i class="av" style="width:32px;height:32px;font-size:12px;background:#1a5fb4;font-style:normal">CD</i>
+      <div style="flex:1;height:34px;border-radius:6px;background:rgba(0,0,0,.06);display:flex;align-items:center;padding:0 10px;color:#5e5c64">Répondre à Lucie Morel…</div>
+    </div>
+    <sc-for list="{{replies}}" as="q" hint-placeholder-count="2">
+      <div class="post" style="padding:12px 16px">
+        <i class="av" style="width:32px;height:32px;font-size:12px;background:{{q.color}};font-style:normal">{{q.ini}}</i>
+        <div style="flex:1;min-width:0"><div style="display:flex;align-items:baseline;gap:6px"><span class="nm">{{q.name}}</span><span class="dim" style="font-size:13px">{{q.time}}</span></div><div style="margin-top:2px;text-wrap:pretty">{{q.text}}</div></div>
+      </div>
+    </sc-for>
+  </div>
+</section>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":800}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const sel = 'background:rgba(28,113,216,.07)';
+    return {
+      posts: [
+        { ini:'RB', color:'#865e3c', name:'Romain Bailly', handle:'@romain.example.social', time:'4 min', repostBy:'Nadia', text:'Premier essai de Flathub en mode hors ligne dans le train : tout fonctionne, sauf la météo de mon appli de météo.', r:'5', rp:'2', l:'31', selStyle:'' },
+        { ini:'LM', color:'#613583', name:'Lucie Morel', handle:'@lucie.example.social', time:'27 min', text:'Notes de version de GNOME 49 : le nouveau sélecteur de fichiers est enfin utilisable au clavier de bout en bout. Merci à celles et ceux qui ont testé la bêta.', r:'8', rp:'12', l:'48', selStyle:sel },
+        { ini:'AK', color:'#1b6b45', name:'Aya Koné', handle:'@aya.example.social', time:'1 h', text:'Lever de soleil sur le Vercors ce matin, 6 h 40, moins 3 degrés. Photo prise avec un vieux reflex et beaucoup de patience.', image:true, r:'14', rp:'9', l:'212', selStyle:'' },
+        { ini:'PD', color:'#a51d2d', name:'Pierre Delmas', handle:'@pierre.example.social', time:'2 h', text:'Un billet sur l’accessibilité des applications GTK4 : ce que Orca lit vraiment, et comment le vérifier.', linkTitle:'Tester ses applications GTK avec un lecteur d’écran', linkHost:'blog.example.org', r:'3', rp:'6', l:'57', selStyle:'' }
+      ],
+      replies: [
+        { ini:'AK', color:'#1b6b45', name:'Aya Koné', time:'20 min', text:'Super nouvelle. Le raccourci pour ouvrir le dossier parent est-il documenté quelque part ?' },
+        { ini:'RB', color:'#865e3c', name:'Romain Bailly', time:'12 min', text:'Je confirme, testé hier sur Fedora. Mention spéciale pour la recherche récursive.' },
+        { ini:'NS', color:'#26626b', name:'Nadia Safi', time:'5 min', text:'Et la vue en grille des miniatures, c’est pour 50 ou plus tard ?' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

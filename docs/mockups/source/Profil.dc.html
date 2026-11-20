@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Profil</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;background:transparent}
+*{box-sizing:border-box}
+.win{width:1280px;height:800px;display:flex;background:#fafafb;color:#2e3436;font-family:"Adwaita Sans",Cantarell,Inter,system-ui,sans-serif;font-size:14px;line-height:1.4;border-radius:12px;overflow:hidden;border:1px solid rgba(0,0,0,.2)}
+.hb{height:47px;flex:none;display:flex;align-items:center;gap:6px;padding:0 6px;background:#ebebeb;border-bottom:1px solid #d6d6d6}
+.hb h1{flex:1;margin:0;text-align:center;font-size:14px;font-weight:700}
+.ib{width:34px;height:34px;flex:none;display:inline-flex;align-items:center;justify-content:center;border:0;border-radius:6px;background:transparent;color:#2e3436;padding:0;cursor:pointer}
+.ib:hover{background:rgba(0,0,0,.07)}
+svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.sug{background:#1c71d8;color:#fff}
+.side{width:240px;flex:none;background:#ebebeb;border-right:1px solid #d6d6d6;display:flex;flex-direction:column}
+.nav{display:flex;align-items:center;gap:10px;height:36px;margin:1px 6px;padding:0 10px;border-radius:6px;color:#2e3436;text-decoration:none}
+.nav.on{background:rgba(0,0,0,.09)}
+.nav span{flex:1}
+.badge{min-width:20px;height:20px;border-radius:10px;background:#1c71d8;color:#fff;font-size:11px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;padding:0 6px;font-style:normal}
+.dim{color:#5e5c64}
+.av{border-radius:50%;color:#fff;font-weight:700;display:flex;align-items:center;justify-content:center;font-style:normal;flex:none}
+.btn{height:34px;padding:0 14px;border:0;border-radius:6px;background:rgba(0,0,0,.07);color:#2e3436;font:inherit;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.btn.sug{background:#1c71d8;color:#fff}
+.tg{display:inline-flex;gap:2px;padding:3px;border-radius:9px;background:rgba(0,0,0,.07)}
+.tg a{height:30px;padding:0 12px;border-radius:7px;display:inline-flex;align-items:center;color:#2e3436;text-decoration:none;font-weight:700;font-size:13px}
+.tg a.on{background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.2)}
+.post{display:flex;gap:12px;padding:14px 20px;border-bottom:1px solid #e3e3e3}
+.act{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 8px;border:0;border-radius:6px;background:transparent;color:#5e5c64;font:inherit;font-size:13px}
+</style>
+</helmet>
+<div class="win">
+<aside class="side">
+  <div class="hb">
+    <button class="ib" aria-label="Menu principal"><svg viewBox="0 0 16 16"><path d="M2.5 4h11M2.5 8h11M2.5 12h11"/></svg></button>
+    <h1>Tsubame</h1>
+    <button class="ib sug" aria-label="Nouveau post"><svg viewBox="0 0 16 16"><path d="M3 13l.6-3.2L11 2.4 13.6 5 6.2 12.4z"/></svg></button>
+  </div>
+  <div style="flex:1;padding-top:12px">
+    <a class="nav" href="#"><svg viewBox="0 0 16 16"><path d="M2.5 7.5L8 3l5.5 4.5V13a.5.5 0 0 1-.5.5H3a.5.5 0 0 1-.5-.5z"/></svg><span>Accueil</span></a>
+    <a class="nav" href="#"><svg viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5L14 14"/></svg><span>Explorer</span></a>
+    <a class="nav" href="#"><svg viewBox="0 0 16 16"><path d="M4 11V7a4 4 0 0 1 8 0v4l1 1.5H3zM6.5 14h3"/></svg><span>Notifications</span><i class="badge">3</i></a>
+    <a class="nav" href="#"><svg viewBox="0 0 16 16"><path d="M2.5 3.5h11v7h-5l-3 3v-3h-3z"/></svg><span>Messages</span><i class="badge">2</i></a>
+    <a class="nav" href="#"><svg viewBox="0 0 16 16"><path d="M4 2.5h8v11L8 10.5 4 13.5z"/></svg><span>Signets</span></a>
+    <a class="nav" href="#"><svg viewBox="0 0 16 16"><path d="M5 4h8M5 8h8M5 12h8M2.5 4h.01M2.5 8h.01M2.5 12h.01"/></svg><span>Listes</span></a>
+    <a class="nav on" href="#"><svg viewBox="0 0 16 16"><circle cx="8" cy="5.5" r="2.5"/><path d="M3 13.5a5 5 0 0 1 10 0"/></svg><span>Profil</span></a>
+  </div>
+</aside>
+
+<main style="flex:1;min-width:0;display:flex;flex-direction:column">
+  <div class="hb">
+    <button class="ib" aria-label="Retour"><svg viewBox="0 0 16 16"><path d="M10 3L5 8l5 5"/></svg></button>
+    <h1>Lucie Morel</h1>
+    <button class="ib" aria-label="Rechercher dans ses posts"><svg viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5L14 14"/></svg></button>
+    <button class="ib" aria-label="Plus d'actions"><svg viewBox="0 0 16 16"><circle cx="3.5" cy="8" r="1" fill="currentColor"/><circle cx="8" cy="8" r="1" fill="currentColor"/><circle cx="12.5" cy="8" r="1" fill="currentColor"/></svg></button>
+  </div>
+  <div style="flex:1;overflow:hidden">
+   <div style="max-width:720px;margin:0 auto;background:#fafafb">
+    <div style="height:150px;background:#c5d3e0"></div>
+    <div style="padding:0 20px;position:relative">
+      <i class="av" style="width:88px;height:88px;font-size:28px;background:#613583;margin-top:-44px;border:4px solid #fafafb">LM</i>
+      <div style="position:absolute;right:20px;top:12px;display:flex;gap:8px">
+        <button class="btn" aria-label="Notifications d'activité"><svg viewBox="0 0 16 16"><path d="M4 11V7a4 4 0 0 1 8 0v4l1 1.5H3zM6.5 14h3"/></svg></button>
+        <button class="btn" aria-label="Message"><svg viewBox="0 0 16 16"><path d="M2.5 3.5h11v7h-5l-3 3v-3h-3z"/></svg></button>
+        <button class="btn sug">Suivre</button>
+      </div>
+      <div style="margin-top:10px;display:flex;align-items:center;gap:8px"><b style="font-size:22px">Lucie Morel</b><span class="dim" style="font-size:12px;padding:2px 8px;border-radius:5px;background:rgba(0,0,0,.07);font-weight:700">Vérifiée</span></div>
+      <div class="dim">@lucie.example.social · vous suit</div>
+      <div style="margin-top:10px;text-wrap:pretty;max-width:560px">Développeuse GTK et traductrice. Je documente l'accessibilité des applications GNOME. Pro-nom : elle.</div>
+      <div style="margin-top:10px;display:flex;gap:18px"><span><b>1 284</b> <span class="dim">abonnés</span></span><span><b>312</b> <span class="dim">abonnements</span></span><span><b>2 906</b> <span class="dim">posts</span></span></div>
+      <div class="dim" style="margin-top:8px;font-size:13px;display:flex;align-items:center;gap:8px"><span style="display:inline-flex"><i class="av" style="width:20px;height:20px;font-size:8px;background:#865e3c;border:2px solid #fafafb">RB</i><i class="av" style="width:20px;height:20px;font-size:8px;background:#1b6b45;border:2px solid #fafafb;margin-left:-6px">AK</i></span>Suivie par Romain, Aya et 5 autres personnes que vous suivez</div>
+      <div style="margin:14px 0 0;overflow:hidden"><div class="tg"><a class="on" href="#">Posts</a><a href="#">Réponses</a><a href="#">Médias</a><a href="#">Vidéos</a><a href="#">J'aime</a><a href="#">Flux</a><a href="#">Listes</a><a href="#">Starter packs</a></div></div>
+    </div>
+    <div style="margin-top:12px;border-top:1px solid #e3e3e3">
+      <article class="post"><i class="av" style="width:40px;height:40px;background:#613583">LM</i><div style="flex:1"><div style="display:flex;gap:6px;align-items:baseline"><b>Lucie Morel</b><span class="dim" style="font-size:13px">@lucie.example.social · 27 min</span></div><div style="margin-top:2px;font-size:14.5px;line-height:1.45;text-wrap:pretty">Notes de version de GNOME 49 : le nouveau sélecteur de fichiers est enfin utilisable au clavier de bout en bout. Merci à celles et ceux qui ont testé la bêta.</div><div style="display:flex;justify-content:space-between;max-width:400px;margin:8px 0 -6px -8px"><button class="act"><svg viewBox="0 0 16 16"><path d="M2.5 3.5h11v7h-5l-3 3v-3h-3z"/></svg>8</button><button class="act"><svg viewBox="0 0 16 16"><path d="M3 7V6a1.5 1.5 0 0 1 1.5-1.5H12L10 2.5M13 9v1a1.5 1.5 0 0 1-1.5 1.5H4L6 13.5"/></svg>12</button><button class="act"><svg viewBox="0 0 16 16"><path d="M8 13.5S2.5 10 2.5 6.2A2.7 2.7 0 0 1 8 5a2.7 2.7 0 0 1 5.5 1.2C13.5 10 8 13.5 8 13.5z"/></svg>48</button><button class="act"><svg viewBox="0 0 16 16"><path d="M4 2.5h8v11L8 10.5 4 13.5z"/></svg></button></div></div></article>
+      <article class="post"><i class="av" style="width:40px;height:40px;background:#613583">LM</i><div style="flex:1"><div style="display:flex;gap:6px;align-items:baseline"><b>Lucie Morel</b><span class="dim" style="font-size:13px">@lucie.example.social · 3 j</span></div><div style="margin-top:2px;font-size:14.5px;line-height:1.45;text-wrap:pretty">Rappel : ajoutez un texte alternatif à vos captures d'écran. Dix secondes pour vous, un contenu lisible pour tout le monde.</div></div></article>
+    </div>
+   </div>
+  </div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":800}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

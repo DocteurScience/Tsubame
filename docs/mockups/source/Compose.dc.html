@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Rédaction d'un post</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;background:transparent}
+*{box-sizing:border-box}
+.dlg{width:640px;height:760px;display:flex;flex-direction:column;background:#fafafb;color:#2e3436;font-family:"Adwaita Sans",Cantarell,Inter,system-ui,sans-serif;font-size:14px;line-height:1.4;border-radius:12px;overflow:hidden;border:1px solid rgba(0,0,0,.2)}
+.hb{height:47px;flex:none;display:flex;align-items:center;gap:6px;padding:0 6px;background:#ebebeb;border-bottom:1px solid #d6d6d6}
+.hb h1{flex:1;margin:0;text-align:center;font-size:14px;font-weight:700}
+.btn{height:34px;padding:0 14px;border:0;border-radius:6px;background:rgba(0,0,0,.07);color:#2e3436;font:inherit;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.btn.sug{background:#1c71d8;color:#fff}
+.btn.fl{background:transparent}
+.btn.fl:hover{background:rgba(0,0,0,.07)}
+.ib{width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;border:0;border-radius:6px;background:transparent;color:#2e3436;padding:0;cursor:pointer}
+.ib:hover{background:rgba(0,0,0,.07)}
+svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.dim{color:#5e5c64}
+.av{width:40px;height:40px;flex:none;border-radius:50%;color:#fff;font-weight:700;display:flex;align-items:center;justify-content:center;font-style:normal;background:#1a5fb4}
+.ph{position:relative;height:150px;border-radius:12px;background:#d5dde6;border:1px solid rgba(0,0,0,.08)}
+.ph .x{position:absolute;top:6px;right:6px;width:28px;height:28px;border-radius:50%;background:rgba(0,0,0,.7);color:#fff;border:0;display:flex;align-items:center;justify-content:center;padding:0}
+.ph .alt{position:absolute;left:8px;bottom:8px;padding:3px 9px;border:0;border-radius:6px;background:rgba(0,0,0,.72);color:#fff;font:inherit;font-size:12px;font-weight:700}
+.chip{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 10px;border-radius:15px;background:rgba(0,0,0,.06);font-size:13px;font-weight:700;border:0;color:#2e3436}
+.mention{position:absolute;left:70px;top:150px;width:330px;background:#fff;border-radius:12px;box-shadow:0 2px 12px rgba(0,0,0,.25);border:1px solid rgba(0,0,0,.12);padding:6px}
+.mrow{display:flex;gap:10px;align-items:center;padding:6px 8px;border-radius:6px;height:44px}
+.mrow.on{background:rgba(0,0,0,.07)}
+</style>
+</helmet>
+<div class="dlg">
+  <div class="hb">
+    <button class="btn fl">Annuler</button>
+    <h1>Nouveau post</h1>
+    <button class="btn fl" aria-label="Brouillons"><svg viewBox="0 0 16 16"><path d="M3.5 2.5h7l2 2v9h-9zM5.5 7h5M5.5 10h5"/></svg>Brouillons</button>
+    <button class="btn sug">Publier</button>
+  </div>
+
+  <div style="flex:1;overflow:hidden;position:relative;padding:16px 18px 0">
+    <div style="display:flex;gap:12px">
+      <i class="av">CD</i>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:17px;line-height:1.45;min-height:90px;text-wrap:pretty">Test de la bêta de GNOME 49 sur mon portable : le sélecteur de fichiers, c'est du bon. Merci <span style="color:#1c71d8">@lucie.example.social</span> pour le coup de main et <span style="color:#1c71d8">#GNOME</span> pour le fil !<span style="border-left:2px solid #1c71d8;margin-left:1px"></span></div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px">
+          <div class="ph"><button class="x" aria-label="Retirer l'image"><svg viewBox="0 0 16 16" style="width:12px;height:12px"><path d="M4 4l8 8M12 4l-8 8"/></svg></button><button class="alt">+ ALT</button></div>
+          <div class="ph"><button class="x" aria-label="Retirer l'image"><svg viewBox="0 0 16 16" style="width:12px;height:12px"><path d="M4 4l8 8M12 4l-8 8"/></svg></button><button class="alt">ALT ✓</button></div>
+        </div>
+        <div class="dim" style="margin-top:8px;font-size:12.5px">Décrivez chaque image pour les personnes qui utilisent un lecteur d'écran.</div>
+      </div>
+    </div>
+
+    <div class="mention">
+      <div class="mrow on"><i class="av" style="width:32px;height:32px;font-size:12px;background:#613583">LM</i><div style="line-height:1.2"><b>Lucie Morel</b><br><small class="dim">@lucie.example.social</small></div></div>
+      <div class="mrow"><i class="av" style="width:32px;height:32px;font-size:12px;background:#26626b">LB</i><div style="line-height:1.2"><b>Luc Bernard</b><br><small class="dim">@luc.example.social</small></div></div>
+    </div>
+
+    <div style="position:absolute;left:18px;right:18px;bottom:14px;display:flex;align-items:center;gap:8px;border-top:1px solid #e3e3e3;padding-top:12px">
+      <button class="ib" aria-label="Ajouter l'enchaînement d'un second post"><svg viewBox="0 0 16 16"><path d="M8 3v10M3 8h10"/></svg></button>
+      <span class="dim" style="font-size:12.5px">Ajouter un post au fil</span>
+    </div>
+  </div>
+
+  <!-- barre d'outils bas -->
+  <div style="flex:none;border-top:1px solid #d6d6d6;background:#ebebeb;padding:8px 10px;display:flex;align-items:center;gap:2px">
+    <button class="ib" aria-label="Ajouter une image"><svg viewBox="0 0 16 16"><rect x="2.5" y="3" width="11" height="10" rx="1.5"/><circle cx="6" cy="6.5" r="1"/><path d="M3 12l3.5-3.5 2.5 2 2-2 2.5 2.5"/></svg></button>
+    <button class="ib" aria-label="Ajouter une vidéo"><svg viewBox="0 0 16 16"><rect x="2" y="4" width="8.5" height="8" rx="1.5"/><path d="M10.5 7l3.5-2v6l-3.5-2"/></svg></button>
+    <button class="ib" aria-label="Ajouter un GIF"><svg viewBox="0 0 16 16"><rect x="2" y="3.5" width="12" height="9" rx="2"/><path d="M5 9.5V7M5 7h1.5M8.5 7v2.5M10.5 9.5V7h1.5"/></svg></button>
+    <button class="ib" aria-label="Emoji"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.5"/><path d="M5.8 9.5a2.8 2.8 0 0 0 4.4 0M6 6.5h.01M10 6.5h.01"/></svg></button>
+    <span style="width:1px;height:20px;background:#d0d0d0;margin:0 6px"></span>
+    <button class="chip"><svg viewBox="0 0 16 16" style="width:14px;height:14px"><circle cx="8" cy="8" r="5.5"/><path d="M2.5 8h11M8 2.5c2 2 2 9 0 11M8 2.5c-2 2-2 9 0 11"/></svg>Français</button>
+    <button class="chip"><svg viewBox="0 0 16 16" style="width:14px;height:14px"><circle cx="8" cy="8" r="5.5"/><path d="M8 5v3.5M8 11h.01"/></svg>Étiquettes</button>
+    <span style="flex:1"></span>
+    <span class="dim" style="font-size:12.5px">198 / 300</span>
+    <svg viewBox="0 0 20 20" style="width:22px;height:22px;margin:0 6px 0 8px" aria-label="Jauge de caractères"><circle cx="10" cy="10" r="8" stroke="#d0d0d0" stroke-width="2.4"/><circle cx="10" cy="10" r="8" stroke="#1c71d8" stroke-width="2.4" stroke-dasharray="33 50" transform="rotate(-90 10 10)"/></svg>
+  </div>
+  <div style="flex:none;background:#ebebeb;padding:0 10px 10px;display:flex;gap:8px">
+    <button class="chip" style="height:34px;border-radius:6px"><svg viewBox="0 0 16 16" style="width:14px;height:14px"><circle cx="8" cy="8" r="5.5"/><path d="M2.5 8h11M8 2.5c2 2 2 9 0 11M8 2.5c-2 2-2 9 0 11"/></svg>Tout le monde peut répondre<svg viewBox="0 0 16 16" style="width:12px;height:12px"><path d="M4 6l4 4 4-4"/></svg></button>
+    <button class="chip" style="height:34px;border-radius:6px"><svg viewBox="0 0 16 16" style="width:14px;height:14px"><path d="M3 7V6a1.5 1.5 0 0 1 1.5-1.5H12L10 2.5M13 9v1a1.5 1.5 0 0 1-1.5 1.5H4L6 13.5"/></svg>Citations autorisées<svg viewBox="0 0 16 16" style="width:12px;height:12px"><path d="M4 6l4 4 4-4"/></svg></button>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":640,"height":760}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

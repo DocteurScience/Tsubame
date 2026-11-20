@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Explorer et recherche</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;background:transparent}
+*{box-sizing:border-box}
+.win{width:1280px;height:800px;display:flex;background:#fafafb;color:#2e3436;font-family:"Adwaita Sans",Cantarell,Inter,system-ui,sans-serif;font-size:14px;line-height:1.4;border-radius:12px;overflow:hidden;border:1px solid rgba(0,0,0,.2)}
+.hb{height:47px;flex:none;display:flex;align-items:center;gap:6px;padding:0 6px;background:#ebebeb;border-bottom:1px solid #d6d6d6}
+.hb h1{flex:1;margin:0;text-align:center;font-size:14px;font-weight:700}
+.ib{width:34px;height:34px;flex:none;display:inline-flex;align-items:center;justify-content:center;border:0;border-radius:6px;background:transparent;color:#2e3436;padding:0}
+svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.sug{background:#1c71d8;color:#fff}
+.side{width:240px;flex:none;background:#ebebeb;border-right:1px solid #d6d6d6;display:flex;flex-direction:column}
+.nav{display:flex;align-items:center;gap:10px;height:36px;margin:1px 6px;padding:0 10px;border-radius:6px;color:#2e3436;text-decoration:none}
+.nav.on{background:rgba(0,0,0,.09)}
+.nav span{flex:1}
+.badge{min-width:20px;height:20px;border-radius:10px;background:#1c71d8;color:#fff;font-size:11px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;padding:0 6px;font-style:normal}
+.dim{color:#5e5c64}
+.av{border-radius:50%;color:#fff;font-weight:700;display:flex;align-items:center;justify-content:center;font-style:normal;flex:none}
+.tg{display:inline-flex;gap:2px;padding:3px;border-radius:9px;background:rgba(0,0,0,.07)}
+.tg a{height:30px;padding:0 14px;border-radius:7px;display:inline-flex;align-items:center;color:#2e3436;text-decoration:none;font-weight:700;font-size:13px}
+.tg a.on{background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.2)}
+.bl{background:#fff;border:1px solid #dcdcdc;border-radius:12px;overflow:hidden}
+.row{display:flex;align-items:center;gap:12px;min-height:58px;padding:8px 14px;border-top:1px solid #ececec}
+.row:first-child{border-top:0}
+.row .t{flex:1;line-height:1.3;min-width:0}
+.row .t small{display:block;color:#5e5c64;font-size:12.5px}
+.btn{height:32px;padding:0 14px;border:0;border-radius:6px;background:rgba(0,0,0,.07);color:#2e3436;font:inherit;font-weight:700;font-size:13px;display:inline-flex;align-items:center}
+.btn.sg{background:#1c71d8;color:#fff}
+.gt{margin:22px 0 8px;font-weight:700;font-size:15px}
+.sp{background:#fff;border:1px solid #dcdcdc;border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:6px}
+</style>
+</helmet>
+<div class="win">
+<aside class="side">
+  <div class="hb">
+    <button class="ib" aria-label="Menu principal"><svg viewBox="0 0 16 16"><path d="M2.5 4h11M2.5 8h11M2.5 12h11"/></svg></button>
+    <h1>Tsubame</h1>
+    <button class="ib sug" aria-label="Nouveau post"><svg viewBox="0 0 16 16"><path d="M3 13l.6-3.2L11 2.4 13.6 5 6.2 12.4z"/></svg></button>
+  </div>
+  <div style="flex:1;padding-top:12px">
+    <a class="nav" href="#"><svg viewBox="0 0 16 16"><path d="M2.5 7.5L8 3l5.5 4.5V13a.5.5 0 0 1-.5.5H3a.5.5 0 0 1-.5-.5z"/></svg><span>Accueil</span></a>
+    <a class="nav on" href="#"><svg viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5L14 14"/></svg><span>Explorer</span></a>
+    <a class="nav" href="#"><svg viewBox="0 0 16 16"><path d="M4 11V7a4 4 0 0 1 8 0v4l1 1.5H3zM6.5 14h3"/></svg><span>Notifications</span><i class="badge">3</i></a>
+    <a class="nav" href="#"><svg viewBox="0 0 16 16"><path d="M2.5 3.5h11v7h-5l-3 3v-3h-3z"/></svg><span>Messages</span><i class="badge">2</i></a>
+    <a class="nav" href="#"><svg viewBox="0 0 16 16"><path d="M4 2.5h8v11L8 10.5 4 13.5z"/></svg><span>Signets</span></a>
+    <a class="nav" href="#"><svg viewBox="0 0 16 16"><path d="M5 4h8M5 8h8M5 12h8M2.5 4h.01M2.5 8h.01M2.5 12h.01"/></svg><span>Listes</span></a>
+    <a class="nav" href="#"><svg viewBox="0 0 16 16"><circle cx="8" cy="5.5" r="2.5"/><path d="M3 13.5a5 5 0 0 1 10 0"/></svg><span>Profil</span></a>
+  </div>
+</aside>
+
+<main style="flex:1;min-width:0;display:flex;flex-direction:column">
+  <div class="hb" style="justify-content:center">
+    <div style="width:460px;height:34px;border-radius:6px;background:#fff;border:1px solid #d0d0d0;display:flex;align-items:center;gap:8px;padding:0 10px;color:#5e5c64"><svg viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5L14 14"/></svg>Rechercher des posts, des personnes, des flux…</div>
+  </div>
+  <div style="flex:1;overflow:hidden">
+   <div style="max-width:760px;margin:0 auto;padding:18px 20px">
+    <div class="tg"><a class="on" href="#">Pour vous</a><a href="#">Tendances</a><a href="#">Flux</a><a href="#">Starter packs</a><a href="#">Personnes</a></div>
+
+    <div class="gt">Sujets du moment</div>
+    <div class="bl">
+      <div class="row"><b class="dim" style="width:18px">1</b><div class="t"><b>#GNOME49</b><small>Logiciels libres · 1 240 posts</small></div><svg viewBox="0 0 16 16"><path d="M6 3l5 5-5 5"/></svg></div>
+      <div class="row"><b class="dim" style="width:18px">2</b><div class="t"><b>Accessibilité numérique</b><small>Techno · 860 posts</small></div><svg viewBox="0 0 16 16"><path d="M6 3l5 5-5 5"/></svg></div>
+      <div class="row"><b class="dim" style="width:18px">3</b><div class="t"><b>Photographie de montagne</b><small>Photo · 540 posts</small></div><svg viewBox="0 0 16 16"><path d="M6 3l5 5-5 5"/></svg></div>
+    </div>
+
+    <div class="gt">Personnes à suivre</div>
+    <div class="bl">
+      <div class="row"><i class="av" style="width:42px;height:42px;background:#26626b">NS</i><div class="t"><b>Nadia Safi</b><small>@nadia.example.social · Traductrice, communauté GNOME fr</small></div><button class="btn sg">Suivre</button></div>
+      <div class="row"><i class="av" style="width:42px;height:42px;background:#865e3c">RB</i><div class="t"><b>Romain Bailly</b><small>@romain.example.social · Packaging Flatpak</small></div><button class="btn sg">Suivre</button></div>
+      <div class="row"><i class="av" style="width:42px;height:42px;background:#a51d2d">PD</i><div class="t"><b>Pierre Delmas</b><small>@pierre.example.social · Accessibilité GTK</small></div><button class="btn">Abonné</button></div>
+    </div>
+
+    <div class="gt">Starter packs</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="sp"><div style="height:80px;border-radius:8px;background:#d5dde6"></div><b>Communauté GNOME francophone</b><span class="dim" style="font-size:13px">Par Lucie Morel · 24 comptes · 3 flux</span><button class="btn sg" style="align-self:flex-start;margin-top:4px">Tout suivre</button></div>
+      <div class="sp"><div style="height:80px;border-radius:8px;background:#dfe3d8"></div><b>Photographes de nature</b><span class="dim" style="font-size:13px">Par Aya Koné · 40 comptes</span><button class="btn sg" style="align-self:flex-start;margin-top:4px">Tout suivre</button></div>
+    </div>
+   </div>
+  </div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":800}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

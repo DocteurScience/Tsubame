@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Paliers d'adaptation</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;background:transparent}
+*{box-sizing:border-box}
+.pg{width:1280px;height:600px;padding:36px 40px;background:#fafafb;color:#2e3436;font-family:"Adwaita Sans",Cantarell,Inter,system-ui,sans-serif;font-size:13.5px;line-height:1.45;border-radius:12px;border:1px solid rgba(0,0,0,.2);overflow:hidden}
+.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:20px;margin-top:22px}
+.mini{height:170px;border-radius:10px;background:#dcdcdf;border:1px solid #c4c4c8;padding:6px;display:flex;gap:5px}
+.sb{width:30px;flex:none;border-radius:5px;background:#b8b8be}
+.cl{flex:1;border-radius:5px;background:#9ec1f0;border:1px solid #5b95e0}
+.pn{width:44px;flex:none;border-radius:5px;background:#f4f4f6;border:1px solid #c4c4c8}
+.bar{height:20px;flex:none;border-radius:5px;background:#b8b8be}
+.lbl{margin:10px 0 2px;font-weight:700;font-size:14px}
+.w{color:#1a5fb4;font-weight:700;font-size:12.5px}
+.dim{color:#5e5c64}
+</style>
+</helmet>
+<div class="pg">
+  <div style="font-size:22px;font-weight:700">Une seule colonne ne suffit pas : le nombre de colonnes suit la largeur</div>
+  <div class="dim" style="margin-top:4px;max-width:900px">Chaque colonne garde une largeur de lecture confortable. Quand la fenêtre grandit, on ajoute une colonne au lieu d'étirer le texte.</div>
+  <div class="grid">
+    <sc-for list="{{paliers}}" as="p" hint-placeholder-count="4">
+      <div>
+        <div style="{{p.frameStyle}}">
+          <div class="mini" style="{{p.miniStyle}}">
+            <sc-if value="{{p.side}}" hint-placeholder-val="{{ true }}"><div class="sb"></div></sc-if>
+            <sc-for list="{{p.cols}}" as="c" hint-placeholder-count="2"><div class="cl"></div></sc-for>
+            <sc-if value="{{p.pane}}" hint-placeholder-val="{{ true }}"><div class="pn"></div></sc-if>
+          </div>
+          <sc-if value="{{p.bottom}}" hint-placeholder-val="{{ false }}"><div class="bar" style="margin-top:5px"></div></sc-if>
+        </div>
+        <div class="lbl">{{p.nom}}</div>
+        <div class="w">{{p.largeur}}</div>
+        <div class="dim" style="margin-top:4px;text-wrap:pretty">{{p.texte}}</div>
+      </div>
+    </sc-for>
+  </div>
+  <div style="margin-top:22px;padding:12px 16px;border-radius:12px;background:#fff;border:1px solid #dcdcdc;max-width:1000px">
+    <b>Mise à l'échelle :</b> un écran 4K réglé à 200 % donne une fenêtre de 1920 px logiques, donc le palier « large ». Le palier « très large » concerne les écrans 4K à 100 % et les 1440p ultralarges.
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":600}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const n = (k) => Array.from({ length: k }, () => ({}));
+    return {
+      paliers: [
+        { nom:'Compact', largeur:'Moins de 480 sp, téléphone', texte:'Une colonne, navigation en barre du bas, discussion en page empilée.', side:false, pane:false, bottom:true, cols:n(1), frameStyle:'width:110px', miniStyle:'height:170px;width:110px' },
+        { nom:'Moyen', largeur:'Environ 1280 px', texte:'Barre latérale, une colonne de cartes et le volet de discussion à droite.', side:true, pane:true, bottom:false, cols:n(1), frameStyle:'', miniStyle:'' },
+        { nom:'Large', largeur:'Environ 1920 px, 2K ou 4K à 200 %', texte:'Barre latérale, deux à trois colonnes de cartes et le volet de discussion.', side:true, pane:true, bottom:false, cols:n(3), frameStyle:'', miniStyle:'' },
+        { nom:'Très large', largeur:'2560 px et plus, 4K à 100 %', texte:'Barre latérale, quatre colonnes ou plus et le volet. Chaque colonne reste entre 380 et 480 px.', side:true, pane:true, bottom:false, cols:n(5), frameStyle:'', miniStyle:'' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

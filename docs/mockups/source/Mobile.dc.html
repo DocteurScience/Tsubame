@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Accueil mobile</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;background:transparent}
+*{box-sizing:border-box}
+.ph{width:390px;height:844px;display:flex;flex-direction:column;background:#fafafb;color:#2e3436;font-family:"Adwaita Sans",Cantarell,Inter,system-ui,sans-serif;font-size:14px;line-height:1.4;border-radius:18px;overflow:hidden;border:1px solid rgba(0,0,0,.2);position:relative}
+.hb{height:52px;flex:none;display:flex;align-items:center;gap:2px;padding:0 4px;background:#ebebeb;border-bottom:1px solid #d6d6d6}
+.hb h1{flex:1;margin:0;text-align:center;font-size:15px;font-weight:700}
+.ib{width:44px;height:44px;flex:none;display:inline-flex;align-items:center;justify-content:center;border:0;border-radius:8px;background:transparent;color:#2e3436;padding:0}
+svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.dim{color:#5e5c64}
+.av{width:40px;height:40px;flex:none;border-radius:50%;color:#fff;font-weight:700;display:flex;align-items:center;justify-content:center;font-style:normal}
+.post{display:flex;gap:10px;padding:12px 14px;border-bottom:1px solid #e3e3e3}
+.act{display:inline-flex;align-items:center;gap:5px;height:44px;min-width:44px;padding:0 8px;border:0;background:transparent;color:#5e5c64;font:inherit;font-size:13px}
+.vs{height:62px;flex:none;display:flex;background:#ebebeb;border-top:1px solid #d6d6d6}
+.vs a{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:#5e5c64;font-size:11px;font-weight:700;text-decoration:none;position:relative}
+.vs a.on{color:#1c71d8}
+.vs i{position:absolute;top:6px;left:calc(50% + 6px);min-width:16px;height:16px;border-radius:8px;background:#1c71d8;color:#fff;font-size:10px;display:flex;align-items:center;justify-content:center;font-style:normal;padding:0 4px}
+.fab{position:absolute;right:16px;bottom:78px;width:56px;height:56px;border-radius:50%;background:#1c71d8;color:#fff;border:0;box-shadow:0 2px 8px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center}
+</style>
+</helmet>
+<div class="ph">
+  <div class="hb">
+    <button class="ib" aria-label="Ouvrir le panneau des flux"><svg viewBox="0 0 16 16"><path d="M2.5 4h11M2.5 8h11M2.5 12h11"/></svg></button>
+    <h1>Following ▾</h1>
+    <button class="ib" aria-label="Actualiser"><svg viewBox="0 0 16 16"><path d="M13 8a5 5 0 1 1-1.5-3.5M13 2.5v3h-3"/></svg></button>
+  </div>
+  <div style="flex:1;overflow:hidden">
+    <article class="post"><i class="av" style="background:#865e3c">RB</i><div style="flex:1;min-width:0"><div class="dim" style="font-size:12px">Nadia a reposté</div><div style="display:flex;gap:6px;align-items:baseline"><b>Romain Bailly</b><span class="dim" style="font-size:13px">4 min</span></div><div style="margin-top:2px;font-size:14.5px;line-height:1.45;text-wrap:pretty">Premier essai de Flathub en mode hors ligne dans le train : tout fonctionne, sauf la météo de mon appli de météo.</div><div style="display:flex;justify-content:space-between;margin:2px -8px -8px"><button class="act" aria-label="Répondre"><svg viewBox="0 0 16 16"><path d="M2.5 3.5h11v7h-5l-3 3v-3h-3z"/></svg>5</button><button class="act" aria-label="Reposter"><svg viewBox="0 0 16 16"><path d="M3 7V6a1.5 1.5 0 0 1 1.5-1.5H12L10 2.5M13 9v1a1.5 1.5 0 0 1-1.5 1.5H4L6 13.5"/></svg>2</button><button class="act" aria-label="J'aime"><svg viewBox="0 0 16 16"><path d="M8 13.5S2.5 10 2.5 6.2A2.7 2.7 0 0 1 8 5a2.7 2.7 0 0 1 5.5 1.2C13.5 10 8 13.5 8 13.5z"/></svg>31</button><button class="act" aria-label="Partager"><svg viewBox="0 0 16 16"><path d="M8 10V2.5M5 5l3-2.5L11 5M3.5 8v5h9V8"/></svg></button></div></div></article>
+    <article class="post"><i class="av" style="background:#1b6b45">AK</i><div style="flex:1;min-width:0"><div style="display:flex;gap:6px;align-items:baseline"><b>Aya Koné</b><span class="dim" style="font-size:13px">1 h</span></div><div style="margin-top:2px;font-size:14.5px;line-height:1.45;text-wrap:pretty">Lever de soleil sur le Vercors ce matin, 6 h 40, moins 3 degrés.</div><div style="position:relative;margin-top:8px;height:190px;border-radius:12px;background:#d5dde6;border:1px solid rgba(0,0,0,.08)"><span style="position:absolute;left:8px;bottom:8px;padding:2px 7px;border-radius:5px;background:rgba(0,0,0,.72);color:#fff;font-size:11px;font-weight:700">ALT</span></div><div style="display:flex;justify-content:space-between;margin:2px -8px -8px"><button class="act" aria-label="Répondre"><svg viewBox="0 0 16 16"><path d="M2.5 3.5h11v7h-5l-3 3v-3h-3z"/></svg>14</button><button class="act" aria-label="Reposter"><svg viewBox="0 0 16 16"><path d="M3 7V6a1.5 1.5 0 0 1 1.5-1.5H12L10 2.5M13 9v1a1.5 1.5 0 0 1-1.5 1.5H4L6 13.5"/></svg>9</button><button class="act" aria-label="J'aime"><svg viewBox="0 0 16 16"><path d="M8 13.5S2.5 10 2.5 6.2A2.7 2.7 0 0 1 8 5a2.7 2.7 0 0 1 5.5 1.2C13.5 10 8 13.5 8 13.5z"/></svg>212</button><button class="act" aria-label="Partager"><svg viewBox="0 0 16 16"><path d="M8 10V2.5M5 5l3-2.5L11 5M3.5 8v5h9V8"/></svg></button></div></div></article>
+    <article class="post"><i class="av" style="background:#a51d2d">PD</i><div style="flex:1;min-width:0"><div style="display:flex;gap:6px;align-items:baseline"><b>Pierre Delmas</b><span class="dim" style="font-size:13px">2 h</span></div><div style="margin-top:2px;font-size:14.5px;line-height:1.45;text-wrap:pretty">Un billet sur l'accessibilité des applications GTK4 : ce que Orca lit vraiment.</div></div></article>
+  </div>
+  <button class="fab" aria-label="Nouveau post"><svg viewBox="0 0 16 16" style="width:22px;height:22px"><path d="M3 13l.6-3.2L11 2.4 13.6 5 6.2 12.4z"/></svg></button>
+  <nav class="vs" aria-label="Navigation principale">
+    <a class="on" href="#"><svg viewBox="0 0 16 16"><path d="M2.5 7.5L8 3l5.5 4.5V13a.5.5 0 0 1-.5.5H3a.5.5 0 0 1-.5-.5z"/></svg>Accueil</a>
+    <a href="#"><svg viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5L14 14"/></svg>Explorer</a>
+    <a href="#"><svg viewBox="0 0 16 16"><path d="M4 11V7a4 4 0 0 1 8 0v4l1 1.5H3zM6.5 14h3"/></svg>Notifs<i>3</i></a>
+    <a href="#"><svg viewBox="0 0 16 16"><path d="M2.5 3.5h11v7h-5l-3 3v-3h-3z"/></svg>Messages<i>2</i></a>
+    <a href="#"><svg viewBox="0 0 16 16"><circle cx="8" cy="5.5" r="2.5"/><path d="M3 13.5a5 5 0 0 1 10 0"/></svg>Profil</a>
+  </nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

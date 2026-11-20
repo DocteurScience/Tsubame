@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Préférences, modération</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;background:transparent}
+*{box-sizing:border-box}
+.dlg{width:760px;height:760px;display:flex;flex-direction:column;background:#fafafb;color:#2e3436;font-family:"Adwaita Sans",Cantarell,Inter,system-ui,sans-serif;font-size:14px;line-height:1.4;border-radius:12px;overflow:hidden;border:1px solid rgba(0,0,0,.2)}
+.hb{height:47px;flex:none;display:flex;align-items:center;gap:6px;padding:0 6px;background:#ebebeb;border-bottom:1px solid #d6d6d6}
+.hb h1{flex:1;margin:0;text-align:center;font-size:14px;font-weight:700}
+.ib{width:34px;height:34px;flex:none;display:inline-flex;align-items:center;justify-content:center;border:0;border-radius:6px;background:transparent;color:#2e3436;padding:0}
+svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.dim{color:#5e5c64}
+.grp{margin:0 auto;width:560px}
+.gt{margin:18px 0 6px;font-weight:700;font-size:14px}
+.gd{margin:-2px 0 8px;font-size:13px;color:#5e5c64}
+.bl{background:#fff;border:1px solid #dcdcdc;border-radius:12px;overflow:hidden}
+.row{display:flex;align-items:center;gap:12px;min-height:50px;padding:8px 14px;border-top:1px solid #ececec}
+.row:first-child{border-top:0}
+.row .t{flex:1;line-height:1.3}
+.row .t small{display:block;color:#5e5c64;font-size:12.5px}
+.sw{width:46px;height:26px;border-radius:13px;background:#cfcfd3;position:relative;flex:none}
+.sw::after{content:"";position:absolute;top:2px;left:2px;width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.3)}
+.sw.on{background:#1c71d8}.sw.on::after{left:22px}
+.dd{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 10px;border-radius:6px;background:rgba(0,0,0,.07);font-weight:700;font-size:13px}
+</style>
+</helmet>
+<div class="dlg">
+  <div class="hb">
+    <button class="ib" aria-label="Retour aux préférences"><svg viewBox="0 0 16 16"><path d="M10 3L5 8l5 5"/></svg></button>
+    <h1>Modération</h1>
+    <button class="ib" aria-label="Rechercher dans les préférences"><svg viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5L14 14"/></svg></button>
+  </div>
+  <div style="flex:1;overflow:hidden;padding:4px 0 20px">
+    <div class="grp">
+      <div class="gt">Listes et comptes</div>
+      <div class="bl">
+        <div class="row"><div class="t">Boîte de modération<small>Signalements envoyés et avis reçus</small></div><svg viewBox="0 0 16 16"><path d="M6 3l5 5-5 5"/></svg></div>
+        <div class="row"><div class="t">Listes de modération<small>S'abonner à des listes de comptes à masquer ou bloquer</small></div><svg viewBox="0 0 16 16"><path d="M6 3l5 5-5 5"/></svg></div>
+        <div class="row"><div class="t">Comptes masqués</div><span class="dim">14</span><svg viewBox="0 0 16 16"><path d="M6 3l5 5-5 5"/></svg></div>
+        <div class="row"><div class="t">Comptes bloqués</div><span class="dim">3</span><svg viewBox="0 0 16 16"><path d="M6 3l5 5-5 5"/></svg></div>
+        <div class="row"><div class="t">Mots et mots-clics masqués</div><span class="dim">6</span><svg viewBox="0 0 16 16"><path d="M6 3l5 5-5 5"/></svg></div>
+      </div>
+
+      <div class="gt">Contenu sensible</div>
+      <div class="gd">Chaque étiquette peut être affichée, floutée avec un avertissement, ou masquée.</div>
+      <div class="bl">
+        <div class="row"><div class="t">Activer le contenu pour adultes</div><span class="sw"></span></div>
+        <div class="row"><div class="t">Nudité non sexuelle</div><span class="dd">Avertir ▾</span></div>
+        <div class="row"><div class="t">Violence graphique</div><span class="dd">Masquer ▾</span></div>
+        <div class="row"><div class="t">Contenu pouvant heurter</div><span class="dd">Avertir ▾</span></div>
+      </div>
+
+      <div class="gt">Services d'étiquetage</div>
+      <div class="gd">Des services tiers ajoutent leurs propres étiquettes à vos fils et profils.</div>
+      <div class="bl">
+        <div class="row"><i style="width:36px;height:36px;border-radius:8px;background:#1a5fb4;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-style:normal">M</i><div class="t">Modération Bluesky<small>Service par défaut · activé</small></div><span class="sw on"></span></div>
+        <div class="row"><i style="width:36px;height:36px;border-radius:8px;background:#26626b;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-style:normal">V</i><div class="t">Veille communautaire fr<small>Spam et arnaques</small></div><span class="sw on"></span></div>
+      </div>
+
+      <div class="gt">Interactions</div>
+      <div class="bl">
+        <div class="row"><div class="t">Qui peut vous mentionner<small>Tout le monde</small></div><svg viewBox="0 0 16 16"><path d="M6 3l5 5-5 5"/></svg></div>
+        <div class="row"><div class="t">Qui peut répondre à vos nouveaux posts<small>Tout le monde</small></div><svg viewBox="0 0 16 16"><path d="M6 3l5 5-5 5"/></svg></div>
+        <div class="row"><div class="t">Vérification<small>Afficher les badges de vérification</small></div><span class="sw on"></span></div>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":760,"height":760}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

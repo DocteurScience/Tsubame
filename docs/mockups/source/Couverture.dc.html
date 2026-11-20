@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Couverture fonctionnelle</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;background:transparent}
+*{box-sizing:border-box}
+.pg{width:1280px;height:980px;padding:36px 40px;background:#fafafb;color:#2e3436;font-family:"Adwaita Sans",Cantarell,Inter,system-ui,sans-serif;font-size:13.5px;line-height:1.4;border-radius:12px;border:1px solid rgba(0,0,0,.2);overflow:hidden}
+.g{background:#fff;border:1px solid #dcdcdc;border-radius:12px;overflow:hidden;margin-bottom:14px}
+.g h2{margin:0;padding:10px 14px;font-size:13px;font-weight:700;background:#f0f0f1;border-bottom:1px solid #dcdcdc}
+.r{display:grid;grid-template-columns:1.15fr 1fr;gap:14px;padding:8px 14px;border-top:1px solid #ececec}
+.r:first-of-type{border-top:0}
+.w{color:#1a5fb4;font-weight:700}
+</style>
+</helmet>
+<div class="pg">
+  <div style="margin-bottom:18px">
+    <div style="font-size:22px;font-weight:700">Quelle fonction Bluesky, quel écran GNOME</div>
+    <div style="color:#5e5c64;margin-top:4px;max-width:820px">Liste établie à partir des écrans déclarés dans le dépôt social-app (navigation, profils, messagerie, modération, paramètres). En bleu, le widget libadwaita ou le pattern de la HIG utilisé.</div>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 24px">
+    <div>
+      <sc-for list="{{left}}" as="g" hint-placeholder-count="3">
+        <section class="g"><h2>{{g.title}}</h2>
+          <sc-for list="{{g.rows}}" as="x" hint-placeholder-count="3">
+            <div class="r"><span>{{x.f}}</span><span class="w">{{x.w}}</span></div>
+          </sc-for>
+        </section>
+      </sc-for>
+    </div>
+    <div>
+      <sc-for list="{{right}}" as="g" hint-placeholder-count="3">
+        <section class="g"><h2>{{g.title}}</h2>
+          <sc-for list="{{g.rows}}" as="x" hint-placeholder-count="3">
+            <div class="r"><span>{{x.f}}</span><span class="w">{{x.w}}</span></div>
+          </sc-for>
+        </section>
+      </sc-for>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":980}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      left: [
+        { title:'Lire', rows:[
+          { f:'Fils épinglés : Following, Discover, fils personnalisés', w:'Barre latérale, AdwNavigationSplitView' },
+          { f:'Nouveaux posts, actualisation', w:'Pilule flottante (OSD) et bouton, F5' },
+          { f:'Fil de discussion, réponses', w:'Volet utilitaire, page empilée en mobile' },
+          { f:'Hashtags, sujets, flux vidéo', w:'Pages dans AdwNavigationView' },
+          { f:'Qui a aimé, reposté ou cité', w:'AdwDialog avec liste de comptes' },
+          { f:'Signets', w:'Page de la barre latérale' }
+        ]},
+        { title:'Publier', rows:[
+          { f:'Post, fil de posts, brouillons', w:'AdwDialog (feuille basse en mobile), Ctrl+N' },
+          { f:'Images avec texte ALT, vidéo, GIF, aperçu de lien', w:'Barre d’outils du dialogue, portail Fichiers' },
+          { f:'Langue, étiquettes de contenu', w:'Boutons à popover' },
+          { f:'Qui peut répondre ou citer', w:'Boutons à popover' },
+          { f:'Répondre, citer, reposter, aimer, partager, traduire', w:'Barre d’actions et menu ⋮ (GMenu)' }
+        ]},
+        { title:'Découvrir', rows:[
+          { f:'Recherche : posts, personnes, flux', w:'GtkSearchEntry en en-tête, Ctrl+K' },
+          { f:'Tendances, comptes suggérés', w:'Listes encadrées' },
+          { f:'Starter packs : voir, créer, modifier', w:'Cartes, assistant en pages' },
+          { f:'Flux : parcourir, épingler, réordonner', w:'Page Flux, rangées déplaçables' }
+        ]}
+      ],
+      right: [
+        { title:'Personnes et listes', rows:[
+          { f:'Profil, onglets, abonnés, abonnements, suivis communs', w:'Page profil, AdwToggleGroup' },
+          { f:'Suivre, notifications d’activité, masquer, bloquer, signaler', w:'Boutons d’en-tête et menu ⋮' },
+          { f:'Modifier mon profil : avatar, bannière, bio', w:'AdwDialog' },
+          { f:'Listes : créer, modifier, suivre', w:'Page de la barre latérale' }
+        ]},
+        { title:'Messages et notifications', rows:[
+          { f:'Conversations, demandes, groupes, réactions, partage de post', w:'Vue à trois volets (écran 5)' },
+          { f:'Notifications : toutes, mentions, réglages', w:'Page de liste, badge dans la barre' },
+          { f:'Alertes hors de l’appli', w:'Notifications de bureau via le portail' }
+        ]},
+        { title:'Modération et préférences', rows:[
+          { f:'Comptes masqués et bloqués, listes de modération, mots masqués', w:'AdwPreferencesDialog (écran 6)' },
+          { f:'Étiquettes de contenu, services d’étiquetage, boîte de modération', w:'AdwComboRow, AdwSwitchRow' },
+          { f:'Compte : e-mail, mot de passe d’application, export, multi-comptes', w:'Préférences, jeton gardé dans libsecret' },
+          { f:'Apparence, langues, accessibilité, intégrations externes', w:'Suit le thème et l’accent du système' },
+          { f:'Aide, mentions légales', w:'AdwAboutDialog' }
+        ]}
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

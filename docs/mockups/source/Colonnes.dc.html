@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Grand écran, colonnes de cartes</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;background:transparent}
+*{box-sizing:border-box}
+.win{width:2560px;height:1440px;display:flex;background:#f0f0f2;color:#2e3436;font-family:"Adwaita Sans",Cantarell,Inter,system-ui,sans-serif;font-size:14px;line-height:1.4;border-radius:12px;overflow:hidden;border:1px solid rgba(0,0,0,.2)}
+.hb{height:47px;flex:none;display:flex;align-items:center;gap:6px;padding:0 6px;background:#ebebeb;border-bottom:1px solid #d6d6d6}
+.hb h1{flex:1;margin:0;text-align:center;font-size:14px;font-weight:700}
+.ib{width:34px;height:34px;flex:none;display:inline-flex;align-items:center;justify-content:center;border:0;border-radius:6px;background:transparent;color:#2e3436;padding:0}
+svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.sug{background:#1c71d8;color:#fff}
+.side{width:240px;flex:none;background:#ebebeb;border-right:1px solid #d6d6d6;display:flex;flex-direction:column}
+.nav{display:flex;align-items:center;gap:10px;height:36px;margin:1px 6px;padding:0 10px;border-radius:6px;color:#2e3436;text-decoration:none}
+.nav.on{background:rgba(0,0,0,.09)}
+.nav span{flex:1}
+.badge{min-width:20px;height:20px;border-radius:10px;background:#1c71d8;color:#fff;font-size:11px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;padding:0 6px;font-style:normal}
+.cap{margin:14px 14px 4px;font-size:11px;font-weight:700;color:#5e5c64;letter-spacing:.04em;text-transform:uppercase}
+.dim{color:#5e5c64}
+.av{border-radius:50%;color:#fff;font-weight:700;display:flex;align-items:center;justify-content:center;font-style:normal;flex:none}
+.cols{flex:1;min-width:0;display:flex;gap:12px;padding:12px}
+.col{flex:1;min-width:0;display:flex;flex-direction:column;background:#f7f7f8;border:1px solid #d6d6d6;border-radius:12px;overflow:hidden}
+.col .hb{border-radius:0}
+.cards{flex:1;overflow:hidden;padding:12px;display:flex;flex-direction:column;gap:10px}
+.card{background:#fff;border-radius:12px;border:1px solid #dcdcdc;padding:12px 14px;display:flex;gap:10px;box-shadow:0 1px 2px rgba(0,0,0,.05)}
+.card.sel{border-color:#1c71d8;box-shadow:0 0 0 2px rgba(28,113,216,.35)}
+.stats{display:flex;gap:16px;margin-top:8px;font-size:12.5px;color:#5e5c64}
+.stats span{display:inline-flex;align-items:center;gap:5px}
+.stats svg{width:14px;height:14px}
+.pane{width:560px;flex:none;border-left:1px solid #d6d6d6;background:#fafafb;display:flex;flex-direction:column}
+.act{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 10px;border:0;border-radius:6px;background:rgba(0,0,0,.06);color:#2e3436;font:inherit;font-size:13px;font-weight:700}
+</style>
+</helmet>
+<div class="win">
+
+<aside class="side">
+  <div class="hb">
+    <button class="ib" aria-label="Menu principal"><svg viewBox="0 0 16 16"><path d="M2.5 4h11M2.5 8h11M2.5 12h11"/></svg></button>
+    <h1>Tsubame</h1>
+    <button class="ib sug" aria-label="Nouveau post"><svg viewBox="0 0 16 16"><path d="M3 13l.6-3.2L11 2.4 13.6 5 6.2 12.4z"/></svg></button>
+  </div>
+  <div style="flex:1;overflow:hidden">
+    <div class="cap" style="margin-top:12px">Colonnes ouvertes</div>
+    <a class="nav on" href="#"><svg viewBox="0 0 16 16"><path d="M2.5 7.5L8 3l5.5 4.5V13a.5.5 0 0 1-.5.5H3a.5.5 0 0 1-.5-.5z"/></svg><span>Following</span></a>
+    <a class="nav on" href="#"><svg viewBox="0 0 16 16"><path d="M4 11V7a4 4 0 0 1 8 0v4l1 1.5H3zM6.5 14h3"/></svg><span>Notifications</span><i class="badge">3</i></a>
+    <a class="nav on" href="#"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.5"/><path d="M10.5 5.5L9 9 5.5 10.5 7 7z"/></svg><span>Discover</span></a>
+    <a class="nav on" href="#"><svg viewBox="0 0 16 16"><path d="M3 3a10 10 0 0 1 10 10M3 7a6 6 0 0 1 6 6"/><path d="M3.6 12.4h.01" stroke-width="2.6"/></svg><span>Linux et libre</span></a>
+    <a class="nav" href="#" style="color:#1a5fb4"><svg viewBox="0 0 16 16"><path d="M8 3v10M3 8h10"/></svg><span>Ajouter une colonne</span></a>
+    <div class="cap">Ailleurs</div>
+    <a class="nav" href="#"><svg viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5L14 14"/></svg><span>Explorer</span></a>
+    <a class="nav" href="#"><svg viewBox="0 0 16 16"><path d="M2.5 3.5h11v7h-5l-3 3v-3h-3z"/></svg><span>Messages</span><i class="badge">2</i></a>
+    <a class="nav" href="#"><svg viewBox="0 0 16 16"><path d="M4 2.5h8v11L8 10.5 4 13.5z"/></svg><span>Signets</span></a>
+    <a class="nav" href="#"><svg viewBox="0 0 16 16"><path d="M5 4h8M5 8h8M5 12h8M2.5 4h.01M2.5 8h.01M2.5 12h.01"/></svg><span>Listes</span></a>
+    <a class="nav" href="#"><svg viewBox="0 0 16 16"><circle cx="8" cy="5.5" r="2.5"/><path d="M3 13.5a5 5 0 0 1 10 0"/></svg><span>Profil</span></a>
+  </div>
+</aside>
+
+<div class="cols">
+  <sc-for list="{{columns}}" as="col" hint-placeholder-count="4">
+    <section class="col">
+      <div class="hb">
+        <button class="ib" aria-label="Actualiser"><svg viewBox="0 0 16 16"><path d="M13 8a5 5 0 1 1-1.5-3.5M13 2.5v3h-3"/></svg></button>
+        <h1>{{col.title}}</h1>
+        <button class="ib" aria-label="Options de la colonne"><svg viewBox="0 0 16 16"><circle cx="3.5" cy="8" r="1" fill="currentColor"/><circle cx="8" cy="8" r="1" fill="currentColor"/><circle cx="12.5" cy="8" r="1" fill="currentColor"/></svg></button>
+        <button class="ib" aria-label="Fermer la colonne"><svg viewBox="0 0 16 16"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>
+      </div>
+      <div class="cards">
+        <sc-for list="{{col.cards}}" as="c" hint-placeholder-count="5">
+          <article class="card {{c.cls}}">
+            <i class="av" style="width:40px;height:40px;background:{{c.color}}">{{c.ini}}</i>
+            <div style="flex:1;min-width:0">
+              <sc-if value="{{c.head}}" hint-placeholder-val="{{ false }}">
+                <div class="dim" style="font-size:12.5px;margin-bottom:2px">{{c.head}}</div>
+              </sc-if>
+              <div style="display:flex;align-items:baseline;gap:6px"><b>{{c.name}}</b><span class="dim" style="font-size:12.5px">{{c.time}}</span></div>
+              <div style="margin-top:2px;text-wrap:pretty">{{c.text}}</div>
+              <sc-if value="{{c.image}}" hint-placeholder-val="{{ false }}">
+                <div style="position:relative;margin-top:8px;height:150px;border-radius:8px;background:#d5dde6"><span style="position:absolute;left:6px;bottom:6px;padding:1px 6px;border-radius:4px;background:rgba(0,0,0,.72);color:#fff;font-size:10.5px;font-weight:700">ALT</span></div>
+              </sc-if>
+              <div class="stats">
+                <span><svg viewBox="0 0 16 16"><path d="M2.5 3.5h11v7h-5l-3 3v-3h-3z"/></svg>{{c.r}}</span>
+                <span><svg viewBox="0 0 16 16"><path d="M3 7V6a1.5 1.5 0 0 1 1.5-1.5H12L10 2.5M13 9v1a1.5 1.5 0 0 1-1.5 1.5H4L6 13.5"/></svg>{{c.rp}}</span>
+                <span><svg viewBox="0 0 16 16"><path d="M8 13.5S2.5 10 2.5 6.2A2.7 2.7 0 0 1 8 5a2.7 2.7 0 0 1 5.5 1.2C13.5 10 8 13.5 8 13.5z"/></svg>{{c.l}}</span>
+              </div>
+            </div>
+          </article>
+        </sc-for>
+      </div>
+    </section>
+  </sc-for>
+</div>
+
+<section class="pane">
+  <div class="hb">
+    <button class="ib" aria-label="Fermer le volet"><svg viewBox="0 0 16 16"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>
+    <h1>Discussion</h1>
+    <button class="ib" aria-label="Plus d'actions"><svg viewBox="0 0 16 16"><circle cx="3.5" cy="8" r="1" fill="currentColor"/><circle cx="8" cy="8" r="1" fill="currentColor"/><circle cx="12.5" cy="8" r="1" fill="currentColor"/></svg></button>
+  </div>
+  <div style="flex:1;overflow:hidden;padding:18px;display:flex;flex-direction:column;gap:12px">
+    <div class="card" style="padding:18px;flex-direction:column;gap:12px">
+      <div style="display:flex;gap:10px;align-items:center"><i class="av" style="width:44px;height:44px;background:#613583">LM</i><div style="line-height:1.25"><b>Lucie Morel</b><br><span class="dim" style="font-size:13px">@lucie.example.social · 20 nov., 14:32</span></div></div>
+      <div style="font-size:16px;line-height:1.5;text-wrap:pretty">Notes de version de GNOME 49 : le nouveau sélecteur de fichiers est enfin utilisable au clavier de bout en bout. Merci à celles et ceux qui ont testé la bêta.</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="act"><svg viewBox="0 0 16 16"><path d="M2.5 3.5h11v7h-5l-3 3v-3h-3z"/></svg>Répondre</button>
+        <button class="act"><svg viewBox="0 0 16 16"><path d="M3 7V6a1.5 1.5 0 0 1 1.5-1.5H12L10 2.5M13 9v1a1.5 1.5 0 0 1-1.5 1.5H4L6 13.5"/></svg>Reposter · 12</button>
+        <button class="act"><svg viewBox="0 0 16 16"><path d="M8 13.5S2.5 10 2.5 6.2A2.7 2.7 0 0 1 8 5a2.7 2.7 0 0 1 5.5 1.2C13.5 10 8 13.5 8 13.5z"/></svg>J'aime · 48</button>
+      </div>
+    </div>
+    <div class="dim" style="font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;margin:6px 4px 0">3 réponses</div>
+    <div class="card"><i class="av" style="width:34px;height:34px;font-size:12px;background:#1b6b45">AK</i><div style="flex:1"><div style="display:flex;gap:6px;align-items:baseline"><b>Aya Koné</b><span class="dim" style="font-size:12.5px">20 min</span></div><div style="text-wrap:pretty">Super nouvelle. Le raccourci pour ouvrir le dossier parent est-il documenté quelque part ?</div></div></div>
+    <div class="card"><i class="av" style="width:34px;height:34px;font-size:12px;background:#865e3c">RB</i><div style="flex:1"><div style="display:flex;gap:6px;align-items:baseline"><b>Romain Bailly</b><span class="dim" style="font-size:12.5px">12 min</span></div><div style="text-wrap:pretty">Je confirme, testé hier sur Fedora. Mention spéciale pour la recherche récursive.</div></div></div>
+    <div class="card"><i class="av" style="width:34px;height:34px;font-size:12px;background:#26626b">NS</i><div style="flex:1"><div style="display:flex;gap:6px;align-items:baseline"><b>Nadia Safi</b><span class="dim" style="font-size:12.5px">5 min</span></div><div style="text-wrap:pretty">Et la vue en grille des miniatures, c'est pour 50 ou plus tard ?</div></div></div>
+  </div>
+</section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":2560,"height":1440}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const P = (ini,color,name,time,text,r,rp,l,extra) => Object.assign({ ini, color, name, time, text, r, rp, l, cls:'' }, extra || {});
+    return {
+      columns: [
+        { title:'Following', cards:[
+          P('RB','#865e3c','Romain Bailly','4 min','Premier essai de Flathub en mode hors ligne dans le train : tout fonctionne, sauf la météo de mon appli de météo.','5','2','31'),
+          P('LM','#613583','Lucie Morel','27 min','Notes de version de GNOME 49 : le nouveau sélecteur de fichiers est enfin utilisable au clavier de bout en bout.','8','12','48',{cls:'sel'}),
+          P('AK','#1b6b45','Aya Koné','1 h','Lever de soleil sur le Vercors ce matin, 6 h 40, moins 3 degrés.','14','9','212',{image:true}),
+          P('PD','#a51d2d','Pierre Delmas','2 h','Un billet sur l’accessibilité des applications GTK4 : ce que Orca lit vraiment.','3','6','57'),
+          P('NS','#26626b','Nadia Safi','3 h','Le glossaire de traduction est à jour : une cinquantaine de termes harmonisés cette semaine.','2','4','39'),
+          P('RB','#865e3c','Romain Bailly','5 h','Qui a testé le portail de sélection de fichiers sous Wayland avec un lecteur d’écran ?','9','3','22'),
+          P('AK','#1b6b45','Aya Koné','6 h','Reprise des sorties photo ce week-end, plutôt côté Chartreuse.','1','0','65')
+        ]},
+        { title:'Notifications', cards:[
+          P('AK','#1b6b45','Aya Koné','2 min','Super nouvelle. Le raccourci pour ouvrir le dossier parent est-il documenté ?','0','0','3',{head:'a répondu à votre post'}),
+          P('LM','#613583','Lucie Morel','18 min','Test de la bêta de GNOME 49 sur mon portable : le sélecteur de fichiers, c’est du bon.','2','1','12',{head:'vous a mentionné'}),
+          P('PD','#a51d2d','Pierre Delmas','40 min','Rappel : ajoutez un texte alternatif à vos captures d’écran.','1','5','20',{head:'a aimé et reposté votre post'}),
+          P('NS','#26626b','Nadia Safi','1 h','Nadia Safi vous suit depuis ce matin.','0','0','0',{head:'nouvel abonné'}),
+          P('RB','#865e3c','Romain Bailly','2 h','Merci pour la capture, elle m’a bien aidé.','0','0','4',{head:'a répondu à votre post'}),
+          P('AK','#1b6b45','Aya Koné','4 h','Aya Koné a aimé 3 de vos posts.','0','0','0',{head:'activité'})
+        ]},
+        { title:'Discover', cards:[
+          P('MC','#865e3c','Marc Collin','8 min','Dix ans de Flatpak : ce que la distribution d’applications a changé pour les bureaux Linux.','21','40','310'),
+          P('SB','#1a5fb4','Sophie Berger','21 min','Atelier d’écriture accessible ce samedi à la médiathèque, inscriptions ouvertes.','4','12','88'),
+          P('TV','#613583','Théo Vidal','35 min','Un nouveau fil pour suivre les sorties de logiciels libres francophones.','6','18','140'),
+          P('CG','#26626b','Clara Giraud','1 h','Carnet de voyage sonore : trois semaines en Islande, 40 enregistrements de terrain.','11','25','420',{image:true}),
+          P('MC','#865e3c','Marc Collin','2 h','Petit rappel : sauvegardez avant de mettre à jour, même quand tout se passe bien.','7','31','260'),
+          P('SB','#1a5fb4','Sophie Berger','3 h','Hâte de voir les retours sur la nouvelle mise en page des listes.','2','5','47')
+        ]},
+        { title:'Linux et libre', cards:[
+          P('HR','#a51d2d','Hugo Renard','12 min','Sortie de la version 1.8 : meilleure prise en charge des écrans à haute densité.','6','14','97'),
+          P('IM','#1b6b45','Inès Martin','30 min','Bureau GNOME en 4K à 100 % : on gagne énormément de place, mais le texte devient petit.','18','7','156'),
+          P('LM','#613583','Lucie Morel','50 min','Notes de version de GNOME 49 : le nouveau sélecteur de fichiers est enfin utilisable au clavier.','8','12','48'),
+          P('FD','#26626b','Fanny Dumas','1 h','Rapport de la rencontre des traducteurs : 14 langues, un seul dépôt.','3','8','72'),
+          P('HR','#a51d2d','Hugo Renard','2 h','Un script pour trier ses captures d’écran par date, en vingt lignes.','5','9','81'),
+          P('IM','#1b6b45','Inès Martin','4 h','Quel est votre éditeur de texte du moment ? Je compare pour un billet.','31','4','63')
+        ]}
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>
