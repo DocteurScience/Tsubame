@@ -24,10 +24,6 @@ impl ColumnKind {
         ColumnKind::Feed(Feed::LinuxEtLibre),
     ];
 
-    /// Colonnes ouvertes au premier lancement.
-    pub const DEFAULT: [ColumnKind; 2] =
-        [ColumnKind::Feed(Feed::Following), ColumnKind::Notifications];
-
     /// Identifiant stable, utilisé comme cible des actions.
     pub fn id(self) -> &'static str {
         match self {
@@ -83,6 +79,8 @@ pub struct Column {
     title: adw::WindowTitle,
     switcher: gtk::MenuButton,
     close: gtk::Button,
+    options: gtk::MenuButton,
+    moves: gio::Menu,
     posts: Rc<Vec<Post>>,
 }
 
@@ -155,6 +153,27 @@ impl Column {
             .build();
         header.pack_end(&close);
 
+        // Menu « Options de la colonne », comme dans la maquette Colonnes.
+        let target = kind.id();
+        let menu = gio::Menu::new();
+        let moves = gio::Menu::new();
+        menu.append_section(None, &moves);
+        let closing = gio::Menu::new();
+        closing.append(
+            Some(&gettext("Fermer la colonne")),
+            Some(&format!("win.close-column::{target}")),
+        );
+        menu.append_section(None, &closing);
+        let options = gtk::MenuButton::builder()
+            .icon_name("view-more-symbolic")
+            .menu_model(&menu)
+            .tooltip_text(gettext("Options de la colonne"))
+            .build();
+        options.update_property(&[gtk::accessible::Property::Label(&gettext(
+            "Options de la colonne",
+        ))]);
+        header.pack_end(&options);
+
         let root = adw::ToolbarView::builder()
             .content(&scroll)
             .css_classes(["column"])
@@ -169,6 +188,8 @@ impl Column {
             title,
             switcher,
             close,
+            options,
+            moves,
             posts: Rc::new(posts),
         }
     }
@@ -183,10 +204,30 @@ impl Column {
         });
     }
 
+    /// Ne propose dans le menu que les déplacements possibles depuis la
+    /// position `index` parmi `count` colonnes.
+    pub fn set_position(&self, index: usize, count: usize) {
+        let target = self.kind.id();
+        self.moves.remove_all();
+        if index > 0 {
+            self.moves.append(
+                Some(&gettext("Déplacer vers la gauche")),
+                Some(&format!("win.move-column-left::{target}")),
+            );
+        }
+        if index + 1 < count {
+            self.moves.append(
+                Some(&gettext("Déplacer vers la droite")),
+                Some(&format!("win.move-column-right::{target}")),
+            );
+        }
+    }
+
     /// Colonne affichée seule dans sa propre page, sans bouton de
     /// fermeture (onglet Notifications du palier compact).
     pub fn set_standalone(&self) {
         self.close.set_visible(false);
+        self.options.set_visible(false);
         self.header.set_show_end_title_buttons(true);
     }
 
@@ -209,5 +250,35 @@ impl Column {
         if let Some(row) = row {
             row.grab_focus();
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ids_round_trip() {
+        for kind in ColumnKind::ALL {
+            assert_eq!(ColumnKind::from_id(kind.id()), Some(kind));
+        }
+        assert_eq!(ColumnKind::from_id("inconnue"), None);
+    }
+
+    #[test]
+    fn schema_default_columns_exist() {
+        let schema = include_str!("../data/io.github.DocteurScience.Tsubame.gschema.xml");
+        let default = schema
+            .split("<default>")
+            .nth(1)
+            .and_then(|rest| rest.split("</default>").next())
+            .expect("valeur par défaut de « columns »");
+        let ids: Vec<&str> = default
+            .trim_matches(|c| c == '[' || c == ']')
+            .split(',')
+            .map(|id| id.trim().trim_matches('\''))
+            .collect();
+        assert_eq!(ids, ["following", "notifications"]);
+        assert!(ids.iter().all(|id| ColumnKind::from_id(id).is_some()));
     }
 }

@@ -19,7 +19,9 @@ meson compile -C _build
 meson install -C _build
 ```
 
-`meson test -C _build` valide le fichier `.desktop` et les métadonnées AppStream.
+Avec `cargo run`, les réglages (GSettings) utilisent le schéma compilé dans le dossier de build. Une fois l'application installée, ils utilisent le schéma installé dans `glib-2.0/schemas`.
+
+`meson test -C _build` valide le schéma GSettings, le fichier `.desktop` et les métadonnées AppStream.
 
 ## Flatpak
 

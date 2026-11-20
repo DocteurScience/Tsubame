@@ -215,6 +215,25 @@ impl ColumnsView {
         self.queue_resize();
     }
 
+    /// Déplace la colonne d'indice `from` à l'indice `to`.
+    pub fn move_column(&self, from: usize, to: usize) {
+        let imp = self.imp();
+        let mut columns = imp.columns.borrow_mut();
+        if from >= columns.len() || to >= columns.len() || from == to {
+            return;
+        }
+        let column = columns.remove(from);
+        columns.insert(to, column.clone());
+        // L'ordre des widgets fixe l'ordre de tabulation : le suivre.
+        let next = columns
+            .get(to + 1)
+            .cloned()
+            .or_else(|| imp.separator.borrow().clone().map(|s| s.upcast()));
+        column.insert_before(self, next.as_ref());
+        drop(columns);
+        self.queue_allocate();
+    }
+
     /// Décale au besoin les colonnes affichées pour que celle d'indice
     /// `index` soit visible, et la garde visible quand la largeur change.
     pub fn reveal(&self, index: usize) {

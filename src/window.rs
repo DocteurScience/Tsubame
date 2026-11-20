@@ -174,6 +174,8 @@ struct State {
     stacked: ThreadView,
     /// Colonne de la page Notifications de la barre du bas (palier compact).
     compact_notifications: Column,
+    /// Colonnes ouvertes et leur ordre, retrouvés au lancement suivant.
+    settings: gio::Settings,
 }
 
 impl State {
@@ -219,7 +221,7 @@ impl State {
         self.show_column(kind);
     }
 
-    fn close_column(&self, kind: ColumnKind) {
+    fn close_column(self: &Rc<Self>, kind: ColumnKind) {
         let Some(index) = self.column_index(kind) else {
             return;
         };
@@ -248,6 +250,49 @@ impl State {
         }
     }
 
+    /// Déplace une colonne à l'indice `to`. Elle reste la colonne courante.
+    fn move_column_to(self: &Rc<Self>, kind: ColumnKind, to: usize) {
+        let Some(from) = self.column_index(kind) else {
+            return;
+        };
+        let to = to.min(self.columns.borrow().len() - 1);
+        if from == to {
+            return;
+        }
+        {
+            let mut columns = self.columns.borrow_mut();
+            let column = columns.remove(from);
+            columns.insert(to, column);
+        }
+        self.columns_view.move_column(from, to);
+        self.columns_changed();
+        self.show_column(kind);
+    }
+
+    /// Déplace une colonne d'un cran vers la gauche (-1) ou la droite (+1).
+    fn move_column(self: &Rc<Self>, kind: ColumnKind, delta: isize) {
+        if let Some(from) = self.column_index(kind) {
+            let to = from as isize + delta;
+            if to >= 0 {
+                self.move_column_to(kind, to as usize);
+            }
+        }
+    }
+
+    fn current_kind(&self) -> Option<ColumnKind> {
+        self.columns
+            .borrow()
+            .get(self.current.get())
+            .map(|c| c.kind)
+    }
+
+    fn save_columns(&self) {
+        let ids: Vec<&str> = self.columns.borrow().iter().map(|c| c.kind.id()).collect();
+        if let Err(error) = self.settings.set_strv("columns", ids) {
+            glib::g_warning!("tsubame", "Colonnes non enregistrées : {error}");
+        }
+    }
+
     /// Montre la colonne voisine (Ctrl+Page suivante, Ctrl+Page précédente).
     fn step_column(&self, delta: isize) {
         let kind = {
@@ -261,7 +306,11 @@ impl State {
         }
     }
 
-    fn columns_changed(&self) {
+    fn columns_changed(self: &Rc<Self>) {
+        let count = self.columns.borrow().len();
+        for (index, column) in self.columns.borrow().iter().enumerate() {
+            column.set_position(index, count);
+        }
         self.columns_menu.remove_all();
         for column in self.columns.borrow().iter() {
             self.columns_menu.append(
@@ -285,10 +334,11 @@ impl State {
                 .then(|| gettext("Toutes les colonnes sont ouvertes"))
                 .as_deref(),
         );
+        self.save_columns();
         self.rebuild_sidebar();
     }
 
-    fn rebuild_sidebar(&self) {
+    fn rebuild_sidebar(self: &Rc<Self>) {
         self.syncing.set(true);
         // Le bouton d'ajout est réutilisé : le détacher avant de vider.
         if let Some(row) = self.add_button.parent() {
@@ -300,8 +350,9 @@ impl State {
         let mut items = Vec::new();
         for column in self.columns.borrow().iter() {
             let kind = column.kind;
-            self.sidebar_list
-                .append(&sidebar_row(kind.icon(), &kind.title(), kind.badge()));
+            let row = sidebar_row(kind.icon(), &kind.title(), kind.badge());
+            self.make_draggable(&row, kind);
+            self.sidebar_list.append(&row);
             items.push(SidebarItem::Column(kind));
         }
         self.sidebar_list.append(
@@ -322,6 +373,41 @@ impl State {
         self.sidebar_list.invalidate_headers();
         self.syncing.set(false);
         self.sync_sidebar();
+    }
+
+    /// Les rangées des colonnes ouvertes se réordonnent par glisser-déposer.
+    fn make_draggable(self: &Rc<Self>, row: &gtk::ListBoxRow, kind: ColumnKind) {
+        let source = gtk::DragSource::new();
+        source.set_actions(gtk::gdk::DragAction::MOVE);
+        source.connect_prepare(move |_, _, _| {
+            Some(gtk::gdk::ContentProvider::for_value(&kind.id().to_value()))
+        });
+        let dragged = row.downgrade();
+        source.connect_drag_begin(move |source, _| {
+            if let Some(row) = dragged.upgrade() {
+                source.set_icon(Some(&gtk::WidgetPaintable::new(Some(&row))), 0, 0);
+            }
+        });
+        row.add_controller(source);
+
+        let target = gtk::DropTarget::new(glib::Type::STRING, gtk::gdk::DragAction::MOVE);
+        let state = Rc::downgrade(self);
+        target.connect_drop(move |_, value, _, _| {
+            let dropped = value
+                .get::<String>()
+                .ok()
+                .and_then(|id| ColumnKind::from_id(&id));
+            let (Some(state), Some(dropped)) = (state.upgrade(), dropped) else {
+                return false;
+            };
+            let Some(to) = state.column_index(kind) else {
+                return false;
+            };
+            // La barre latérale est reconstruite : attendre la fin du dépôt.
+            glib::idle_add_local_once(move || state.move_column_to(dropped, to));
+            true
+        });
+        row.add_controller(target);
     }
 
     /// Met la sélection de la barre latérale en accord avec ce qui est
@@ -441,6 +527,24 @@ fn install_actions(window: &adw::ApplicationWindow, state: &Rc<State>) {
         s.close_column(k)
     }));
     window.add_action(&kind_action("show-column", state, |s, k| s.show_column(k)));
+    window.add_action(&kind_action("move-column-left", state, |s, k| {
+        s.move_column(k, -1)
+    }));
+    window.add_action(&kind_action("move-column-right", state, |s, k| {
+        s.move_column(k, 1)
+    }));
+    for (name, delta) in [("move-current-left", -1), ("move-current-right", 1)] {
+        let action = gio::SimpleAction::new(name, None);
+        let weak = Rc::downgrade(state);
+        action.connect_activate(move |_, _| {
+            if let Some(state) = weak.upgrade()
+                && let Some(kind) = state.current_kind()
+            {
+                state.move_column(kind, delta);
+            }
+        });
+        window.add_action(&action);
+    }
 
     for (name, delta) in [("next-column", 1), ("previous-column", -1)] {
         let action = gio::SimpleAction::new(name, None);
@@ -609,6 +713,7 @@ pub fn build(app: &adw::Application) -> adw::ApplicationWindow {
         pane,
         stacked,
         compact_notifications,
+        settings: crate::settings::settings(),
     });
     state.connect_column(&state.compact_notifications);
     install_actions(&window, &state);
@@ -677,12 +782,22 @@ pub fn build(app: &adw::Application) -> adw::ApplicationWindow {
         window.add_breakpoint(breakpoint);
     }
 
-    // Colonnes ouvertes par défaut, la première au premier plan.
+    // Colonnes enregistrées (Following et Notifications au premier
+    // lancement), la première au premier plan.
     columns_view.append_column(&state.no_columns);
-    for kind in ColumnKind::DEFAULT {
-        state.open_column(kind);
+    let saved: Vec<ColumnKind> = state
+        .settings
+        .strv("columns")
+        .iter()
+        .filter_map(|id| ColumnKind::from_id(id))
+        .collect();
+    for kind in &saved {
+        state.open_column(*kind);
     }
-    state.show_column(ColumnKind::DEFAULT[0]);
+    state.columns_changed();
+    if let Some(first) = saved.first() {
+        state.show_column(*first);
+    }
 
     // Les gestionnaires ne gardent qu'une référence faible à l'état ; la
     // fenêtre garde la seule référence forte, libérée avec elle.
@@ -693,5 +808,7 @@ pub fn build(app: &adw::Application) -> adw::ApplicationWindow {
     let app = app.clone();
     app.set_accels_for_action("win.next-column", &["<Control>Page_Down"]);
     app.set_accels_for_action("win.previous-column", &["<Control>Page_Up"]);
+    app.set_accels_for_action("win.move-current-right", &["<Control><Shift>Page_Down"]);
+    app.set_accels_for_action("win.move-current-left", &["<Control><Shift>Page_Up"]);
     window
 }

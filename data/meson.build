@@ -37,3 +37,16 @@ install_data(
   'icons/hicolor/symbolic/apps' / application_id + '-symbolic.svg',
   install_dir: datadir / 'icons/hicolor/symbolic/apps',
 )
+
+install_data(
+  application_id + '.gschema.xml',
+  install_dir: datadir / 'glib-2.0/schemas',
+)
+glib_compile_schemas = find_program('glib-compile-schemas', required: false)
+if glib_compile_schemas.found()
+  test(
+    'Valider le schéma GSettings',
+    glib_compile_schemas,
+    args: ['--strict', '--dry-run', meson.current_source_dir()],
+  )
+endif

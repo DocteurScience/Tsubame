@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist gettext-domain="tsubame">
+  <schema id="io.github.DocteurScience.Tsubame" path="/io/github/DocteurScience/Tsubame/">
+    <key name="columns" type="as">
+      <default>['following', 'notifications']</default>
+      <summary>Colonnes ouvertes</summary>
+      <description>Identifiants des colonnes de l’accueil, de gauche à droite : following, discover, linux-et-libre, notifications.</description>
+    </key>
+  </schema>
+</schemalist>
