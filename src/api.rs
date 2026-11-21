@@ -590,14 +590,24 @@ pub struct NewPost {
     pub langs: Vec<String>,
     /// Réponse : la racine de la discussion et le post auquel on répond.
     pub reply: Option<(StrongRef, StrongRef)>,
+    /// Images jointes (4 au plus), prêtes à l'envoi.
+    pub images: Vec<NewImage>,
+}
+
+#[derive(Debug, Clone)]
+pub struct NewImage {
+    pub prepared: crate::photo::Prepared,
+    pub alt: String,
 }
 
 /// Enregistrement `app.bsky.feed.post`. Les mentions dont l'identifiant
 /// n'a pas été résolu (`dids`) restent du texte simple.
+/// `blobs` : les images envoyées, dans l'ordre de `post.images`.
 pub fn post_record(
     post: &NewPost,
     dids: &HashMap<String, String>,
     created_at: &str,
+    blobs: &[serde_json::Value],
 ) -> serde_json::Value {
     use crate::richtext::{Feature, detect};
     use serde_json::json;
@@ -629,6 +639,24 @@ pub fn post_record(
     }
     if !facets.is_empty() {
         record["facets"] = json!(facets);
+    }
+    if !blobs.is_empty() {
+        let images: Vec<_> = post
+            .images
+            .iter()
+            .zip(blobs)
+            .map(|(image, blob)| {
+                json!({
+                    "alt": image.alt,
+                    "image": blob,
+                    "aspectRatio": {
+                        "width": image.prepared.width,
+                        "height": image.prepared.height,
+                    },
+                })
+            })
+            .collect();
+        record["embed"] = json!({"$type": "app.bsky.embed.images", "images": images});
     }
     if let Some((root, parent)) = &post.reply {
         record["reply"] = json!({
@@ -667,8 +695,25 @@ pub async fn publish(session: Arc<Session>, post: NewPost) -> Result<StrongRef, 
             dids.insert(handle, output.data.did.as_str().to_owned());
         }
     }
+    // Images : envoyées une à une avant le post qui les cite.
+    let mut blobs = Vec::new();
+    for image in &post.images {
+        let output = api
+            .api
+            .com
+            .atproto
+            .repo
+            .upload_blob(image.prepared.bytes.clone())
+            .await
+            .map_err(|e| {
+                ApiError::new(
+                    gettext("Une image n'a pas pu être envoyée : {}").replace("{}", &e.to_string()),
+                )
+            })?;
+        blobs.push(serde_json::to_value(&output.data.blob).map_err(|_| invalid_post())?);
+    }
     let created_at = Datetime::now();
-    let record = post_record(&post, &dids, created_at.as_str());
+    let record = post_record(&post, &dids, created_at.as_str(), &blobs);
     let record = serde_json::from_value(record).map_err(|_| invalid_post())?;
     let output = api
         .api
@@ -1103,12 +1148,13 @@ mod tests {
                 .into(),
             langs: vec!["fr".into()],
             reply: Some((root, parent)),
+            images: Vec::new(),
         };
         let dids = HashMap::from([(
             "lucie.example.social".to_owned(),
             "did:plc:lucie".to_owned(),
         )]);
-        let record = post_record(&post, &dids, "2026-11-20T15:00:00.000Z");
+        let record = post_record(&post, &dids, "2026-11-20T15:00:00.000Z", &[]);
         assert_eq!(record["$type"], "app.bsky.feed.post");
         assert_eq!(record["langs"], serde_json::json!(["fr"]));
         assert_eq!(record["reply"]["root"]["cid"], CID);
@@ -1128,13 +1174,53 @@ mod tests {
     }
 
     #[test]
+    fn images_are_embedded_with_alt_text_and_proportions() {
+        let image = |alt: &str| NewImage {
+            prepared: crate::photo::Prepared {
+                bytes: Vec::new(),
+                mime: "image/jpeg",
+                width: 2000,
+                height: 1125,
+            },
+            alt: alt.into(),
+        };
+        let post = NewPost {
+            text: String::new(),
+            langs: vec!["fr".into()],
+            reply: None,
+            images: vec![image("Lever de soleil sur le Vercors"), image("")],
+        };
+        let blob = serde_json::json!({
+            "$type": "blob",
+            "ref": {"$link": CID},
+            "mimeType": "image/jpeg",
+            "size": 123456
+        });
+        let record = post_record(
+            &post,
+            &HashMap::new(),
+            "2026-11-20T15:00:00.000Z",
+            &[blob.clone(), blob],
+        );
+        let images = &record["embed"]["images"];
+        assert_eq!(record["embed"]["$type"], "app.bsky.embed.images");
+        assert_eq!(images[0]["alt"], "Lever de soleil sur le Vercors");
+        assert_eq!(images[1]["alt"], "");
+        assert_eq!(images[0]["aspectRatio"]["height"], 1125);
+        assert_eq!(images[0]["image"]["size"], 123456);
+        // Un post fait seulement d'images est valide.
+        let _: atrium_api::app::bsky::feed::post::Record = serde_json::from_value(record).unwrap();
+    }
+
+    #[test]
     fn plain_posts_have_no_facets_nor_reply() {
         let post = NewPost {
             text: "Bonjour".into(),
             langs: Vec::new(),
             reply: None,
+            images: Vec::new(),
         };
-        let record = post_record(&post, &HashMap::new(), "2026-11-20T15:00:00.000Z");
+        let record = post_record(&post, &HashMap::new(), "2026-11-20T15:00:00.000Z", &[]);
         assert!(record.get("facets").is_none());
         assert!(record.get("reply").is_none());
         assert!(record.get("langs").is_none());

@@ -126,3 +126,25 @@ columnsview > .column headerbar {
   min-height: 56px;
   margin: 18px;
 }
+
+/* Vignettes des images jointes dans la boîte de rédaction. */
+.compose-tile {
+  border-radius: 8px;
+}
+
+.compose-thumb-button {
+  margin: 4px;
+  min-height: 24px;
+  min-width: 24px;
+  padding: 2px 8px;
+}
+
+.compose-alt {
+  font-size: smaller;
+  font-weight: bold;
+}
+
+.compact .compose-thumb-button {
+  min-height: 44px;
+  min-width: 44px;
+}

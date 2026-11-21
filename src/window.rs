@@ -269,11 +269,14 @@ impl State {
             column.set_alone(narrow);
         }
         self.update_window_controls();
-        // Cibles tactiles agrandies en palier compact (voir style.css).
-        if self.compact() {
-            self.root_stack.add_css_class("compact");
-        } else {
-            self.root_stack.remove_css_class("compact");
+        // Cibles tactiles agrandies en palier compact (voir style.css), sur
+        // la fenêtre entière : boîtes de dialogue comprises.
+        if let Some(window) = self.window.upgrade() {
+            if self.compact() {
+                window.add_css_class("compact");
+            } else {
+                window.remove_css_class("compact");
+            }
         }
         if !self.pane_hidden() {
             // Le volet reprend la discussion : retirer la page empilée.

@@ -13,6 +13,7 @@ mod i18n;
 mod images;
 mod interactions;
 mod login;
+mod photo;
 mod richtext;
 mod runtime;
 mod settings;
