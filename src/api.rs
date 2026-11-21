@@ -15,7 +15,7 @@ use chrono::{DateTime, Datelike, FixedOffset, Local, Timelike, Utc};
 use gettextrs::{gettext, ngettext};
 
 use crate::auth::Session;
-use crate::data::{Post, Reply};
+use crate::data::{Media, Post, Reply};
 
 /// Fil « Discover » de Bluesky.
 pub const DISCOVER_FEED: &str =
@@ -177,22 +177,41 @@ fn record_text(post: &PostView) -> String {
         .unwrap_or_default()
 }
 
-/// Texte alternatif de la première image ou vidéo jointe (vide s'il
-/// manque), ou `None` sans média.
-fn media_alt(post: &PostView) -> Option<String> {
-    let first_image = |images: &atrium_api::app::bsky::embed::images::View| {
-        images.images.first().map(|image| image.alt.clone())
+/// Première image ou vidéo jointe, ou `None` sans média.
+fn media(post: &PostView) -> Option<Media> {
+    use atrium_api::app::bsky::embed::{defs::AspectRatio, images, video};
+    let ratio = |ratio: &Option<AspectRatio>| {
+        ratio.as_ref().and_then(|r| {
+            Some((
+                u32::try_from(r.width.get()).ok()?,
+                u32::try_from(r.height.get()).ok()?,
+            ))
+        })
     };
-    let video = |video: &atrium_api::app::bsky::embed::video::View| {
-        Some(video.alt.clone().unwrap_or_default())
+    let images = |view: &images::View| {
+        let first = view.images.first()?;
+        Some(Media {
+            alt: first.alt.clone(),
+            thumb: Some(first.thumb.clone()),
+            aspect_ratio: ratio(&first.aspect_ratio),
+            more: view.images.len().saturating_sub(1) as u32,
+        })
+    };
+    let video = |view: &video::View| {
+        Some(Media {
+            alt: view.alt.clone().unwrap_or_default(),
+            thumb: view.thumbnail.clone(),
+            aspect_ratio: ratio(&view.aspect_ratio),
+            more: 0,
+        })
     };
     match post.embed.as_ref()? {
-        Union::Refs(PostViewEmbedRefs::AppBskyEmbedImagesView(images)) => first_image(images),
-        Union::Refs(PostViewEmbedRefs::AppBskyEmbedVideoView(v)) => video(v),
+        Union::Refs(PostViewEmbedRefs::AppBskyEmbedImagesView(view)) => images(view),
+        Union::Refs(PostViewEmbedRefs::AppBskyEmbedVideoView(view)) => video(view),
         Union::Refs(PostViewEmbedRefs::AppBskyEmbedRecordWithMediaView(with_media)) => {
             match &with_media.media {
-                Union::Refs(ViewMediaRefs::AppBskyEmbedImagesView(images)) => first_image(images),
-                Union::Refs(ViewMediaRefs::AppBskyEmbedVideoView(v)) => video(v),
+                Union::Refs(ViewMediaRefs::AppBskyEmbedImagesView(view)) => images(view),
+                Union::Refs(ViewMediaRefs::AppBskyEmbedVideoView(view)) => video(view),
                 _ => None,
             }
         }
@@ -218,7 +237,8 @@ pub fn post_from_view(post: &PostView, now: DateTime<Utc>) -> Post {
         time: indexed.map(|t| relative_time(t, now)).unwrap_or_default(),
         date: indexed.map(full_date).unwrap_or_default(),
         text: record_text(post),
-        image_alt: media_alt(post),
+        avatar: post.author.avatar.clone(),
+        media: media(post),
         replies: count(post.reply_count),
         reposts: count(post.repost_count),
         likes: count(post.like_count),
@@ -249,6 +269,7 @@ pub fn post_from_feed(item: &FeedViewPost, now: DateTime<Utc>) -> Post {
 fn reply_from_view(post: &PostView, now: DateTime<Utc>) -> Reply {
     let indexed = parse_datetime(post.indexed_at.as_str());
     Reply {
+        avatar: post.author.avatar.clone(),
         name: display_name(&post.author),
         handle: post.author.handle.as_str().to_owned(),
         time: indexed.map(|t| relative_time(t, now)).unwrap_or_default(),
@@ -334,7 +355,8 @@ mod tests {
             "author": {
                 "did": "did:plc:lucie",
                 "handle": "lucie.example.social",
-                "displayName": "Lucie Morel"
+                "displayName": "Lucie Morel",
+                "avatar": "https://cdn.example/avatar/lucie.jpg"
             },
             "record": {
                 "$type": "app.bsky.feed.post",
@@ -346,7 +368,12 @@ mod tests {
                 "images": [{
                     "thumb": "https://cdn.example/thumb.jpg",
                     "fullsize": "https://cdn.example/full.jpg",
-                    "alt": "Capture du sélecteur de fichiers"
+                    "alt": "Capture du sélecteur de fichiers",
+                    "aspectRatio": {"width": 1600, "height": 900}
+                }, {
+                    "thumb": "https://cdn.example/thumb2.jpg",
+                    "fullsize": "https://cdn.example/full2.jpg",
+                    "alt": ""
                 }]
             },
             "replyCount": 8,
@@ -389,8 +416,17 @@ mod tests {
         assert_eq!(post.text, "Notes de version de GNOME 49.");
         assert_eq!(post.time, "28 min");
         assert_eq!(
-            post.image_alt.as_deref(),
-            Some("Capture du sélecteur de fichiers")
+            post.avatar.as_deref(),
+            Some("https://cdn.example/avatar/lucie.jpg")
+        );
+        assert_eq!(
+            post.media,
+            Some(Media {
+                alt: "Capture du sélecteur de fichiers".into(),
+                thumb: Some("https://cdn.example/thumb.jpg".into()),
+                aspect_ratio: Some((1600, 900)),
+                more: 1,
+            })
         );
         assert_eq!((post.replies, post.reposts, post.likes), (8, 12, 48));
         // Repost par un compte sans nom affiché : l'identifiant le remplace.
@@ -423,7 +459,8 @@ mod tests {
         .unwrap();
         let post = post_from_view(&post, now());
         assert_eq!(post.name, "romain.example.social");
-        assert_eq!(post.image_alt, None);
+        assert_eq!(post.media, None);
+        assert_eq!(post.avatar, None);
         assert_eq!((post.replies, post.reposts, post.likes), (0, 0, 0));
         assert_eq!(post.context, None);
     }

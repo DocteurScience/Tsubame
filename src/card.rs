@@ -4,7 +4,8 @@
 use adw::prelude::*;
 use gettextrs::{gettext, ngettext};
 
-use crate::data::{Post, Reply};
+use crate::data::{Media, Post, Reply};
+use crate::images;
 
 const AVATAR_SIZE: i32 = 40;
 const AVATAR_SIZE_LARGE: i32 = 48;
@@ -41,42 +42,93 @@ fn meta(name: &str, time: &str) -> gtk::Box {
     row
 }
 
-/// Image jointe. Pour l'instant un emplacement vide, avec la pastille « ALT »
-/// quand un texte alternatif existe (`alt` non vide).
-fn media(alt: &str) -> gtk::Widget {
-    let placeholder = gtk::Image::builder()
-        .icon_name("image-x-generic-symbolic")
-        .pixel_size(48)
-        .height_request(180)
-        .css_classes(["post-media", "dim-label"])
+/// Largeur approximative d'une image dans une carte, pour en déduire la
+/// hauteur à réserver d'après ses proportions.
+const MEDIA_WIDTH: i32 = 330;
+
+fn badge(text: &str, accessible: &str, halign: gtk::Align, valign: gtk::Align) -> gtk::Label {
+    let badge = gtk::Label::builder()
+        .label(text)
+        .halign(halign)
+        .valign(valign)
+        .margin_start(8)
+        .margin_end(8)
+        .margin_top(8)
+        .margin_bottom(8)
+        .css_classes(["alt-badge"])
         .build();
+    badge.update_property(&[gtk::accessible::Property::Label(accessible)]);
+    badge
+}
+
+/// Image jointe : la miniature, chargée en arrière-plan, ou un emplacement
+/// vide pour les faux posts. Pastille « ALT » quand un texte alternatif
+/// existe, « +N » quand le post a d'autres images.
+fn media(media: &Media) -> gtk::Widget {
+    let height = media
+        .aspect_ratio
+        .filter(|(width, height)| *width > 0 && *height > 0)
+        .map(|(width, height)| (MEDIA_WIDTH as i64 * height as i64 / width as i64) as i32)
+        .unwrap_or(220)
+        .clamp(120, 420);
+    let description = if media.alt.is_empty() {
+        gettext("Image sans texte alternatif")
+    } else {
+        media.alt.clone()
+    };
+
+    let content: gtk::Widget = match &media.thumb {
+        Some(url) => {
+            let picture = gtk::Picture::builder()
+                .content_fit(gtk::ContentFit::Cover)
+                .can_shrink(true)
+                .height_request(height)
+                .alternative_text(&description)
+                .css_classes(["post-media"])
+                .build();
+            let weak = picture.downgrade();
+            images::load(url, move |texture| {
+                if let Some(picture) = weak.upgrade() {
+                    picture.set_paintable(Some(texture));
+                }
+            });
+            picture.upcast()
+        }
+        None => {
+            let placeholder = gtk::Image::builder()
+                .icon_name("image-x-generic-symbolic")
+                .pixel_size(48)
+                .height_request(height)
+                .css_classes(["post-media", "dim-label"])
+                .build();
+            placeholder.update_property(&[gtk::accessible::Property::Label(&description)]);
+            placeholder.upcast()
+        }
+    };
     let overlay = gtk::Overlay::builder()
-        .child(&placeholder)
+        .child(&content)
         .overflow(gtk::Overflow::Hidden)
         .css_classes(["post-media-frame"])
         .build();
-    if alt.is_empty() {
-        placeholder.update_property(&[gtk::accessible::Property::Label(&gettext(
-            "Image sans texte alternatif",
-        ))]);
-        return overlay.upcast();
+    if !media.alt.is_empty() {
+        let alt = badge(
+            &gettext("ALT"),
+            &fill(gettext("Texte alternatif : {}"), &[&media.alt]),
+            gtk::Align::End,
+            gtk::Align::End,
+        );
+        alt.set_tooltip_text(Some(&media.alt));
+        overlay.add_overlay(&alt);
     }
-    placeholder.update_property(&[gtk::accessible::Property::Label(alt)]);
-
-    let badge = gtk::Label::builder()
-        .label(gettext("ALT"))
-        .halign(gtk::Align::End)
-        .valign(gtk::Align::End)
-        .margin_end(8)
-        .margin_bottom(8)
-        .tooltip_text(alt)
-        .css_classes(["alt-badge"])
-        .build();
-    badge.update_property(&[gtk::accessible::Property::Label(&fill(
-        gettext("Texte alternatif : {}"),
-        &[alt],
-    ))]);
-    overlay.add_overlay(&badge);
+    if media.more > 0 {
+        overlay.add_overlay(&badge(
+            &format!("+{}", media.more),
+            &ngettext("{} autre image", "{} autres images", media.more)
+                .replace("{}", &media.more.to_string()),
+            gtk::Align::End,
+            gtk::Align::Start,
+        ));
+    }
     overlay.upcast()
 }
 
@@ -131,7 +183,7 @@ fn stats(post: &Post) -> gtk::Box {
     row
 }
 
-fn card_frame(avatar_size: i32, name: &str) -> (gtk::Box, gtk::Box) {
+fn card_frame(avatar_size: i32, name: &str, avatar_url: Option<&str>) -> (gtk::Box, gtk::Box) {
     let card = gtk::Box::builder()
         .orientation(gtk::Orientation::Horizontal)
         .spacing(10)
@@ -143,6 +195,15 @@ fn card_frame(avatar_size: i32, name: &str) -> (gtk::Box, gtk::Box) {
         .show_initials(true)
         .valign(gtk::Align::Start)
         .build();
+    // Les initiales restent affichées tant que l'image n'est pas là.
+    if let Some(url) = avatar_url {
+        let weak = avatar.downgrade();
+        images::load(url, move |texture| {
+            if let Some(avatar) = weak.upgrade() {
+                avatar.set_custom_image(Some(texture));
+            }
+        });
+    }
     let body = gtk::Box::builder()
         .orientation(gtk::Orientation::Vertical)
         .spacing(4)
@@ -155,7 +216,7 @@ fn card_frame(avatar_size: i32, name: &str) -> (gtk::Box, gtk::Box) {
 
 /// Carte d'un post dans le fil.
 pub fn post_card(post: &Post) -> gtk::Box {
-    let (card, body) = card_frame(AVATAR_SIZE, &post.name);
+    let (card, body) = card_frame(AVATAR_SIZE, &post.name, post.avatar.as_deref());
     if let Some(context) = &post.context {
         body.append(&label(context, &["dim-label", "caption"]));
     }
@@ -163,8 +224,8 @@ pub fn post_card(post: &Post) -> gtk::Box {
     if !post.text.is_empty() {
         body.append(&label(&post.text, &[]));
     }
-    if let Some(alt) = &post.image_alt {
-        body.append(&media(alt));
+    if let Some(m) = &post.media {
+        body.append(&media(m));
     }
     body.append(&stats(post));
     card
@@ -172,7 +233,7 @@ pub fn post_card(post: &Post) -> gtk::Box {
 
 /// Carte d'une réponse dans le volet de discussion.
 pub fn reply_card(reply: &Reply) -> gtk::Box {
-    let (card, body) = card_frame(AVATAR_SIZE, &reply.name);
+    let (card, body) = card_frame(AVATAR_SIZE, &reply.name, reply.avatar.as_deref());
     card.set_tooltip_text(Some(&format!("@{}", reply.handle)));
     body.append(&meta(&reply.name, &reply.time));
     body.append(&label(&reply.text, &[]));
@@ -194,7 +255,7 @@ fn action_button(icon: &str, text: String) -> gtk::Button {
 
 /// Post ouvert en grand en tête du volet de discussion.
 pub fn post_detail(post: &Post) -> gtk::Box {
-    let (card, body) = card_frame(AVATAR_SIZE_LARGE, &post.name);
+    let (card, body) = card_frame(AVATAR_SIZE_LARGE, &post.name, post.avatar.as_deref());
     card.add_css_class("post-detail");
 
     body.append(&label(&post.name, &["title-4"]));
@@ -203,8 +264,8 @@ pub fn post_detail(post: &Post) -> gtk::Box {
         &["dim-label", "caption"],
     ));
     body.append(&label(&post.text, &["post-detail-text"]));
-    if let Some(alt) = &post.image_alt {
-        body.append(&media(alt));
+    if let Some(m) = &post.media {
+        body.append(&media(m));
     }
 
     // Les boutons passent à la ligne quand le volet est étroit.

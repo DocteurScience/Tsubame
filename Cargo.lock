@@ -3243,6 +3243,7 @@ dependencies = [
  "hickory-resolver",
  "libadwaita",
  "oo7",
+ "reqwest",
  "serde",
  "serde_html_form",
  "serde_json",

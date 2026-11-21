@@ -26,16 +26,41 @@ pub struct Post {
     /// Date complète affichée dans le volet de discussion.
     pub date: String,
     pub text: String,
-    /// Image jointe : son texte alternatif, vide s'il n'y en a pas.
-    pub image_alt: Option<String>,
+    /// Adresse de l'avatar de l'auteur (miniature).
+    pub avatar: Option<String>,
+    /// Image ou vidéo jointe.
+    pub media: Option<Media>,
     pub replies: u32,
     pub reposts: u32,
     pub likes: u32,
     pub thread: Vec<Reply>,
 }
 
+/// Image (ou vignette de vidéo) jointe à un post.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Media {
+    /// Texte alternatif, vide s'il n'y en a pas.
+    pub alt: String,
+    /// Adresse de la miniature ; `None` pour les faux posts.
+    pub thumb: Option<String>,
+    /// Largeur et hauteur, pour réserver la bonne place.
+    pub aspect_ratio: Option<(u32, u32)>,
+    /// Autres images du même post, non affichées.
+    pub more: u32,
+}
+
+impl Media {
+    pub fn with_alt(alt: &str) -> Self {
+        Self {
+            alt: alt.to_owned(),
+            ..Default::default()
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Reply {
+    pub avatar: Option<String>,
     pub name: String,
     pub handle: String,
     pub time: String,
@@ -61,7 +86,8 @@ fn post(
         time: time.into(),
         date: date.into(),
         text: text.into(),
-        image_alt: None,
+        avatar: None,
+        media: None,
         replies,
         reposts,
         likes,
@@ -76,6 +102,7 @@ fn reply(
     text: &'static str,
 ) -> Reply {
     Reply {
+        avatar: None,
         name: name.into(),
         handle: handle.into(),
         time: time.into(),
@@ -140,11 +167,10 @@ pub fn posts(feed: Feed) -> Vec<Post> {
             ),
             lucie_gnome_49(),
             Post {
-                image_alt: Some(
+                media: Some(Media::with_alt(
                     "Lever de soleil sur les falaises du Vercors, ciel orange au-dessus \
-                     d'une mer de nuages."
-                        .into(),
-                ),
+                     d'une mer de nuages.",
+                )),
                 thread: vec![reply(
                     "Pierre Delmas",
                     "pierre.example.social",
@@ -220,9 +246,9 @@ pub fn posts(feed: Feed) -> Vec<Post> {
                 88,
             ),
             Post {
-                image_alt: Some(
-                    "Carnet ouvert posé sur un rocher, paysage de lave en fond.".into(),
-                ),
+                media: Some(Media::with_alt(
+                    "Carnet ouvert posé sur un rocher, paysage de lave en fond.",
+                )),
                 ..post(
                     "Clara Giraud",
                     "clara.example.social",

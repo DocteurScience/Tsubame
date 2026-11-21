@@ -103,7 +103,7 @@ Pas de maquette : l'écran suit les motifs de la HIG (icône, titre, champ, bout
 Fils (`src/api.rs`) :
 
 - Following vient de `app.bsky.feed.getTimeline`, Discover du fil « What's Hot » de Bluesky (`getFeed`). Pages de 30 posts ; la suite se charge en arrivant en bas de la colonne. « Actualiser » est dans l'en-tête de la colonne et dans son menu ⋮ (F5, Ctrl+R pour la colonne courante).
-- Les cartes indiquent un repost (« X a reposté ») ou une réponse (« En réponse à X »), l'heure relative (« 4 min », « 2 h », « 3 j », puis la date) et la présence d'une image ou d'une vidéo avec son texte alternatif. Les images elles-mêmes et les avatars ne sont pas encore téléchargés.
+- Les cartes indiquent un repost (« X a reposté ») ou une réponse (« En réponse à X »), l'heure relative (« 4 min », « 2 h », « 3 j », puis la date) la première image (ou la vignette d'une vidéo) à ses proportions, avec la pastille « ALT » quand un texte alternatif existe et « +N » quand le post en a d'autres, et l'avatar de l'auteur (initiales en attendant). Les images sont téléchargées en arrière-plan (6 à la fois, 10 Mo au plus), décodées hors de la boucle GTK et gardées en mémoire (400 au plus) : `src/images.rs`.
 - La discussion affiche le post tout de suite, puis ses réponses directes (`getPostThread`).
 - Notifications et « Linux et libre » (fil fictif des maquettes) affichent « Pas encore disponible ».
 - Chaque colonne a ses états : chargement, liste, liste vide, erreur avec « Réessayer ». Une session expirée ou illisible ramène à l'écran de connexion, identifiant pré-rempli, et la session est retirée du trousseau.
