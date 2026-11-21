@@ -3236,6 +3236,7 @@ dependencies = [
  "atrium-common",
  "atrium-identity",
  "atrium-oauth",
+ "chrono",
  "gettext-rs",
  "glib-build-tools",
  "gtk4",

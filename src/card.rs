@@ -42,7 +42,7 @@ fn meta(name: &str, time: &str) -> gtk::Box {
 }
 
 /// Image jointe. Pour l'instant un emplacement vide, avec la pastille « ALT »
-/// quand un texte alternatif existe.
+/// quand un texte alternatif existe (`alt` non vide).
 fn media(alt: &str) -> gtk::Widget {
     let placeholder = gtk::Image::builder()
         .icon_name("image-x-generic-symbolic")
@@ -50,6 +50,17 @@ fn media(alt: &str) -> gtk::Widget {
         .height_request(180)
         .css_classes(["post-media", "dim-label"])
         .build();
+    let overlay = gtk::Overlay::builder()
+        .child(&placeholder)
+        .overflow(gtk::Overflow::Hidden)
+        .css_classes(["post-media-frame"])
+        .build();
+    if alt.is_empty() {
+        placeholder.update_property(&[gtk::accessible::Property::Label(&gettext(
+            "Image sans texte alternatif",
+        ))]);
+        return overlay.upcast();
+    }
     placeholder.update_property(&[gtk::accessible::Property::Label(alt)]);
 
     let badge = gtk::Label::builder()
@@ -65,12 +76,6 @@ fn media(alt: &str) -> gtk::Widget {
         gettext("Texte alternatif : {}"),
         &[alt],
     ))]);
-
-    let overlay = gtk::Overlay::builder()
-        .child(&placeholder)
-        .overflow(gtk::Overflow::Hidden)
-        .css_classes(["post-media-frame"])
-        .build();
     overlay.add_overlay(&badge);
     overlay.upcast()
 }
@@ -150,13 +155,15 @@ fn card_frame(avatar_size: i32, name: &str) -> (gtk::Box, gtk::Box) {
 
 /// Carte d'un post dans le fil.
 pub fn post_card(post: &Post) -> gtk::Box {
-    let (card, body) = card_frame(AVATAR_SIZE, post.name);
-    if let Some(context) = post.context {
-        body.append(&label(&gettext(context), &["dim-label", "caption"]));
+    let (card, body) = card_frame(AVATAR_SIZE, &post.name);
+    if let Some(context) = &post.context {
+        body.append(&label(context, &["dim-label", "caption"]));
     }
-    body.append(&meta(post.name, post.time));
-    body.append(&label(post.text, &[]));
-    if let Some(alt) = post.image_alt {
+    body.append(&meta(&post.name, &post.time));
+    if !post.text.is_empty() {
+        body.append(&label(&post.text, &[]));
+    }
+    if let Some(alt) = &post.image_alt {
         body.append(&media(alt));
     }
     body.append(&stats(post));
@@ -165,10 +172,10 @@ pub fn post_card(post: &Post) -> gtk::Box {
 
 /// Carte d'une réponse dans le volet de discussion.
 pub fn reply_card(reply: &Reply) -> gtk::Box {
-    let (card, body) = card_frame(AVATAR_SIZE, reply.name);
+    let (card, body) = card_frame(AVATAR_SIZE, &reply.name);
     card.set_tooltip_text(Some(&format!("@{}", reply.handle)));
-    body.append(&meta(reply.name, reply.time));
-    body.append(&label(reply.text, &[]));
+    body.append(&meta(&reply.name, &reply.time));
+    body.append(&label(&reply.text, &[]));
     card
 }
 
@@ -187,16 +194,16 @@ fn action_button(icon: &str, text: String) -> gtk::Button {
 
 /// Post ouvert en grand en tête du volet de discussion.
 pub fn post_detail(post: &Post) -> gtk::Box {
-    let (card, body) = card_frame(AVATAR_SIZE_LARGE, post.name);
+    let (card, body) = card_frame(AVATAR_SIZE_LARGE, &post.name);
     card.add_css_class("post-detail");
 
-    body.append(&label(post.name, &["title-4"]));
+    body.append(&label(&post.name, &["title-4"]));
     body.append(&label(
         &format!("@{} · {}", post.handle, post.date),
         &["dim-label", "caption"],
     ));
-    body.append(&label(post.text, &["post-detail-text"]));
-    if let Some(alt) = post.image_alt {
+    body.append(&label(&post.text, &["post-detail-text"]));
+    if let Some(alt) = &post.image_alt {
         body.append(&media(alt));
     }
 

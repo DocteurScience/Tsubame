@@ -2,6 +2,7 @@ use adw::prelude::*;
 use gettextrs::gettext;
 use gtk::{gio, glib};
 
+mod api;
 mod auth;
 mod card;
 mod column;

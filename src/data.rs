@@ -1,8 +1,9 @@
-//! Faux posts pour développer l'interface sans connexion réseau.
+//! Posts affichés en cartes, et faux posts de démonstration.
 //!
-//! Les noms, comptes et textes reprennent ceux des maquettes
-//! (`docs/mockups/source/Cartes.dc.html` et `Colonnes.dc.html`). Ils sont
-//! fictifs.
+//! Les posts réels viennent de l'API (`api.rs`). Les faux posts servent
+//! sans compte (builds de développement) : noms, comptes et textes
+//! reprennent ceux des maquettes (`docs/mockups/source/Cartes.dc.html` et
+//! `Colonnes.dc.html`). Ils sont fictifs.
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Feed {
@@ -13,18 +14,20 @@ pub enum Feed {
 
 #[derive(Debug, Clone)]
 pub struct Post {
-    /// Contexte affiché au-dessus du nom, pour les notifications
-    /// (« a répondu à votre post »).
-    pub context: Option<&'static str>,
-    pub name: &'static str,
-    pub handle: &'static str,
+    /// Adresse `at://` du post ; `None` pour les faux posts.
+    pub uri: Option<String>,
+    /// Contexte affiché au-dessus du nom : notification (« a répondu à
+    /// votre post ») ou repost (« Nadia Safi a reposté »).
+    pub context: Option<String>,
+    pub name: String,
+    pub handle: String,
     /// Heure relative affichée sur la carte.
-    pub time: &'static str,
+    pub time: String,
     /// Date complète affichée dans le volet de discussion.
-    pub date: &'static str,
-    pub text: &'static str,
-    /// Texte alternatif de l'image jointe, s'il y en a une.
-    pub image_alt: Option<&'static str>,
+    pub date: String,
+    pub text: String,
+    /// Image jointe : son texte alternatif, vide s'il n'y en a pas.
+    pub image_alt: Option<String>,
     pub replies: u32,
     pub reposts: u32,
     pub likes: u32,
@@ -33,10 +36,10 @@ pub struct Post {
 
 #[derive(Debug, Clone)]
 pub struct Reply {
-    pub name: &'static str,
-    pub handle: &'static str,
-    pub time: &'static str,
-    pub text: &'static str,
+    pub name: String,
+    pub handle: String,
+    pub time: String,
+    pub text: String,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -51,12 +54,13 @@ fn post(
     likes: u32,
 ) -> Post {
     Post {
+        uri: None,
         context: None,
-        name,
-        handle,
-        time,
-        date,
-        text,
+        name: name.into(),
+        handle: handle.into(),
+        time: time.into(),
+        date: date.into(),
+        text: text.into(),
         image_alt: None,
         replies,
         reposts,
@@ -72,10 +76,10 @@ fn reply(
     text: &'static str,
 ) -> Reply {
     Reply {
-        name,
-        handle,
-        time,
-        text,
+        name: name.into(),
+        handle: handle.into(),
+        time: time.into(),
+        text: text.into(),
     }
 }
 
@@ -83,7 +87,8 @@ fn lucie_gnome_49() -> Post {
     Post {
         text: "Notes de version de GNOME 49 : le nouveau sélecteur de fichiers est enfin \
                utilisable au clavier de bout en bout. Merci à celles et ceux qui ont testé \
-               la bêta.",
+               la bêta."
+            .into(),
         thread: vec![
             reply(
                 "Aya Koné",
@@ -137,7 +142,8 @@ pub fn posts(feed: Feed) -> Vec<Post> {
             Post {
                 image_alt: Some(
                     "Lever de soleil sur les falaises du Vercors, ciel orange au-dessus \
-                     d'une mer de nuages.",
+                     d'une mer de nuages."
+                        .into(),
                 ),
                 thread: vec![reply(
                     "Pierre Delmas",
@@ -214,7 +220,9 @@ pub fn posts(feed: Feed) -> Vec<Post> {
                 88,
             ),
             Post {
-                image_alt: Some("Carnet ouvert posé sur un rocher, paysage de lave en fond."),
+                image_alt: Some(
+                    "Carnet ouvert posé sur un rocher, paysage de lave en fond.".into(),
+                ),
                 ..post(
                     "Clara Giraud",
                     "clara.example.social",
@@ -281,7 +289,7 @@ pub fn posts(feed: Feed) -> Vec<Post> {
 /// `Colonnes.dc.html`.
 pub fn notifications() -> Vec<Post> {
     let notification = |context, post: Post| Post {
-        context: Some(context),
+        context: Some(gettextrs::gettext(context)),
         ..post
     };
     vec![

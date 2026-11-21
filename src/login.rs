@@ -3,15 +3,16 @@
 
 use std::cell::RefCell;
 use std::rc::{Rc, Weak};
+use std::sync::Arc;
 
 use adw::prelude::*;
 use gettextrs::gettext;
 use gtk::{gio, glib};
 
-use crate::auth::{self, Account, LoginError};
+use crate::auth::{self, LoginError, Session};
 use crate::runtime::runtime;
 
-type LoggedIn = Box<dyn Fn(Option<Account>)>;
+type LoggedIn = Box<dyn Fn(Option<Arc<Session>>)>;
 
 pub struct LoginPage {
     pub root: adw::ToolbarView,
@@ -216,10 +217,15 @@ impl LoginPage {
         page
     }
 
-    /// Appelle `f` une fois connecté, avec le compte, ou `None` pour les
+    /// Appelle `f` une fois connecté, avec la session, ou `None` pour les
     /// posts de démonstration.
-    pub fn connect_logged_in(&self, f: impl Fn(Option<Account>) + 'static) {
+    pub fn connect_logged_in(&self, f: impl Fn(Option<Arc<Session>>) + 'static) {
         self.on_logged_in.replace(Some(Box::new(f)));
+    }
+
+    /// Pré-remplit l'identifiant, par exemple après une session expirée.
+    pub fn set_identifier(&self, identifier: &str) {
+        self.entry.set_text(identifier);
     }
 
     /// Montre l'attente pendant la lecture du trousseau au lancement.
@@ -255,10 +261,10 @@ impl LoginPage {
         self.show_form(Some(&error.message()));
     }
 
-    fn logged_in(&self, account: Option<Account>) {
+    fn logged_in(&self, session: Option<Arc<Session>>) {
         self.cancel_task();
         if let Some(f) = self.on_logged_in.borrow().as_ref() {
-            f(account);
+            f(session);
         }
     }
 
@@ -307,7 +313,7 @@ impl LoginPage {
             let result = handle.await;
             let Some(page) = weak.upgrade() else { return };
             match flatten(result) {
-                Some(Ok(account)) => page.logged_in(Some(account)),
+                Some(Ok(session)) => page.logged_in(Some(session)),
                 Some(Err(error)) => page.show_error(&error),
                 None => {}
             }

@@ -100,6 +100,14 @@ Pas de maquette : l'écran suit les motifs de la HIG (icône, titre, champ, bout
 - L'identifiant du compte s'affiche sous le titre de la barre latérale. « Se déconnecter… » dans le menu principal demande confirmation, révoque les jetons si le serveur répond, et retire la session du trousseau.
 - Les builds de développement proposent « Continuer avec les posts de démonstration », tant que les fils ne sont pas branchés sur le réseau.
 
+Fils (`src/api.rs`) :
+
+- Following vient de `app.bsky.feed.getTimeline`, Discover du fil « What's Hot » de Bluesky (`getFeed`). Pages de 30 posts ; la suite se charge en arrivant en bas de la colonne. « Actualiser » est dans l'en-tête de la colonne et dans son menu ⋮ (F5, Ctrl+R pour la colonne courante).
+- Les cartes indiquent un repost (« X a reposté ») ou une réponse (« En réponse à X »), l'heure relative (« 4 min », « 2 h », « 3 j », puis la date) et la présence d'une image ou d'une vidéo avec son texte alternatif. Les images elles-mêmes et les avatars ne sont pas encore téléchargés.
+- La discussion affiche le post tout de suite, puis ses réponses directes (`getPostThread`).
+- Notifications et « Linux et libre » (fil fictif des maquettes) affichent « Pas encore disponible ».
+- Chaque colonne a ses états : chargement, liste, liste vide, erreur avec « Réessayer ». Une session expirée ou illisible ramène à l'écran de connexion, identifiant pré-rempli, et la session est retirée du trousseau.
+
 **Point ouvert : client OAuth de production.** Tsubame utilise pour l'instant le client de développement « localhost » du protocole AT, qui ne demande rien de publié mais n'est pas fait pour une version distribuée. Il faudra publier les métadonnées du client en https (par exemple sur GitHub Pages) et utiliser leur adresse comme `client_id`, avec une URI de redirection adaptée à une application native.
 
 ## Limites de la proposition

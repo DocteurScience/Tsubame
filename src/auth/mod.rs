@@ -17,6 +17,7 @@ pub mod loopback;
 
 use std::sync::Arc;
 
+use atrium_api::agent::Agent;
 use atrium_api::agent::SessionManager;
 use atrium_api::types::string::{Did, Handle};
 use atrium_common::store::Store;
@@ -25,7 +26,7 @@ use atrium_identity::handle::{AtprotoHandleResolver, AtprotoHandleResolverConfig
 use atrium_oauth::store::state::MemoryStateStore;
 use atrium_oauth::{
     AtprotoLocalhostClientMetadata, AuthorizeOptions, CallbackParams, DefaultHttpClient,
-    KnownScope, OAuthClient, OAuthClientConfig, OAuthResolverConfig, Scope,
+    KnownScope, OAuthClient, OAuthClientConfig, OAuthResolverConfig, OAuthSession, Scope,
 };
 use gettextrs::gettext;
 
@@ -44,6 +45,8 @@ pub struct Account {
 pub enum LoginError {
     InvalidHandle,
     AccountNotFound,
+    /// Plus de session pour ce compte dans le trousseau.
+    Expired,
     /// Identité introuvable faute de réponse : compte inexistant ou réseau
     /// absent, on ne peut pas trancher.
     Unreachable,
@@ -59,6 +62,7 @@ impl LoginError {
                 gettext("Cet identifiant n'est pas valide. Exemple : vous.bsky.social")
             }
             LoginError::AccountNotFound => gettext("Aucun compte trouvé pour cet identifiant."),
+            LoginError::Expired => gettext("Votre session a expiré. Reconnectez-vous."),
             LoginError::Unreachable => gettext(
                 "Impossible de trouver ce compte. Vérifiez l'identifiant et votre connexion à \
                  Internet.",
@@ -93,10 +97,29 @@ impl From<atrium_oauth::Error> for LoginError {
                 | atrium_identity::Error::DnsResolver(_)
                 | atrium_identity::Error::HttpStatus(_),
             ) => LoginError::Unreachable,
+            e @ (atrium_oauth::Error::SessionRegistry(_) | atrium_oauth::Error::ServerAgent(_))
+                if session_unusable(&e.to_string()) =>
+            {
+                LoginError::Expired
+            }
             atrium_oauth::Error::SessionStore(e) => LoginError::Keyring(e.to_string()),
             e => LoginError::Failed(e.to_string()),
         }
     }
+}
+
+/// La session est-elle inutilisable (absente, illisible, jetons qui ne se
+/// renouvellent plus) ? `atrium-oauth` ne rend pas publics les types de ces
+/// erreurs : on les reconnaît à leur texte, celui de sa version 0.2.
+fn session_unusable(message: &str) -> bool {
+    [
+        "session does not exist",
+        "no refresh token available",
+        "token response verification failed",
+        keyring::UNREADABLE_PREFIX,
+    ]
+    .iter()
+    .any(|marker| message.contains(marker))
 }
 
 /// Met en forme ce que l'utilisateur a saisi : sans espaces ni « @ », en
@@ -114,7 +137,7 @@ pub fn normalize_identifier(input: &str) -> Result<String, LoginError> {
         .map_err(|_| LoginError::InvalidHandle)
 }
 
-struct HickoryDnsTxtResolver {
+pub struct HickoryDnsTxtResolver {
     resolver: hickory_resolver::TokioResolver,
 }
 
@@ -222,7 +245,7 @@ pub async fn start(identifier: String) -> Result<PendingLogin, LoginError> {
 impl PendingLogin {
     /// Attend la redirection du navigateur et termine la connexion. La
     /// session est alors dans le trousseau.
-    pub async fn finish(self) -> Result<Account, LoginError> {
+    pub async fn finish(self) -> Result<Arc<Session>, LoginError> {
         let query = self
             .server
             .wait_for_callback()
@@ -234,10 +257,11 @@ impl PendingLogin {
             .did()
             .await
             .ok_or_else(|| LoginError::Failed(gettext("identité du compte inconnue")))?;
-        Ok(Account {
+        let account = Account {
             did: did.as_str().to_owned(),
             handle: self.handle,
-        })
+        };
+        Ok(Session::with_api(account, Arc::new(Agent::new(session))))
     }
 }
 
@@ -263,12 +287,68 @@ fn parse_callback(query: &str) -> Result<CallbackParams, LoginError> {
 }
 
 /// Compte dont la session est dans le trousseau, s'il y en a un.
-pub async fn stored_account() -> Result<Option<Account>, LoginError> {
+pub async fn stored_session() -> Result<Option<Arc<Session>>, LoginError> {
     let accounts = keyring::stored_accounts().await?;
-    Ok(accounts.into_iter().next().map(|account| Account {
-        did: account.did,
-        handle: account.handle,
+    Ok(accounts.into_iter().next().map(|account| {
+        Session::new(Account {
+            did: account.did,
+            handle: account.handle,
+        })
     }))
+}
+
+/// Accès à l'API de Bluesky avec la session OAuth d'un compte.
+pub type Api = Agent<
+    OAuthSession<
+        DefaultHttpClient,
+        CommonDidResolver<DefaultHttpClient>,
+        AtprotoHandleResolver<HickoryDnsTxtResolver, DefaultHttpClient>,
+        KeyringSessionStore,
+    >,
+>;
+
+/// Compte connecté et accès à l'API.
+///
+/// Au lancement, la session est lue dans le trousseau mais pas encore
+/// restaurée : la restauration interroge le serveur d'autorisation. Elle se
+/// fait à la première requête, et recommence à la suivante si elle échoue
+/// (hors ligne, par exemple).
+pub struct Session {
+    pub account: Account,
+    api: tokio::sync::OnceCell<Arc<Api>>,
+}
+
+impl Session {
+    fn new(account: Account) -> Arc<Self> {
+        Arc::new(Self {
+            account,
+            api: tokio::sync::OnceCell::new(),
+        })
+    }
+
+    fn with_api(account: Account, api: Arc<Api>) -> Arc<Self> {
+        Arc::new(Self {
+            account,
+            api: tokio::sync::OnceCell::new_with(Some(api)),
+        })
+    }
+
+    pub async fn api(&self) -> Result<Arc<Api>, LoginError> {
+        self.api
+            .get_or_try_init(|| async {
+                let stored = keyring::stored_accounts()
+                    .await?
+                    .into_iter()
+                    .find(|stored| stored.did == self.account.did)
+                    .ok_or(LoginError::Expired)?;
+                let did = Did::new(stored.did.clone()).map_err(|_| LoginError::Expired)?;
+                let client = client(&stored.handle, &stored.redirect_uri)?;
+                let session = client.restore(&did).await?;
+                Ok(Arc::new(Agent::new(session)))
+            })
+            .await
+            .cloned()
+    }
 }
 
 /// Déconnecte le compte : révoque les jetons si le serveur répond, et
@@ -347,6 +427,23 @@ mod tests {
                 atrium_identity::Error::NotFound
             )),
             LoginError::AccountNotFound
+        ));
+    }
+
+    #[test]
+    fn unusable_sessions_ask_to_log_in_again() {
+        assert!(session_unusable("session does not exist"));
+        assert!(session_unusable(&format!(
+            "session store error: {}missing field `dpop_key`",
+            keyring::UNREADABLE_PREFIX
+        )));
+        assert!(session_unusable("no refresh token available"));
+        // Trousseau indisponible ou réseau absent : pas une session expirée.
+        assert!(!session_unusable(
+            "session store error: trousseau : pas de service"
+        ));
+        assert!(!session_unusable(
+            "http client error: error sending request"
         ));
     }
 

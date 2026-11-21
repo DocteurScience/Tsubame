@@ -24,6 +24,12 @@ const ATTR_HANDLE: &str = "handle";
 const ATTR_REDIRECT_URI: &str = "redirect-uri";
 const KIND_SESSION: &str = "oauth-session";
 
+/// Début des messages d'erreur. `atrium-oauth` ne transmet parfois que le
+/// texte de l'erreur : ces préfixes permettent d'y reconnaître une session
+/// illisible.
+const KEYRING_PREFIX: &str = "trousseau : ";
+pub const UNREADABLE_PREFIX: &str = "session illisible : ";
+
 #[derive(Debug)]
 pub enum KeyringError {
     Keyring(oo7::Error),
@@ -33,8 +39,8 @@ pub enum KeyringError {
 impl fmt::Display for KeyringError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            KeyringError::Keyring(e) => write!(f, "trousseau : {e}"),
-            KeyringError::Json(e) => write!(f, "session illisible : {e}"),
+            KeyringError::Keyring(e) => write!(f, "{KEYRING_PREFIX}{e}"),
+            KeyringError::Json(e) => write!(f, "{UNREADABLE_PREFIX}{e}"),
         }
     }
 }

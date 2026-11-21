@@ -16,7 +16,10 @@ use adw::prelude::*;
 use gettextrs::gettext;
 use gtk::{gio, glib};
 
-use crate::auth::{self, Account};
+use std::sync::Arc;
+
+use crate::api;
+use crate::auth::{self, Session};
 use crate::column::{Column, ColumnKind};
 use crate::columns::{ColumnsView, Layout};
 use crate::data::Post;
@@ -77,6 +80,14 @@ fn other_pages() -> Vec<OtherPage> {
             None,
         ),
     ]
+}
+
+/// Colonne à charger : une colonne de l'accueil, ou celle de l'onglet
+/// Notifications du palier compact.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Target {
+    Home(ColumnKind),
+    CompactNotifications,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -188,7 +199,10 @@ struct State {
     login: Rc<LoginPage>,
     sidebar_title: adw::WindowTitle,
     /// Compte connecté ; `None` avec les posts de démonstration.
-    account: RefCell<Option<Account>>,
+    session: RefCell<Option<Arc<Session>>>,
+    /// Post affiché dans la discussion, pour ignorer des réponses arrivées
+    /// trop tard.
+    shown_uri: RefCell<Option<String>>,
     logout_action: gio::SimpleAction,
 }
 
@@ -276,7 +290,19 @@ impl State {
             .set_show_end_title_buttons(layout != Layout::Right);
     }
 
-    fn connect_column(self: &Rc<Self>, column: &Column) {
+    fn connect_column(self: &Rc<Self>, column: &Column, target: Target) {
+        let state = Rc::downgrade(self);
+        column.connect_refresh(move || {
+            if let Some(state) = state.upgrade() {
+                state.load(target, false);
+            }
+        });
+        let state = Rc::downgrade(self);
+        column.connect_end_reached(move || {
+            if let Some(state) = state.upgrade() {
+                state.load(target, true);
+            }
+        });
         let state = Rc::downgrade(self);
         column.connect_post_selected(move |list, post| {
             if let Some(state) = state.upgrade() {
@@ -295,13 +321,14 @@ impl State {
         if !self.is_open(kind) {
             let column = Column::new(kind, &self.columns_menu);
             column.set_alone(self.layout() == Layout::Single);
-            self.connect_column(&column);
+            self.connect_column(&column, Target::Home(kind));
             if self.columns.borrow().is_empty() {
                 self.columns_view.remove_column(&self.no_columns);
             }
             self.columns_view.append_column(&column.root);
             self.columns.borrow_mut().push(column);
             self.columns_changed();
+            self.load(Target::Home(kind), false);
         }
         self.show_column(kind);
     }
@@ -380,15 +407,17 @@ impl State {
 
     /// Passe à l'application, avec le compte connecté ou sans (posts de
     /// démonstration).
-    fn enter(&self, account: Option<Account>) {
+    fn enter(self: &Rc<Self>, session: Option<Arc<Session>>) {
         self.sidebar_title.set_subtitle(
-            &account
+            &session
                 .as_ref()
-                .map(|a| format!("@{}", a.handle))
+                .map(|s| format!("@{}", s.account.handle))
                 .unwrap_or_default(),
         );
-        self.logout_action.set_enabled(account.is_some());
-        self.account.replace(account);
+        self.logout_action.set_enabled(session.is_some());
+        self.session.replace(session);
+        self.clear_thread();
+        self.load_all();
         self.root_stack.set_visible_child_name("main");
         if let Some(column) = self.columns.borrow().get(self.current.get()) {
             column.focus();
@@ -396,8 +425,12 @@ impl State {
     }
 
     /// Revient à l'écran de connexion.
-    fn leave(&self, message: Option<&str>) {
-        self.account.replace(None);
+    fn leave(self: &Rc<Self>, message: Option<&str>) {
+        self.session.replace(None);
+        // Ne rien garder du compte à l'écran : les colonnes repassent aux
+        // faux posts, cachés derrière l'écran de connexion.
+        self.clear_thread();
+        self.load_all();
         self.logout_action.set_enabled(false);
         self.sidebar_title.set_subtitle("");
         self.login.show_form(message);
@@ -406,7 +439,12 @@ impl State {
 
     /// Demande confirmation, puis déconnecte le compte.
     fn confirm_logout(self: &Rc<Self>, window: &adw::ApplicationWindow) {
-        let Some(account) = self.account.borrow().clone() else {
+        let Some(account) = self
+            .session
+            .borrow()
+            .as_ref()
+            .map(|session| session.account.clone())
+        else {
             return;
         };
         let dialog = adw::AlertDialog::new(
@@ -448,13 +486,13 @@ impl State {
     fn restore_session(self: &Rc<Self>) {
         self.login.show_checking();
         self.root_stack.set_visible_child_name("login");
-        let task = runtime().spawn(auth::stored_account());
+        let task = runtime().spawn(auth::stored_session());
         let weak = Rc::downgrade(self);
         glib::spawn_future_local(async move {
             let result = task.await;
             let Some(state) = weak.upgrade() else { return };
             match result {
-                Ok(Ok(Some(account))) => state.enter(Some(account)),
+                Ok(Ok(Some(session))) => state.enter(Some(session)),
                 Ok(Ok(None)) => state.leave(None),
                 Ok(Err(error)) => {
                     // Sans trousseau, on peut se connecter, mais la session
@@ -696,7 +734,7 @@ impl State {
     }
 
     /// Un seul post est sélectionné à la fois, toutes colonnes confondues.
-    fn post_selected(&self, list: &gtk::ListBox, post: Option<Post>) {
+    fn post_selected(self: &Rc<Self>, list: &gtk::ListBox, post: Option<Post>) {
         let Some(post) = post else {
             return;
         };
@@ -707,6 +745,133 @@ impl State {
         }
         self.pane.show(Some(&post));
         self.stacked.show(Some(&post));
+        self.shown_uri.replace(post.uri.clone());
+
+        // Réponses d'un post réel : les charger.
+        let (Some(uri), Some(session)) = (post.uri, self.session.borrow().clone()) else {
+            return;
+        };
+        let task = runtime().spawn(api::replies(session, uri.clone()));
+        let weak = Rc::downgrade(self);
+        glib::spawn_future_local(async move {
+            let result = task.await;
+            let Some(state) = weak.upgrade() else { return };
+            if state.shown_uri.borrow().as_deref() != Some(uri.as_str()) {
+                return;
+            }
+            let result = result.unwrap_or_else(|_| {
+                Err(api::ApiError::new(gettext(
+                    "Les réponses n'ont pas pu être chargées.",
+                )))
+            });
+            if let Err(error) = &result
+                && error.expired
+            {
+                state.session_expired(&error.message);
+                return;
+            }
+            for view in [&state.pane, &state.stacked] {
+                view.set_replies(Some(
+                    result
+                        .as_ref()
+                        .map(Vec::as_slice)
+                        .map_err(|e| e.message.as_str()),
+                ));
+            }
+        });
+    }
+
+    fn clear_thread(&self) {
+        self.shown_uri.replace(None);
+        self.pane.show(None);
+        self.stacked.show(None);
+        self.nav.pop_to_tag("main");
+    }
+
+    /// Applique `f` à la colonne désignée, si elle est toujours ouverte.
+    fn with_column(&self, target: Target, f: impl FnOnce(&Column)) {
+        match target {
+            Target::CompactNotifications => f(&self.compact_notifications),
+            Target::Home(kind) => {
+                if let Some(column) = self.columns.borrow().iter().find(|c| c.kind == kind) {
+                    f(column);
+                }
+            }
+        }
+    }
+
+    /// Charge une colonne depuis le début, ou sa page suivante (`more`).
+    /// Sans compte, faux posts.
+    fn load(self: &Rc<Self>, target: Target, more: bool) {
+        let session = self.session.borrow().clone();
+        self.with_column(target, |column| {
+            let (session, source) = match (session, column.kind.source()) {
+                (None, _) => {
+                    if !more {
+                        column.show_demo();
+                    }
+                    return;
+                }
+                (Some(_), None) => {
+                    if !more {
+                        column.show_unavailable();
+                    }
+                    return;
+                }
+                (Some(session), Some(source)) => (session, source),
+            };
+            let Some(load) = column.begin_load(more) else {
+                return;
+            };
+            let task = runtime().spawn(api::load(session, source, load.cursor.clone()));
+            let weak = Rc::downgrade(self);
+            glib::spawn_future_local(async move {
+                let result = task.await.unwrap_or_else(|_| {
+                    Err(api::ApiError::new(gettext(
+                        "Le chargement a été interrompu.",
+                    )))
+                });
+                let Some(state) = weak.upgrade() else { return };
+                if let Err(error) = &result
+                    && error.expired
+                {
+                    state.session_expired(&error.message);
+                    return;
+                }
+                state.with_column(target, |column| column.finish_load(&load, result));
+            });
+        });
+    }
+
+    /// Session inutilisable : la retirer du trousseau et revenir à l'écran
+    /// de connexion, avec le message.
+    fn session_expired(self: &Rc<Self>, message: &str) {
+        let Some(session) = self.session.borrow().clone() else {
+            return;
+        };
+        let account = session.account.clone();
+        self.login.set_identifier(&account.handle);
+        runtime().spawn(async move {
+            let _ = auth::logout(&account).await;
+        });
+        self.leave(Some(message));
+    }
+
+    fn load_all(self: &Rc<Self>) {
+        let kinds: Vec<_> = self.columns.borrow().iter().map(|c| c.kind).collect();
+        for kind in kinds {
+            self.load(Target::Home(kind), false);
+        }
+        self.load(Target::CompactNotifications, false);
+    }
+
+    /// Actualise la colonne affichée (F5, Ctrl+R).
+    fn refresh_current(self: &Rc<Self>) {
+        if self.stack.visible_child_name().as_deref() == Some("notifications") {
+            self.load(Target::CompactNotifications, false);
+        } else if let Some(kind) = self.current_kind() {
+            self.load(Target::Home(kind), false);
+        }
     }
 
     /// Aux paliers étroits, ouvrir un post empile la page de discussion.
@@ -776,6 +941,9 @@ fn install_actions(window: &adw::ApplicationWindow, state: &Rc<State>) {
         s.close_column(k)
     }));
     window.add_action(&kind_action("show-column", state, |s, k| s.show_column(k)));
+    window.add_action(&kind_action("refresh-column", state, |s, k| {
+        s.load(Target::Home(k), false)
+    }));
     window.add_action(&kind_action("move-column-left", state, |s, k| {
         s.move_column(k, -1)
     }));
@@ -794,6 +962,15 @@ fn install_actions(window: &adw::ApplicationWindow, state: &Rc<State>) {
         });
         window.add_action(&action);
     }
+
+    let refresh = gio::SimpleAction::new("refresh", None);
+    let weak = Rc::downgrade(state);
+    refresh.connect_activate(move |_, _| {
+        if let Some(state) = weak.upgrade() {
+            state.refresh_current();
+        }
+    });
+    window.add_action(&refresh);
 
     for (name, delta) in [("next-column", 1), ("previous-column", -1)] {
         let action = gio::SimpleAction::new(name, None);
@@ -988,10 +1165,11 @@ pub fn build(app: &adw::Application) -> adw::ApplicationWindow {
         root_stack: root_stack.clone(),
         login: login.clone(),
         sidebar_title,
-        account: RefCell::default(),
+        session: RefCell::default(),
+        shown_uri: RefCell::default(),
         logout_action: gio::SimpleAction::new("logout", None),
     });
-    state.connect_column(&state.compact_notifications);
+    state.connect_column(&state.compact_notifications, Target::CompactNotifications);
     install_actions(&window, &state);
 
     // Position du volet : action à état liée au réglage, que les boutons du
@@ -1092,9 +1270,9 @@ pub fn build(app: &adw::Application) -> adw::ApplicationWindow {
     state.update_layout();
 
     let weak = Rc::downgrade(&state);
-    login.connect_logged_in(move |account| {
+    login.connect_logged_in(move |session| {
         if let Some(state) = weak.upgrade() {
-            state.enter(account);
+            state.enter(session);
         }
     });
     state.restore_session();
@@ -1106,6 +1284,7 @@ pub fn build(app: &adw::Application) -> adw::ApplicationWindow {
     });
 
     let app = app.clone();
+    app.set_accels_for_action("win.refresh", &["F5", "<Control>r"]);
     app.set_accels_for_action("win.next-column", &["<Control>Page_Down"]);
     app.set_accels_for_action("win.previous-column", &["<Control>Page_Up"]);
     app.set_accels_for_action("win.move-current-right", &["<Control><Shift>Page_Down"]);

@@ -8,7 +8,7 @@ use adw::prelude::*;
 use gettextrs::{gettext, ngettext};
 
 use crate::card;
-use crate::data::Post;
+use crate::data::{Post, Reply};
 
 pub struct ThreadView {
     pub root: adw::ToolbarView,
@@ -16,6 +16,7 @@ pub struct ThreadView {
     selector: gtk::Box,
     stack: gtk::Stack,
     content: gtk::Box,
+    replies: gtk::Box,
 }
 
 /// Sélecteur de position du volet de lecture : trois boutons liés à l'action
@@ -91,6 +92,10 @@ impl ThreadView {
             selector,
             stack,
             content,
+            replies: gtk::Box::builder()
+                .orientation(gtk::Orientation::Vertical)
+                .spacing(12)
+                .build(),
         }
     }
 
@@ -105,6 +110,8 @@ impl ThreadView {
         self.header.set_show_end_title_buttons(visible);
     }
 
+    /// Affiche un post. Les faux posts ont leurs réponses avec eux ; pour
+    /// un post réel, `set_replies` les ajoute une fois chargées.
     pub fn show(&self, post: Option<&Post>) {
         let Some(post) = post else {
             self.stack.set_visible_child_name("empty");
@@ -114,23 +121,57 @@ impl ThreadView {
             self.content.remove(&child);
         }
         self.content.append(&card::post_detail(post));
-        if !post.thread.is_empty() {
-            let count = post.thread.len() as u32;
-            self.content.append(
-                &gtk::Label::builder()
-                    .label(
-                        ngettext("{} réponse", "{} réponses", count)
-                            .replace("{}", &count.to_string()),
-                    )
-                    .xalign(0.0)
-                    .margin_top(12)
-                    .css_classes(["heading"])
-                    .build(),
-            );
-            for reply in &post.thread {
-                self.content.append(&card::reply_card(reply));
-            }
+        self.content.append(&self.replies);
+        if post.uri.is_some() {
+            self.set_replies(None);
+        } else {
+            self.set_replies(Some(Ok(&post.thread)));
         }
         self.stack.set_visible_child_name("thread");
+    }
+
+    /// Réponses : `None` pendant le chargement, sinon la liste ou l'erreur.
+    pub fn set_replies(&self, replies: Option<Result<&[Reply], &str>>) {
+        while let Some(child) = self.replies.first_child() {
+            self.replies.remove(&child);
+        }
+        let heading = |text: String| {
+            gtk::Label::builder()
+                .label(text)
+                .xalign(0.0)
+                .margin_top(12)
+                .wrap(true)
+                .css_classes(["heading"])
+                .build()
+        };
+        match replies {
+            None => {
+                let spinner = gtk::Spinner::builder()
+                    .spinning(true)
+                    .halign(gtk::Align::Center)
+                    .margin_top(12)
+                    .build();
+                spinner.update_property(&[gtk::accessible::Property::Label(&gettext(
+                    "Chargement des réponses",
+                ))]);
+                self.replies.append(&spinner);
+            }
+            Some(Err(message)) => {
+                let label = heading(message.to_owned());
+                label.remove_css_class("heading");
+                label.add_css_class("dim-label");
+                self.replies.append(&label);
+            }
+            Some(Ok([])) => {}
+            Some(Ok(replies)) => {
+                let count = replies.len() as u32;
+                self.replies.append(&heading(
+                    ngettext("{} réponse", "{} réponses", count).replace("{}", &count.to_string()),
+                ));
+                for reply in replies {
+                    self.replies.append(&card::reply_card(reply));
+                }
+            }
+        }
     }
 }
