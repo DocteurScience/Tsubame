@@ -173,3 +173,23 @@ columnsview > .column headerbar {
   padding: 4px 14px;
   min-height: 0;
 }
+
+/* Bulles de la messagerie. */
+.bubble {
+  padding: 8px 12px;
+  border-radius: 16px;
+}
+
+.bubble.theirs {
+  background-color: @card_bg_color;
+  box-shadow: 0 0 0 1px alpha(currentColor, 0.08);
+}
+
+.bubble.mine {
+  color: @accent_fg_color;
+  background-color: @accent_bg_color;
+}
+
+.bubble.failed {
+  opacity: 0.55;
+}

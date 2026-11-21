@@ -96,7 +96,7 @@ impl From<crate::auth::LoginError> for ApiError {
     }
 }
 
-fn request_failed(error: impl std::fmt::Display) -> ApiError {
+pub(crate) fn request_failed(error: impl std::fmt::Display) -> ApiError {
     ApiError::new(gettext("Bluesky n'a pas répondu : {}").replace("{}", &error.to_string()))
 }
 
@@ -270,7 +270,7 @@ fn display_name(author: &ProfileViewBasic) -> String {
 }
 
 /// Nom affiché, ou l'identifiant quand il est vide.
-fn name_or_handle(display_name: Option<&str>, handle: &str) -> String {
+pub(crate) fn name_or_handle(display_name: Option<&str>, handle: &str) -> String {
     display_name
         .map(str::trim)
         .filter(|name| !name.is_empty())
@@ -339,7 +339,7 @@ fn media(post: &PostView) -> Option<Media> {
     }
 }
 
-fn parse_datetime(value: &str) -> Option<DateTime<FixedOffset>> {
+pub(crate) fn parse_datetime(value: &str) -> Option<DateTime<FixedOffset>> {
     DateTime::parse_from_rfc3339(value).ok()
 }
 
@@ -1097,7 +1097,7 @@ pub async fn publish(session: Arc<Session>, post: NewPost) -> Result<StrongRef, 
     })
 }
 
-fn month(month: u32) -> String {
+pub(crate) fn month(month: u32) -> String {
     match month {
         1 => gettext("janv."),
         2 => gettext("févr."),

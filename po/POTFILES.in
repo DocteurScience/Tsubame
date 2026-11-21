@@ -5,12 +5,14 @@ src/auth/keyring.rs
 src/auth/loopback.rs
 src/auth/mod.rs
 src/card.rs
+src/chat.rs
 src/column.rs
 src/compose.rs
 src/data.rs
 src/explore.rs
 src/login.rs
 src/main.rs
+src/messages.rs
 src/post_list.rs
 src/profile.rs
 src/thread.rs

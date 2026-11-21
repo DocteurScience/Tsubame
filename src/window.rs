@@ -27,6 +27,7 @@ use crate::data::Post;
 use crate::explore::ExplorePage;
 use crate::interactions::{self, Change, Interaction};
 use crate::login::LoginPage;
+use crate::messages::MessagesPage;
 use crate::profile::{self, ProfilePage};
 use crate::runtime::runtime;
 use crate::thread::ThreadView;
@@ -204,6 +205,11 @@ struct State {
     /// Page « Profil » : mon profil, ou une invitation à se connecter.
     my_profile_bin: adw::Bin,
     my_profile: RefCell<Option<Rc<ProfilePage>>>,
+    messages_bin: adw::Bin,
+    messages: RefCell<Option<Rc<MessagesPage>>>,
+    messages_page: adw::ViewStackPage,
+    /// Messages non lus (pastilles de « Messages »).
+    messages_unread: Cell<u32>,
     /// Fils épinglés du compte, proposés en colonnes.
     pinned: RefCell<Vec<ColumnKind>>,
     explore_bin: adw::Bin,
@@ -276,6 +282,9 @@ impl State {
         self.stacked.set_selector_visible(!narrow);
         for column in self.columns.borrow().iter() {
             column.set_alone(narrow);
+        }
+        if let Some(messages) = self.messages.borrow().as_ref() {
+            messages.root.set_collapsed(narrow);
         }
         self.update_window_controls();
         // Cibles tactiles agrandies en palier compact (voir style.css), sur
@@ -492,6 +501,7 @@ impl State {
         self.columns_changed();
         self.update_my_profile();
         self.update_explore();
+        self.update_messages();
         self.root_stack.set_visible_child_name("main");
         if let Some(column) = self.columns.borrow().get(self.current.get()) {
             column.focus();
@@ -507,6 +517,7 @@ impl State {
         self.load_all();
         self.update_my_profile();
         self.update_explore();
+        self.update_messages();
         self.pinned.borrow_mut().clear();
         self.columns_changed();
         self.logout_action.set_enabled(false);
@@ -661,8 +672,12 @@ impl State {
         );
         items.push(SidebarItem::AddColumn);
         for page in &self.pages {
+            let badge = match page.name {
+                "messages" => Some(self.messages_unread.get()).filter(|n| *n > 0),
+                _ => page.badge,
+            };
             self.sidebar_list
-                .append(&sidebar_row(page.icon, &page.title, page.badge));
+                .append(&sidebar_row(page.icon, &page.title, badge));
             items.push(SidebarItem::Page(page.name));
         }
         *self.sidebar_items.borrow_mut() = items;
@@ -973,6 +988,28 @@ impl State {
                     .map_err(|e| e.message.as_str()),
             ));
         });
+    }
+
+    /// Page Messages, pour le compte connecté ou la démonstration.
+    fn update_messages(self: &Rc<Self>) {
+        let weak = Rc::downgrade(self);
+        let page = MessagesPage::new(self.profile_host(), move |count| {
+            if let Some(state) = weak.upgrade() {
+                state.set_messages_unread(count);
+            }
+        });
+        page.root.set_collapsed(self.layout() == Layout::Single);
+        self.messages_bin.set_child(Some(&page.root));
+        self.messages.replace(Some(page));
+    }
+
+    fn set_messages_unread(self: &Rc<Self>, count: u32) {
+        if self.messages_unread.replace(count) == count {
+            return;
+        }
+        self.messages_page.set_badge_number(count);
+        self.messages_page.set_needs_attention(count > 0);
+        self.rebuild_sidebar();
     }
 
     /// Page Explorer, pour le compte connecté ou la démonstration.
@@ -1452,13 +1489,16 @@ pub fn build(app: &adw::Application) -> adw::ApplicationWindow {
     );
     notifications.set_visible(false);
     let mut hidden_when_compact = Vec::new();
-    // « Profil » : mon profil une fois connecté.
+    // « Profil » : mon profil une fois connecté. « Messages » : construite à
+    // l'entrée dans l'application.
     let my_profile_bin = adw::Bin::new();
+    let messages_bin = adw::Bin::new();
+    let mut messages_stack_page = None;
     for page in &pages[1..] {
-        let child: gtk::Widget = if page.name == "profile" {
-            my_profile_bin.clone().upcast()
-        } else {
-            placeholder_page(page.icon, &page.title).upcast()
+        let child: gtk::Widget = match page.name {
+            "profile" => my_profile_bin.clone().upcast(),
+            "messages" => messages_bin.clone().upcast(),
+            _ => placeholder_page(page.icon, &page.title).upcast(),
         };
         let stack_page =
             stack.add_titled_with_icon(&child, Some(page.name), &page.title, page.icon);
@@ -1466,7 +1506,9 @@ pub fn build(app: &adw::Application) -> adw::ApplicationWindow {
             stack_page.set_badge_number(badge);
             stack_page.set_needs_attention(true);
         }
-        if page.name != "messages" {
+        if page.name == "messages" {
+            messages_stack_page = Some(stack_page);
+        } else {
             hidden_when_compact.push(stack_page);
         }
     }
@@ -1600,6 +1642,10 @@ pub fn build(app: &adw::Application) -> adw::ApplicationWindow {
         toasts: toasts.clone(),
         my_profile_bin,
         my_profile: RefCell::default(),
+        messages_bin,
+        messages: RefCell::default(),
+        messages_page: messages_stack_page.expect("page Messages"),
+        messages_unread: Cell::new(0),
         pinned: RefCell::default(),
         explore_bin,
         explore: RefCell::default(),
