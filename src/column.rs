@@ -1,5 +1,6 @@
 //! Une colonne de cartes : en-tête (titre, fermeture) et liste de posts.
 
+use std::cell::RefCell;
 use std::rc::Rc;
 
 use adw::prelude::*;
@@ -10,33 +11,96 @@ use crate::api::{ApiError, DISCOVER_FEED, Page, Source};
 use crate::data::{self, Feed, Post};
 use crate::post_list::{Load, PostList};
 
+/// Fil personnalisé ouvert en colonne (fil épinglé sur Bluesky), repéré
+/// par un numéro dans le registre des fils : `ColumnKind` reste ainsi
+/// copiable.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct FeedId(usize);
+
+#[derive(Debug, Clone)]
+struct FeedInfo {
+    uri: String,
+    name: String,
+}
+
+thread_local! {
+    static FEEDS: RefCell<Vec<FeedInfo>> = RefCell::default();
+}
+
+impl FeedId {
+    /// Numéro du fil `uri`, enregistré au besoin. En attendant son vrai nom,
+    /// le fil porte la fin de son adresse.
+    pub fn intern(uri: &str) -> Self {
+        FEEDS.with_borrow_mut(|feeds| {
+            if let Some(index) = feeds.iter().position(|f| f.uri == uri) {
+                return FeedId(index);
+            }
+            let name = uri.rsplit('/').next().unwrap_or(uri).to_owned();
+            feeds.push(FeedInfo {
+                uri: uri.to_owned(),
+                name,
+            });
+            FeedId(feeds.len() - 1)
+        })
+    }
+
+    pub fn set_name(self, name: &str) {
+        FEEDS.with_borrow_mut(|feeds| feeds[self.0].name = name.to_owned());
+    }
+
+    pub fn uri(self) -> String {
+        FEEDS.with_borrow(|feeds| feeds[self.0].uri.clone())
+    }
+
+    fn name(self) -> String {
+        FEEDS.with_borrow(|feeds| feeds[self.0].name.clone())
+    }
+}
+
 /// Ce qu'une colonne affiche. Chaque sorte s'ouvre au plus une fois.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ColumnKind {
     Feed(Feed),
     Notifications,
+    /// Fil épinglé sur Bluesky.
+    Custom(FeedId),
 }
 
+const FEED_PREFIX: &str = "feed:";
+
 impl ColumnKind {
-    pub const ALL: [ColumnKind; 4] = [
+    /// Colonnes toujours proposées. « Linux et libre », fil fictif des
+    /// maquettes, ne l'est qu'en démonstration ; les fils épinglés
+    /// s'ajoutent une fois connecté.
+    pub const BUILTIN: [ColumnKind; 3] = [
         ColumnKind::Feed(Feed::Following),
         ColumnKind::Notifications,
         ColumnKind::Feed(Feed::Discover),
-        ColumnKind::Feed(Feed::LinuxEtLibre),
     ];
+    pub const DEMO: ColumnKind = ColumnKind::Feed(Feed::LinuxEtLibre);
 
-    /// Identifiant stable, utilisé comme cible des actions.
-    pub fn id(self) -> &'static str {
+    /// Identifiant stable, enregistré dans les réglages et utilisé comme
+    /// cible des actions.
+    pub fn id(self) -> String {
         match self {
-            ColumnKind::Feed(Feed::Following) => "following",
-            ColumnKind::Feed(Feed::Discover) => "discover",
-            ColumnKind::Feed(Feed::LinuxEtLibre) => "linux-et-libre",
-            ColumnKind::Notifications => "notifications",
+            ColumnKind::Feed(Feed::Following) => "following".into(),
+            ColumnKind::Feed(Feed::Discover) => "discover".into(),
+            ColumnKind::Feed(Feed::LinuxEtLibre) => "linux-et-libre".into(),
+            ColumnKind::Notifications => "notifications".into(),
+            ColumnKind::Custom(feed) => format!("{FEED_PREFIX}{}", feed.uri()),
         }
     }
 
     pub fn from_id(id: &str) -> Option<Self> {
-        Self::ALL.into_iter().find(|kind| kind.id() == id)
+        if let Some(uri) = id.strip_prefix(FEED_PREFIX) {
+            return uri
+                .starts_with("at://")
+                .then(|| ColumnKind::Custom(FeedId::intern(uri)));
+        }
+        Self::BUILTIN
+            .into_iter()
+            .chain([Self::DEMO])
+            .find(|kind| kind.id() == id)
     }
 
     pub fn title(self) -> String {
@@ -46,12 +110,13 @@ impl ColumnKind {
             ColumnKind::Feed(Feed::Discover) => "Discover".to_owned(),
             ColumnKind::Feed(Feed::LinuxEtLibre) => gettext("Linux et libre"),
             ColumnKind::Notifications => gettext("Notifications"),
+            ColumnKind::Custom(feed) => feed.name(),
         }
     }
 
     pub fn icon(self) -> &'static str {
         match self {
-            ColumnKind::Feed(_) => "view-list-symbolic",
+            ColumnKind::Feed(_) | ColumnKind::Custom(_) => "view-list-symbolic",
             ColumnKind::Notifications => "preferences-system-notifications-symbolic",
         }
     }
@@ -61,16 +126,18 @@ impl ColumnKind {
         match self {
             ColumnKind::Feed(feed) => data::posts(feed),
             ColumnKind::Notifications => data::notifications(),
+            ColumnKind::Custom(_) => Vec::new(),
         }
     }
 
     /// Source des posts sur Bluesky, ou `None` si la colonne n'y est pas
-    /// encore reliée.
+    /// reliée.
     pub fn source(self) -> Option<Source> {
         match self {
             ColumnKind::Feed(Feed::Following) => Some(Source::Timeline),
             ColumnKind::Feed(Feed::Discover) => Some(Source::Feed(DISCOVER_FEED.to_owned())),
             ColumnKind::Notifications => Some(Source::Notifications),
+            ColumnKind::Custom(feed) => Some(Source::Feed(feed.uri())),
             // « Linux et libre » est le fil fictif des maquettes.
             ColumnKind::Feed(Feed::LinuxEtLibre) => None,
         }
@@ -284,6 +351,15 @@ impl Column {
         self.header.set_show_end_title_buttons(visible);
     }
 
+    /// Met à jour le titre, une fois le nom du fil connu.
+    pub fn refresh_title(&self) {
+        let title = self.kind.title();
+        self.title.set_title(&title);
+        self.switcher.set_label(&title);
+        self.list
+            .update_property(&[gtk::accessible::Property::Label(&title)]);
+    }
+
     /// Donne le focus à la carte sélectionnée, ou à la première.
     pub fn focus(&self) {
         self.posts.focus();
@@ -296,10 +372,24 @@ mod tests {
 
     #[test]
     fn ids_round_trip() {
-        for kind in ColumnKind::ALL {
-            assert_eq!(ColumnKind::from_id(kind.id()), Some(kind));
+        for kind in ColumnKind::BUILTIN.into_iter().chain([ColumnKind::DEMO]) {
+            assert_eq!(ColumnKind::from_id(&kind.id()), Some(kind));
         }
         assert_eq!(ColumnKind::from_id("inconnue"), None);
+        assert_eq!(ColumnKind::from_id("feed:pas-une-adresse"), None);
+    }
+
+    #[test]
+    fn pinned_feeds_get_a_stable_id() {
+        let uri = "at://did:plc:a/app.bsky.feed.generator/linux";
+        let kind = ColumnKind::from_id(&format!("feed:{uri}")).unwrap();
+        assert_eq!(kind, ColumnKind::Custom(FeedId::intern(uri)));
+        assert_eq!(kind.id(), format!("feed:{uri}"));
+        // Nom provisoire, puis le vrai nom.
+        assert_eq!(kind.title(), "linux");
+        FeedId::intern(uri).set_name("Linux et logiciels libres");
+        assert_eq!(kind.title(), "Linux et logiciels libres");
+        assert_eq!(kind.source(), Some(Source::Feed(uri.to_owned())));
     }
 
     #[test]

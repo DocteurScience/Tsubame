@@ -20,7 +20,7 @@ use std::sync::Arc;
 
 use crate::api;
 use crate::auth::{self, Session};
-use crate::column::{Column, ColumnKind};
+use crate::column::{Column, ColumnKind, FeedId};
 use crate::columns::{ColumnsView, Layout};
 use crate::compose;
 use crate::data::Post;
@@ -204,6 +204,8 @@ struct State {
     /// Page « Profil » : mon profil, ou une invitation à se connecter.
     my_profile_bin: adw::Bin,
     my_profile: RefCell<Option<Rc<ProfilePage>>>,
+    /// Fils épinglés du compte, proposés en colonnes.
+    pinned: RefCell<Vec<ColumnKind>>,
     explore_bin: adw::Bin,
     explore: RefCell<Option<Rc<ExplorePage>>>,
     login: Rc<LoginPage>,
@@ -415,8 +417,59 @@ impl State {
             .map(|c| c.kind)
     }
 
+    /// Colonnes que « Ajouter une colonne » propose : les colonnes de base,
+    /// puis les fils épinglés du compte, ou le fil fictif en démonstration.
+    fn available_kinds(&self) -> Vec<ColumnKind> {
+        let mut kinds = ColumnKind::BUILTIN.to_vec();
+        if self.session.borrow().is_some() {
+            kinds.extend(self.pinned.borrow().iter().copied());
+        } else {
+            kinds.push(ColumnKind::DEMO);
+        }
+        kinds
+    }
+
+    /// Fils épinglés du compte : proposés en colonnes, et nommés dans les
+    /// colonnes déjà ouvertes.
+    fn load_pinned_feeds(self: &Rc<Self>) {
+        self.pinned.borrow_mut().clear();
+        let Some(session) = self.session.borrow().clone() else {
+            return;
+        };
+        let task = runtime().spawn(api::pinned_feeds(session));
+        let weak = Rc::downgrade(self);
+        glib::spawn_future_local(async move {
+            let Some(state) = weak.upgrade() else { return };
+            match task.await {
+                Ok(Ok(feeds)) => {
+                    let kinds = feeds
+                        .iter()
+                        // Discover a déjà sa colonne.
+                        .filter(|feed| feed.uri != api::DISCOVER_FEED)
+                        .map(|feed| {
+                            let id = FeedId::intern(&feed.uri);
+                            id.set_name(&feed.name);
+                            ColumnKind::Custom(id)
+                        })
+                        .collect();
+                    state.pinned.replace(kinds);
+                    for column in state.columns.borrow().iter() {
+                        column.refresh_title();
+                    }
+                    state.columns_changed();
+                }
+                Ok(Err(error)) if error.expired => state.session_expired(&error.message),
+                Ok(Err(error)) => {
+                    glib::g_debug!("tsubame", "fils épinglés : {}", error.message);
+                }
+                Err(_) => {}
+            }
+        });
+    }
+
     fn save_columns(&self) {
-        let ids: Vec<&str> = self.columns.borrow().iter().map(|c| c.kind.id()).collect();
+        let ids: Vec<String> = self.columns.borrow().iter().map(|c| c.kind.id()).collect();
+        let ids: Vec<&str> = ids.iter().map(String::as_str).collect();
         if let Err(error) = self.settings.set_strv("columns", ids) {
             glib::g_warning!("tsubame", "Colonnes non enregistrées : {error}");
         }
@@ -435,6 +488,8 @@ impl State {
         self.session.replace(session);
         self.clear_thread();
         self.load_all();
+        self.load_pinned_feeds();
+        self.columns_changed();
         self.update_my_profile();
         self.update_explore();
         self.root_stack.set_visible_child_name("main");
@@ -452,6 +507,8 @@ impl State {
         self.load_all();
         self.update_my_profile();
         self.update_explore();
+        self.pinned.borrow_mut().clear();
+        self.columns_changed();
         self.logout_action.set_enabled(false);
         self.sidebar_title.set_subtitle("");
         self.login.show_form(message);
@@ -546,19 +603,20 @@ impl State {
         }
         self.update_window_controls();
         self.columns_menu.remove_all();
+        // Cibles typées : une adresse de fil contient des deux-points.
+        let item = |kind: ColumnKind, action: &str| {
+            let item = gio::MenuItem::new(Some(&kind.title()), None);
+            item.set_action_and_target_value(Some(action), Some(&kind.id().to_variant()));
+            item
+        };
         for column in self.columns.borrow().iter() {
-            self.columns_menu.append(
-                Some(&column.kind.title()),
-                Some(&format!("win.show-column::{}", column.kind.id())),
-            );
+            self.columns_menu
+                .append_item(&item(column.kind, "win.show-column"));
         }
         self.add_menu.remove_all();
-        for kind in ColumnKind::ALL {
+        for kind in self.available_kinds() {
             if !self.is_open(kind) {
-                self.add_menu.append(
-                    Some(&kind.title()),
-                    Some(&format!("win.add-column::{}", kind.id())),
-                );
+                self.add_menu.append_item(&item(kind, "win.add-column"));
             }
         }
         let all_open = self.add_menu.n_items() == 0;
@@ -586,7 +644,7 @@ impl State {
             let kind = column.kind;
             let badge = match kind {
                 ColumnKind::Notifications => Some(self.unread.get()).filter(|n| *n > 0),
-                ColumnKind::Feed(_) => None,
+                ColumnKind::Feed(_) | ColumnKind::Custom(_) => None,
             };
             let row = sidebar_row(kind.icon(), &kind.title(), badge);
             self.make_draggable(&row, kind);
@@ -1542,6 +1600,7 @@ pub fn build(app: &adw::Application) -> adw::ApplicationWindow {
         toasts: toasts.clone(),
         my_profile_bin,
         my_profile: RefCell::default(),
+        pinned: RefCell::default(),
         explore_bin,
         explore: RefCell::default(),
         login: login.clone(),

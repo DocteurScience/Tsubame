@@ -651,6 +651,93 @@ pub async fn trending(session: Arc<Session>) -> Result<Vec<Topic>, ApiError> {
         .collect())
 }
 
+/// Fil épinglé : son adresse et son nom.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PinnedFeed {
+    pub uri: String,
+    pub name: String,
+}
+
+/// Adresses des fils épinglés, dans l'ordre, d'après les préférences
+/// (format `savedFeedsPrefV2`, ou l'ancien `savedFeedsPref`). Les listes et
+/// le fil Following, qui ne sont pas des générateurs de fil, sont laissés
+/// de côté.
+pub fn pinned_feed_uris(preferences: &serde_json::Value) -> Vec<String> {
+    let items = preferences.as_array().cloned().unwrap_or_default();
+    let of_type = |name: &str| {
+        items
+            .iter()
+            .find(|item| item.get("$type").and_then(|t| t.as_str()) == Some(name))
+    };
+    if let Some(v2) = of_type("app.bsky.actor.defs#savedFeedsPrefV2") {
+        return v2
+            .get("items")
+            .and_then(|items| items.as_array())
+            .into_iter()
+            .flatten()
+            .filter(|item| {
+                item.get("pinned").and_then(|p| p.as_bool()) == Some(true)
+                    && item.get("type").and_then(|t| t.as_str()) == Some("feed")
+            })
+            .filter_map(|item| item.get("value")?.as_str().map(str::to_owned))
+            .collect();
+    }
+    of_type("app.bsky.actor.defs#savedFeedsPref")
+        .and_then(|legacy| legacy.get("pinned")?.as_array().cloned())
+        .into_iter()
+        .flatten()
+        .filter_map(|uri| uri.as_str().map(str::to_owned))
+        .filter(|uri| uri.contains("/app.bsky.feed.generator/"))
+        .collect()
+}
+
+/// Fils épinglés du compte, avec leurs noms.
+pub async fn pinned_feeds(session: Arc<Session>) -> Result<Vec<PinnedFeed>, ApiError> {
+    let api = session.api().await?;
+    let output = api
+        .api
+        .app
+        .bsky
+        .actor
+        .get_preferences(atrium_api::app::bsky::actor::get_preferences::ParametersData {}.into())
+        .await
+        .map_err(request_failed)?;
+    let preferences = serde_json::to_value(&output.data.preferences).unwrap_or_default();
+    let uris = pinned_feed_uris(&preferences);
+    if uris.is_empty() {
+        return Ok(Vec::new());
+    }
+    let output = api
+        .api
+        .app
+        .bsky
+        .feed
+        .get_feed_generators(
+            atrium_api::app::bsky::feed::get_feed_generators::ParametersData {
+                feeds: uris.clone(),
+            }
+            .into(),
+        )
+        .await
+        .map_err(request_failed)?;
+    let names: HashMap<&str, &str> = output
+        .data
+        .feeds
+        .iter()
+        .map(|feed| (feed.uri.as_str(), feed.display_name.as_str()))
+        .collect();
+    // Dans l'ordre des préférences ; un fil disparu depuis est ignoré.
+    Ok(uris
+        .iter()
+        .filter_map(|uri| {
+            names.get(uri.as_str()).map(|name| PinnedFeed {
+                uri: uri.clone(),
+                name: (*name).to_owned(),
+            })
+        })
+        .collect())
+}
+
 fn invalid_actor() -> ApiError {
     ApiError::new(gettext("Ce compte n'existe pas."))
 }
@@ -1561,6 +1648,38 @@ mod tests {
             actor.following.as_deref(),
             Some("at://did:plc:moi/app.bsky.graph.follow/3")
         );
+    }
+
+    #[test]
+    fn pinned_feeds_are_read_from_preferences() {
+        let preferences = serde_json::json!([
+            {"$type": "app.bsky.actor.defs#adultContentPref", "enabled": false},
+            {"$type": "app.bsky.actor.defs#savedFeedsPrefV2", "items": [
+                {"id": "1", "type": "timeline", "value": "following", "pinned": true},
+                {"id": "2", "type": "feed", "value": "at://did:plc:a/app.bsky.feed.generator/linux", "pinned": true},
+                {"id": "3", "type": "list", "value": "at://did:plc:a/app.bsky.graph.list/l", "pinned": true},
+                {"id": "4", "type": "feed", "value": "at://did:plc:a/app.bsky.feed.generator/saved", "pinned": false},
+                {"id": "5", "type": "feed", "value": "at://did:plc:b/app.bsky.feed.generator/photo", "pinned": true}
+            ]}
+        ]);
+        assert_eq!(
+            pinned_feed_uris(&preferences),
+            vec![
+                "at://did:plc:a/app.bsky.feed.generator/linux",
+                "at://did:plc:b/app.bsky.feed.generator/photo",
+            ]
+        );
+        // Ancien format.
+        let legacy = serde_json::json!([
+            {"$type": "app.bsky.actor.defs#savedFeedsPref",
+             "pinned": ["at://did:plc:a/app.bsky.feed.generator/linux", "at://did:plc:a/app.bsky.graph.list/l"],
+             "saved": []}
+        ]);
+        assert_eq!(
+            pinned_feed_uris(&legacy),
+            vec!["at://did:plc:a/app.bsky.feed.generator/linux"]
+        );
+        assert!(pinned_feed_uris(&serde_json::json!([])).is_empty());
     }
 
     #[test]
