@@ -8,6 +8,7 @@ src/card.rs
 src/column.rs
 src/compose.rs
 src/data.rs
+src/explore.rs
 src/login.rs
 src/main.rs
 src/post_list.rs

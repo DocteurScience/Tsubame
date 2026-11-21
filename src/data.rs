@@ -46,6 +46,72 @@ pub struct Post {
     pub unread: bool,
 }
 
+/// Compte dans une liste de personnes (suggestions, résultats de recherche).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Actor {
+    pub did: String,
+    pub handle: String,
+    /// Nom affiché, ou l'identifiant s'il n'y en a pas.
+    pub name: String,
+    pub bio: String,
+    pub avatar: Option<String>,
+    /// Mon abonnement à ce compte (adresse de l'enregistrement), s'il existe.
+    pub following: Option<String>,
+}
+
+/// Sujet du moment.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Topic {
+    /// Nom affiché.
+    pub name: String,
+    /// Recherche correspondante.
+    pub query: String,
+}
+
+/// Personnes à suivre et sujets du moment de démonstration, repris de la
+/// maquette `Explorer.dc.html`.
+pub fn demo_topics() -> Vec<Topic> {
+    [
+        "#GNOME49",
+        "Accessibilité numérique",
+        "Photographie de montagne",
+    ]
+    .into_iter()
+    .map(|name| Topic {
+        name: name.to_owned(),
+        query: name.to_owned(),
+    })
+    .collect()
+}
+
+pub fn demo_actors() -> Vec<Actor> {
+    [
+        (
+            "Nadia Safi",
+            "nadia.example.social",
+            "Traductrice, communauté GNOME fr",
+        ),
+        (
+            "Romain Bailly",
+            "romain.example.social",
+            "Packaging Flatpak",
+        ),
+        (
+            "Pierre Delmas",
+            "pierre.example.social",
+            "Accessibilité GTK",
+        ),
+    ]
+    .into_iter()
+    .map(|(name, handle, bio)| Actor {
+        handle: handle.to_owned(),
+        name: name.to_owned(),
+        bio: bio.to_owned(),
+        ..Default::default()
+    })
+    .collect()
+}
+
 /// Profil d'un compte.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Profile {

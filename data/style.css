@@ -167,3 +167,9 @@ columnsview > .column headerbar {
   border-radius: 12px;
   background-color: mix(@window_bg_color, @accent_bg_color, 0.25);
 }
+
+/* Bouton « Suivre » dans les listes de personnes. */
+.small-pill {
+  padding: 4px 14px;
+  min-height: 0;
+}

@@ -9,6 +9,7 @@ mod column;
 mod columns;
 mod compose;
 mod data;
+mod explore;
 mod i18n;
 mod images;
 mod interactions;

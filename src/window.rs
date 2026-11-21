@@ -24,6 +24,7 @@ use crate::column::{Column, ColumnKind};
 use crate::columns::{ColumnsView, Layout};
 use crate::compose;
 use crate::data::Post;
+use crate::explore::ExplorePage;
 use crate::interactions::{self, Change, Interaction};
 use crate::login::LoginPage;
 use crate::profile::{self, ProfilePage};
@@ -203,6 +204,8 @@ struct State {
     /// Page « Profil » : mon profil, ou une invitation à se connecter.
     my_profile_bin: adw::Bin,
     my_profile: RefCell<Option<Rc<ProfilePage>>>,
+    explore_bin: adw::Bin,
+    explore: RefCell<Option<Rc<ExplorePage>>>,
     login: Rc<LoginPage>,
     sidebar_title: adw::WindowTitle,
     /// Compte connecté ; `None` avec les posts de démonstration.
@@ -433,6 +436,7 @@ impl State {
         self.clear_thread();
         self.load_all();
         self.update_my_profile();
+        self.update_explore();
         self.root_stack.set_visible_child_name("main");
         if let Some(column) = self.columns.borrow().get(self.current.get()) {
             column.focus();
@@ -447,6 +451,7 @@ impl State {
         self.clear_thread();
         self.load_all();
         self.update_my_profile();
+        self.update_explore();
         self.logout_action.set_enabled(false);
         self.sidebar_title.set_subtitle("");
         self.login.show_form(message);
@@ -912,6 +917,21 @@ impl State {
         });
     }
 
+    /// Page Explorer, pour le compte connecté ou la démonstration.
+    fn update_explore(self: &Rc<Self>) {
+        let page = ExplorePage::new(self.profile_host());
+        self.explore_bin.set_child(Some(&page.root));
+        self.explore.replace(Some(page));
+    }
+
+    /// Rechercher (Ctrl+K) : ouvre Explorer, le champ de recherche prêt.
+    fn focus_search(&self) {
+        self.stack.set_visible_child_name("explore");
+        if let Some(page) = self.explore.borrow().as_ref() {
+            page.entry.grab_focus();
+        }
+    }
+
     /// Page « Profil » : mon profil, ou une invitation à se connecter.
     fn update_my_profile(self: &Rc<Self>) {
         let session = self.session.borrow().clone();
@@ -1228,6 +1248,15 @@ fn install_actions(window: &adw::ApplicationWindow, state: &Rc<State>) {
     });
     window.add_action(&open_profile);
 
+    let search = gio::SimpleAction::new("search", None);
+    let weak = Rc::downgrade(state);
+    search.connect_activate(move |_, _| {
+        if let Some(state) = weak.upgrade() {
+            state.focus_search();
+        }
+    });
+    window.add_action(&search);
+
     let compose = gio::SimpleAction::new("compose", None);
     let weak = Rc::downgrade(state);
     compose.connect_activate(move |_, _| {
@@ -1343,8 +1372,11 @@ pub fn build(app: &adw::Application) -> adw::ApplicationWindow {
     );
     let pages = other_pages();
     let explore = &pages[0];
+    // Explorer : construite à l'entrée dans l'application (compte ou
+    // démonstration).
+    let explore_bin = adw::Bin::new();
     stack.add_titled_with_icon(
-        &placeholder_page(explore.icon, &explore.title),
+        &explore_bin,
         Some(explore.name),
         &explore.title,
         explore.icon,
@@ -1510,6 +1542,8 @@ pub fn build(app: &adw::Application) -> adw::ApplicationWindow {
         toasts: toasts.clone(),
         my_profile_bin,
         my_profile: RefCell::default(),
+        explore_bin,
+        explore: RefCell::default(),
         login: login.clone(),
         sidebar_title,
         session: RefCell::default(),
@@ -1636,6 +1670,7 @@ pub fn build(app: &adw::Application) -> adw::ApplicationWindow {
     let app = app.clone();
     app.set_accels_for_action("win.refresh", &["F5", "<Control>r"]);
     app.set_accels_for_action("win.compose", &["<Control>n"]);
+    app.set_accels_for_action("win.search", &["<Control>k", "<Control>f"]);
     app.set_accels_for_action("win.next-column", &["<Control>Page_Down"]);
     app.set_accels_for_action("win.previous-column", &["<Control>Page_Up"]);
     app.set_accels_for_action("win.move-current-right", &["<Control><Shift>Page_Down"]);

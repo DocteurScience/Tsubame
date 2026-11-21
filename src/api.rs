@@ -17,7 +17,7 @@ use chrono::{DateTime, Datelike, FixedOffset, Local, Timelike, Utc};
 use gettextrs::{gettext, ngettext};
 
 use crate::auth::Session;
-use crate::data::{Media, Post, Profile, Reply, StrongRef};
+use crate::data::{Actor, Media, Post, Profile, Reply, StrongRef, Topic};
 
 /// Fil « Discover » de Bluesky.
 pub const DISCOVER_FEED: &str =
@@ -39,6 +39,8 @@ pub enum Source {
     Author { actor: String, filter: AuthorFilter },
     /// Posts aimés par un compte (`getActorLikes`) : seulement le sien.
     Likes(String),
+    /// Recherche de posts (`searchPosts`).
+    Search(String),
 }
 
 /// Onglets d'un profil.
@@ -107,6 +109,42 @@ pub async fn load(
     let limit = PAGE_SIZE.try_into().ok();
     let (feed, cursor) = match source {
         Source::Notifications => return notifications(&api, cursor).await,
+        Source::Search(query) => {
+            let output = api
+                .api
+                .app
+                .bsky
+                .feed
+                .search_posts(
+                    atrium_api::app::bsky::feed::search_posts::ParametersData {
+                        author: None,
+                        cursor,
+                        domain: None,
+                        lang: None,
+                        limit,
+                        mentions: None,
+                        q: query,
+                        since: None,
+                        sort: None,
+                        tag: None,
+                        until: None,
+                        url: None,
+                    }
+                    .into(),
+                )
+                .await
+                .map_err(request_failed)?;
+            let now = Utc::now();
+            return Ok(Page {
+                posts: output
+                    .data
+                    .posts
+                    .iter()
+                    .map(|post| post_from_view(post, now))
+                    .collect(),
+                cursor: output.data.cursor,
+            });
+        }
         Source::Author { actor, filter } => {
             let output = api
                 .api
@@ -526,6 +564,91 @@ pub fn post_from_notification(
     }
     post.unread = !notification.is_read;
     Some(post)
+}
+
+pub fn actor_from_view(actor: &atrium_api::app::bsky::actor::defs::ProfileView) -> Actor {
+    Actor {
+        did: actor.did.as_str().to_owned(),
+        handle: actor.handle.as_str().to_owned(),
+        name: name_or_handle(actor.display_name.as_deref(), actor.handle.as_str()),
+        bio: actor.description.clone().unwrap_or_default(),
+        avatar: actor.avatar.clone(),
+        following: actor.viewer.as_ref().and_then(|v| v.following.clone()),
+    }
+}
+
+/// Personnes à suivre (`getSuggestions`).
+pub async fn suggestions(session: Arc<Session>) -> Result<Vec<Actor>, ApiError> {
+    let api = session.api().await?;
+    let output = api
+        .api
+        .app
+        .bsky
+        .actor
+        .get_suggestions(
+            atrium_api::app::bsky::actor::get_suggestions::ParametersData {
+                cursor: None,
+                limit: 10.try_into().ok(),
+            }
+            .into(),
+        )
+        .await
+        .map_err(request_failed)?;
+    Ok(output.data.actors.iter().map(actor_from_view).collect())
+}
+
+/// Recherche de personnes (`searchActors`).
+pub async fn search_actors(session: Arc<Session>, query: String) -> Result<Vec<Actor>, ApiError> {
+    let api = session.api().await?;
+    let output = api
+        .api
+        .app
+        .bsky
+        .actor
+        .search_actors(
+            atrium_api::app::bsky::actor::search_actors::ParametersData {
+                cursor: None,
+                limit: 25.try_into().ok(),
+                q: Some(query),
+                term: None,
+            }
+            .into(),
+        )
+        .await
+        .map_err(request_failed)?;
+    Ok(output.data.actors.iter().map(actor_from_view).collect())
+}
+
+/// Sujets du moment (`getTrendingTopics`).
+pub async fn trending(session: Arc<Session>) -> Result<Vec<Topic>, ApiError> {
+    let api = session.api().await?;
+    let output = api
+        .api
+        .app
+        .bsky
+        .unspecced
+        .get_trending_topics(
+            atrium_api::app::bsky::unspecced::get_trending_topics::ParametersData {
+                limit: 10.try_into().ok(),
+                viewer: None,
+            }
+            .into(),
+        )
+        .await
+        .map_err(request_failed)?;
+    Ok(output
+        .data
+        .topics
+        .iter()
+        .map(|topic| Topic {
+            name: topic
+                .display_name
+                .clone()
+                .filter(|name| !name.trim().is_empty())
+                .unwrap_or_else(|| topic.topic.clone()),
+            query: topic.topic.clone(),
+        })
+        .collect())
 }
 
 fn invalid_actor() -> ApiError {
@@ -1418,6 +1541,26 @@ mod tests {
         );
         assert!(profile.follows_me);
         assert_eq!(profile.banner, None);
+    }
+
+    #[test]
+    fn people_are_read() {
+        let view: atrium_api::app::bsky::actor::defs::ProfileView = serde_json::from_str(
+            r#"{
+                "did": "did:plc:nadia",
+                "handle": "nadia.example.social",
+                "description": "Traductrice",
+                "viewer": {"following": "at://did:plc:moi/app.bsky.graph.follow/3"}
+            }"#,
+        )
+        .unwrap();
+        let actor = actor_from_view(&view);
+        assert_eq!(actor.name, "nadia.example.social");
+        assert_eq!(actor.bio, "Traductrice");
+        assert_eq!(
+            actor.following.as_deref(),
+            Some("at://did:plc:moi/app.bsky.graph.follow/3")
+        );
     }
 
     #[test]
