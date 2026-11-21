@@ -10,6 +10,7 @@ src/compose.rs
 src/data.rs
 src/login.rs
 src/main.rs
+src/post_list.rs
 src/profile.rs
 src/thread.rs
 src/window.rs
