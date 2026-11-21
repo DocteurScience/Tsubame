@@ -59,7 +59,7 @@ fn other_pages() -> Vec<OtherPage> {
             "messages",
             "mail-unread-symbolic",
             gettext("Messages"),
-            Some(2),
+            None,
         ),
         page(
             "bookmarks",
@@ -200,6 +200,10 @@ struct State {
     sidebar_title: adw::WindowTitle,
     /// Compte connecté ; `None` avec les posts de démonstration.
     session: RefCell<Option<Arc<Session>>>,
+    /// Notifications pas encore vues (pastilles de la barre latérale et de
+    /// l'onglet Notifications).
+    unread: Cell<u32>,
+    notifications_page: adw::ViewStackPage,
     /// Post affiché dans la discussion, pour ignorer des réponses arrivées
     /// trop tard.
     shown_uri: RefCell<Option<String>>,
@@ -563,7 +567,11 @@ impl State {
         let mut items = Vec::new();
         for column in self.columns.borrow().iter() {
             let kind = column.kind;
-            let row = sidebar_row(kind.icon(), &kind.title(), kind.badge());
+            let badge = match kind {
+                ColumnKind::Notifications => Some(self.unread.get()).filter(|n| *n > 0),
+                ColumnKind::Feed(_) => None,
+            };
+            let row = sidebar_row(kind.icon(), &kind.title(), badge);
             self.make_draggable(&row, kind);
             self.sidebar_list.append(&row);
             items.push(SidebarItem::Column(kind));
@@ -743,6 +751,9 @@ impl State {
                 other.unselect_all();
             }
         }
+        if self.is_notifications_list(list) {
+            self.mark_notifications_seen();
+        }
         self.pane.show(Some(&post));
         self.stacked.show(Some(&post));
         self.shown_uri.replace(post.uri.clone());
@@ -809,6 +820,12 @@ impl State {
                 (None, _) => {
                     if !more {
                         column.show_demo();
+                        let weak = Rc::downgrade(self);
+                        glib::idle_add_local_once(move || {
+                            if let Some(state) = weak.upgrade() {
+                                state.refresh_unread();
+                            }
+                        });
                     }
                     return;
                 }
@@ -839,6 +856,7 @@ impl State {
                     return;
                 }
                 state.with_column(target, |column| column.finish_load(&load, result));
+                state.refresh_unread();
             });
         });
     }
@@ -855,6 +873,58 @@ impl State {
             let _ = auth::logout(&account).await;
         });
         self.leave(Some(message));
+    }
+
+    fn set_unread(self: &Rc<Self>, count: u32) {
+        if self.unread.replace(count) == count {
+            return;
+        }
+        self.notifications_page.set_badge_number(count);
+        self.notifications_page.set_needs_attention(count > 0);
+        self.rebuild_sidebar();
+    }
+
+    /// Recalcule le nombre de notifications non vues d'après les colonnes
+    /// chargées.
+    fn refresh_unread(self: &Rc<Self>) {
+        let mut count = 0;
+        for target in [
+            Target::CompactNotifications,
+            Target::Home(ColumnKind::Notifications),
+        ] {
+            self.with_column(target, |column| count = count.max(column.unread_count()));
+        }
+        self.set_unread(count);
+    }
+
+    fn is_notifications_list(&self, list: &gtk::ListBox) -> bool {
+        list == &self.compact_notifications.list
+            || self
+                .columns
+                .borrow()
+                .iter()
+                .any(|c| c.kind == ColumnKind::Notifications && &c.list == list)
+    }
+
+    /// Ouvrir une notification les marque toutes comme vues, à l'écran et
+    /// sur Bluesky.
+    fn mark_notifications_seen(self: &Rc<Self>) {
+        if self.unread.get() == 0 {
+            return;
+        }
+        self.with_column(Target::CompactNotifications, Column::mark_all_read);
+        self.with_column(
+            Target::Home(ColumnKind::Notifications),
+            Column::mark_all_read,
+        );
+        self.set_unread(0);
+        if let Some(session) = self.session.borrow().clone() {
+            runtime().spawn(async move {
+                if let Err(error) = api::mark_notifications_seen(session).await {
+                    glib::g_debug!("tsubame", "notifications non marquées : {}", error.message);
+                }
+            });
+        }
     }
 
     fn load_all(self: &Rc<Self>) {
@@ -1043,8 +1113,6 @@ pub fn build(app: &adw::Application) -> adw::ApplicationWindow {
         &gettext("Notifications"),
         ColumnKind::Notifications.icon(),
     );
-    notifications.set_badge_number(3);
-    notifications.set_needs_attention(true);
     notifications.set_visible(false);
     let mut hidden_when_compact = Vec::new();
     for page in &pages[1..] {
@@ -1167,6 +1235,8 @@ pub fn build(app: &adw::Application) -> adw::ApplicationWindow {
         sidebar_title,
         session: RefCell::default(),
         shown_uri: RefCell::default(),
+        unread: Cell::new(0),
+        notifications_page: notifications.clone(),
         logout_action: gio::SimpleAction::new("logout", None),
     });
     state.connect_column(&state.compact_notifications, Target::CompactNotifications);

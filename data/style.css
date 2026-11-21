@@ -98,3 +98,8 @@ columnsview > .column headerbar {
   min-height: 44px;
   min-width: 44px;
 }
+
+/* Notification pas encore vue : légère teinte de la couleur d'accent. */
+.post-card.unread {
+  background-color: mix(@card_bg_color, @accent_bg_color, 0.08);
+}

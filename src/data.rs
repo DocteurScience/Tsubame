@@ -34,6 +34,8 @@ pub struct Post {
     pub reposts: u32,
     pub likes: u32,
     pub thread: Vec<Reply>,
+    /// Notification pas encore vue.
+    pub unread: bool,
 }
 
 /// Image (ou vignette de vidéo) jointe à un post.
@@ -92,6 +94,7 @@ fn post(
         reposts,
         likes,
         thread: Vec::new(),
+        unread: false,
     }
 }
 
@@ -314,9 +317,16 @@ pub fn posts(feed: Feed) -> Vec<Post> {
 /// Notifications : posts précédés d'un contexte, comme dans la maquette
 /// `Colonnes.dc.html`.
 pub fn notifications() -> Vec<Post> {
-    let notification = |context, post: Post| Post {
-        context: Some(gettextrs::gettext(context)),
-        ..post
+    // Les deux plus récentes ne sont pas encore vues.
+    let mut unread = 2;
+    let mut notification = |context, post: Post| {
+        let is_unread = unread > 0;
+        unread -= 1;
+        Post {
+            context: Some(gettextrs::gettext(context)),
+            unread: is_unread,
+            ..post
+        }
     };
     vec![
         notification(

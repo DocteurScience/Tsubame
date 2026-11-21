@@ -1,6 +1,7 @@
 //! Lecture des fils et des discussions sur l'API de Bluesky, et conversion
 //! des réponses en posts affichables (`data::Post`).
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use atrium_api::app::bsky::actor::defs::ProfileViewBasic;
@@ -10,6 +11,7 @@ use atrium_api::app::bsky::feed::defs::{
     ThreadViewPostRepliesItem,
 };
 use atrium_api::app::bsky::feed::get_post_thread::OutputThreadRefs;
+use atrium_api::app::bsky::notification::list_notifications::Notification;
 use atrium_api::types::Union;
 use chrono::{DateTime, Datelike, FixedOffset, Local, Timelike, Utc};
 use gettextrs::{gettext, ngettext};
@@ -31,6 +33,8 @@ pub enum Source {
     Timeline,
     /// Fil personnalisé, par son adresse `at://` (`getFeed`).
     Feed(String),
+    /// Notifications (`listNotifications`).
+    Notifications,
 }
 
 /// Une page de posts et le curseur de la suivante.
@@ -77,6 +81,7 @@ pub async fn load(
     let api = session.api().await?;
     let limit = PAGE_SIZE.try_into().ok();
     let (feed, cursor) = match source {
+        Source::Notifications => return notifications(&api, cursor).await,
         Source::Timeline => {
             let output = api
                 .api
@@ -160,13 +165,16 @@ fn replies_from_thread(thread: &Union<OutputThreadRefs>, now: DateTime<Utc>) -> 
 }
 
 fn display_name(author: &ProfileViewBasic) -> String {
-    author
-        .display_name
-        .as_deref()
+    name_or_handle(author.display_name.as_deref(), author.handle.as_str())
+}
+
+/// Nom affiché, ou l'identifiant quand il est vide.
+fn name_or_handle(display_name: Option<&str>, handle: &str) -> String {
+    display_name
         .map(str::trim)
         .filter(|name| !name.is_empty())
-        .map(str::to_owned)
-        .unwrap_or_else(|| author.handle.as_str().to_owned())
+        .unwrap_or(handle)
+        .to_owned()
 }
 
 /// Texte du post : le champ `text` de l'enregistrement `app.bsky.feed.post`.
@@ -243,6 +251,7 @@ pub fn post_from_view(post: &PostView, now: DateTime<Utc>) -> Post {
         reposts: count(post.repost_count),
         likes: count(post.like_count),
         thread: Vec::new(),
+        unread: false,
     }
 }
 
@@ -275,6 +284,163 @@ fn reply_from_view(post: &PostView, now: DateTime<Utc>) -> Reply {
         time: indexed.map(|t| relative_time(t, now)).unwrap_or_default(),
         text: record_text(post),
     }
+}
+
+/// Posts concernés par des notifications, par lots de 25 (`getPosts`).
+async fn posts_by_uri(
+    api: &crate::auth::Api,
+    uris: Vec<String>,
+) -> Result<HashMap<String, PostView>, ApiError> {
+    let mut posts = HashMap::new();
+    for batch in uris.chunks(25) {
+        let output = api
+            .api
+            .app
+            .bsky
+            .feed
+            .get_posts(
+                atrium_api::app::bsky::feed::get_posts::ParametersData {
+                    uris: batch.to_vec(),
+                }
+                .into(),
+            )
+            .await
+            .map_err(request_failed)?;
+        for post in output.data.posts {
+            posts.insert(post.uri.clone(), post);
+        }
+    }
+    Ok(posts)
+}
+
+async fn notifications(api: &crate::auth::Api, cursor: Option<String>) -> Result<Page, ApiError> {
+    let output = api
+        .api
+        .app
+        .bsky
+        .notification
+        .list_notifications(
+            atrium_api::app::bsky::notification::list_notifications::ParametersData {
+                cursor,
+                limit: PAGE_SIZE.try_into().ok(),
+                priority: None,
+                reasons: None,
+                seen_at: None,
+            }
+            .into(),
+        )
+        .await
+        .map_err(request_failed)?;
+    let mut uris: Vec<String> = output
+        .data
+        .notifications
+        .iter()
+        .filter_map(|n| subject_uri(n).map(str::to_owned))
+        .collect();
+    uris.sort();
+    uris.dedup();
+    let posts = posts_by_uri(api, uris).await?;
+    let now = Utc::now();
+    Ok(Page {
+        posts: output
+            .data
+            .notifications
+            .iter()
+            .filter_map(|n| post_from_notification(n, &posts, now))
+            .collect(),
+        cursor: output.data.cursor,
+    })
+}
+
+/// Marque les notifications comme vues (`updateSeen`).
+pub async fn mark_notifications_seen(session: Arc<Session>) -> Result<(), ApiError> {
+    let api = session.api().await?;
+    let now = atrium_api::types::string::Datetime::now();
+    api.api
+        .app
+        .bsky
+        .notification
+        .update_seen(
+            atrium_api::app::bsky::notification::update_seen::InputData { seen_at: now }.into(),
+        )
+        .await
+        .map_err(request_failed)
+}
+
+/// Post dont parle une notification : la réponse, la mention ou la
+/// citation elle-même, ou le post aimé ou reposté.
+fn subject_uri(notification: &Notification) -> Option<&str> {
+    match notification.reason.as_str() {
+        "reply" | "mention" | "quote" => Some(&notification.uri),
+        "like" | "repost" | "like-via-repost" | "repost-via-repost" => {
+            notification.reason_subject.as_deref()
+        }
+        _ => None,
+    }
+}
+
+fn notification_context(reason: &str) -> Option<String> {
+    Some(match reason {
+        "like" => gettext("a aimé votre post"),
+        "repost" => gettext("a reposté votre post"),
+        "follow" => gettext("vous suit"),
+        "mention" => gettext("vous a mentionné"),
+        "reply" => gettext("a répondu à votre post"),
+        "quote" => gettext("a cité votre post"),
+        "like-via-repost" => gettext("a aimé votre repost"),
+        "repost-via-repost" => gettext("a reposté votre repost"),
+        "starterpack-joined" => gettext("a rejoint Bluesky avec votre starter pack"),
+        // Raisons apparues après cette version : ignorées.
+        _ => return None,
+    })
+}
+
+/// Carte d'une notification : la personne à l'origine (nom, avatar), ce
+/// qu'elle a fait, et le post concerné (texte, image, compteurs). Ouvrir la
+/// carte ouvre la discussion de ce post.
+pub fn post_from_notification(
+    notification: &Notification,
+    posts: &HashMap<String, PostView>,
+    now: DateTime<Utc>,
+) -> Option<Post> {
+    let context = notification_context(&notification.reason)?;
+    let subject = subject_uri(notification).and_then(|uri| posts.get(uri));
+    let mut post = match subject {
+        Some(view) => post_from_view(view, now),
+        // Abonnement, ou post supprimé depuis : le texte de l'enregistrement
+        // de la notification, s'il y en a un.
+        None => Post {
+            uri: None,
+            context: None,
+            name: String::new(),
+            handle: String::new(),
+            time: String::new(),
+            date: String::new(),
+            text: serde_json::to_value(&notification.record)
+                .ok()
+                .and_then(|record| record.get("text")?.as_str().map(str::to_owned))
+                .unwrap_or_default(),
+            avatar: None,
+            media: None,
+            replies: 0,
+            reposts: 0,
+            likes: 0,
+            thread: Vec::new(),
+            unread: false,
+        },
+    };
+    let author = &notification.author;
+    let indexed = parse_datetime(notification.indexed_at.as_str());
+    post.context = Some(context);
+    post.name = name_or_handle(author.display_name.as_deref(), author.handle.as_str());
+    post.handle = author.handle.as_str().to_owned();
+    post.avatar = author.avatar.clone();
+    post.time = indexed.map(|t| relative_time(t, now)).unwrap_or_default();
+    if post.date.is_empty() {
+        post.date = indexed.map(full_date).unwrap_or_default();
+    }
+    post.unread = !notification.is_read;
+    Some(post)
 }
 
 fn month(month: u32) -> String {
@@ -503,6 +669,129 @@ mod tests {
         assert_eq!(replies[0].name, "Aya Koné");
         assert_eq!(replies[0].text, "Super nouvelle.");
         assert_eq!(replies[0].time, "20 min");
+    }
+
+    fn notification(reason: &str, uri: &str, subject: Option<&str>, record: &str) -> Notification {
+        let subject = subject
+            .map(|s| format!(r#""reasonSubject": "{s}","#))
+            .unwrap_or_default();
+        serde_json::from_str(&format!(
+            r#"{{
+                "uri": "{uri}",
+                "cid": "bafyreie5737gdxlw5i64vzichcalba3z2v5n6icifvx5xytvske7mr3hpm",
+                "author": {{
+                    "did": "did:plc:pierre",
+                    "handle": "pierre.example.social",
+                    "displayName": "Pierre Delmas",
+                    "avatar": "https://cdn.example/avatar/pierre.jpg"
+                }},
+                "reason": "{reason}",
+                {subject}
+                "record": {record},
+                "isRead": false,
+                "indexedAt": "2026-11-20T14:20:00.000Z"
+            }}"#
+        ))
+        .unwrap()
+    }
+
+    fn my_post() -> PostView {
+        serde_json::from_str(
+            r#"{
+                "uri": "at://did:plc:moi/app.bsky.feed.post/1",
+                "cid": "bafyreie5737gdxlw5i64vzichcalba3z2v5n6icifvx5xytvske7mr3hpm",
+                "author": {"did": "did:plc:moi", "handle": "vous.bsky.social"},
+                "record": {"$type": "app.bsky.feed.post", "text": "Ajoutez un texte alternatif.", "createdAt": "2026-11-20T10:00:00.000Z"},
+                "likeCount": 20,
+                "indexedAt": "2026-11-20T10:00:00.000Z"
+            }"#,
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn likes_show_who_liked_and_the_liked_post() {
+        let like = notification(
+            "like",
+            "at://did:plc:pierre/app.bsky.feed.like/9",
+            Some("at://did:plc:moi/app.bsky.feed.post/1"),
+            r#"{"$type": "app.bsky.feed.like", "subject": {"uri": "at://did:plc:moi/app.bsky.feed.post/1", "cid": "x"}, "createdAt": "2026-11-20T14:20:00.000Z"}"#,
+        );
+        let posts = HashMap::from([(my_post().uri.clone(), my_post())]);
+        let post = post_from_notification(&like, &posts, now()).unwrap();
+        assert_eq!(post.context.as_deref(), Some("a aimé votre post"));
+        assert_eq!(post.name, "Pierre Delmas");
+        assert_eq!(
+            post.avatar.as_deref(),
+            Some("https://cdn.example/avatar/pierre.jpg")
+        );
+        assert_eq!(post.text, "Ajoutez un texte alternatif.");
+        assert_eq!(post.likes, 20);
+        assert_eq!(
+            post.uri.as_deref(),
+            Some("at://did:plc:moi/app.bsky.feed.post/1")
+        );
+        assert_eq!(post.time, "40 min");
+        assert!(post.unread);
+    }
+
+    #[test]
+    fn replies_show_the_reply_itself() {
+        let uri = "at://did:plc:pierre/app.bsky.feed.post/r";
+        let reply = notification(
+            "reply",
+            uri,
+            Some("at://did:plc:moi/app.bsky.feed.post/1"),
+            r#"{"$type": "app.bsky.feed.post", "text": "Bien vu.", "createdAt": "2026-11-20T14:20:00.000Z"}"#,
+        );
+        let view: PostView = serde_json::from_str(&format!(
+            r#"{{
+                "uri": "{uri}",
+                "cid": "bafyreie5737gdxlw5i64vzichcalba3z2v5n6icifvx5xytvske7mr3hpm",
+                "author": {{"did": "did:plc:pierre", "handle": "pierre.example.social"}},
+                "record": {{"$type": "app.bsky.feed.post", "text": "Bien vu.", "createdAt": "2026-11-20T14:20:00.000Z"}},
+                "replyCount": 1,
+                "indexedAt": "2026-11-20T14:20:00.000Z"
+            }}"#
+        ))
+        .unwrap();
+        let posts = HashMap::from([(uri.to_owned(), view)]);
+        let post = post_from_notification(&reply, &posts, now()).unwrap();
+        assert_eq!(post.context.as_deref(), Some("a répondu à votre post"));
+        assert_eq!(post.text, "Bien vu.");
+        assert_eq!(post.uri.as_deref(), Some(uri));
+        assert_eq!(post.replies, 1);
+    }
+
+    #[test]
+    fn follows_deleted_posts_and_unknown_reasons() {
+        let follow = notification(
+            "follow",
+            "at://did:plc:pierre/app.bsky.graph.follow/1",
+            None,
+            r#"{"$type": "app.bsky.graph.follow", "subject": "did:plc:moi", "createdAt": "2026-11-20T14:20:00.000Z"}"#,
+        );
+        let post = post_from_notification(&follow, &HashMap::new(), now()).unwrap();
+        assert_eq!(post.context.as_deref(), Some("vous suit"));
+        assert_eq!((post.uri, post.text.as_str()), (None, ""));
+
+        // Réponse supprimée depuis : le texte de la notification reste.
+        let reply = notification(
+            "reply",
+            "at://did:plc:pierre/app.bsky.feed.post/gone",
+            None,
+            r#"{"$type": "app.bsky.feed.post", "text": "Message disparu", "createdAt": "2026-11-20T14:20:00.000Z"}"#,
+        );
+        let post = post_from_notification(&reply, &HashMap::new(), now()).unwrap();
+        assert_eq!(post.text, "Message disparu");
+
+        let unknown = notification(
+            "nouveauté",
+            "at://did:plc:pierre/app.bsky.feed.post/n",
+            None,
+            r#"{"$type": "app.bsky.feed.post", "text": "", "createdAt": "2026-11-20T14:20:00.000Z"}"#,
+        );
+        assert!(post_from_notification(&unknown, &HashMap::new(), now()).is_none());
     }
 
     #[test]

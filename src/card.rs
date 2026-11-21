@@ -217,6 +217,9 @@ fn card_frame(avatar_size: i32, name: &str, avatar_url: Option<&str>) -> (gtk::B
 /// Carte d'un post dans le fil.
 pub fn post_card(post: &Post) -> gtk::Box {
     let (card, body) = card_frame(AVATAR_SIZE, &post.name, post.avatar.as_deref());
+    if post.unread {
+        card.add_css_class("unread");
+    }
     if let Some(context) = &post.context {
         body.append(&label(context, &["dim-label", "caption"]));
     }

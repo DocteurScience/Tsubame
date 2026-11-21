@@ -57,14 +57,6 @@ impl ColumnKind {
         }
     }
 
-    /// Nombre d'éléments non lus, affiché en pastille.
-    pub fn badge(self) -> Option<u32> {
-        match self {
-            ColumnKind::Notifications => Some(3),
-            ColumnKind::Feed(_) => None,
-        }
-    }
-
     /// Faux posts, sans compte (builds de développement).
     pub fn demo_posts(self) -> Vec<Post> {
         match self {
@@ -79,9 +71,9 @@ impl ColumnKind {
         match self {
             ColumnKind::Feed(Feed::Following) => Some(Source::Timeline),
             ColumnKind::Feed(Feed::Discover) => Some(Source::Feed(DISCOVER_FEED.to_owned())),
-            // « Linux et libre » est le fil fictif des maquettes ; les
-            // notifications viendront avec leur propre requête.
-            ColumnKind::Feed(Feed::LinuxEtLibre) | ColumnKind::Notifications => None,
+            ColumnKind::Notifications => Some(Source::Notifications),
+            // « Linux et libre » est le fil fictif des maquettes.
+            ColumnKind::Feed(Feed::LinuxEtLibre) => None,
         }
     }
 }
@@ -372,6 +364,32 @@ impl Column {
                 self.error.set_description(Some(&message));
                 self.stack.set_visible_child_name(ERROR);
             }
+        }
+    }
+
+    /// Notifications pas encore vues parmi les posts chargés.
+    pub fn unread_count(&self) -> u32 {
+        self.posts
+            .borrow()
+            .iter()
+            .filter(|post| post.unread)
+            .count() as u32
+    }
+
+    /// Marque tous les posts comme vus, à l'écran.
+    pub fn mark_all_read(&self) {
+        for post in self.posts.borrow_mut().iter_mut() {
+            post.unread = false;
+        }
+        let mut row = self.list.first_child();
+        while let Some(widget) = row {
+            if let Some(card) = widget
+                .downcast_ref::<gtk::ListBoxRow>()
+                .and_then(|row| row.child())
+            {
+                card.remove_css_class("unread");
+            }
+            row = widget.next_sibling();
         }
     }
 
