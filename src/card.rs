@@ -154,7 +154,8 @@ fn stats(post: &Post) -> gtk::Box {
     let row = gtk::Box::new(gtk::Orientation::Horizontal, 4);
     row.add_css_class("post-stats");
     let n = |count: u32| count.to_string();
-    row.append(&stat_button(
+    let entry = interactions::register(post);
+    let reply = stat_button(
         "mail-reply-sender-symbolic",
         post.replies,
         fill(
@@ -165,8 +166,10 @@ fn stats(post: &Post) -> gtk::Box {
             ),
             &[&n(post.replies)],
         ),
-    ));
-    let entry = interactions::register(post);
+    );
+    reply.set_action_name(Some("win.reply"));
+    reply.set_action_target_value(Some(&entry.key.to_variant()));
+    row.append(&reply);
     row.append(&interaction_button(&entry, Interaction::Repost, false));
     row.append(&interaction_button(&entry, Interaction::Like, false));
     row
@@ -359,11 +362,11 @@ pub fn post_detail(post: &Post) -> gtk::Box {
         .max_children_per_line(3)
         .margin_top(8)
         .build();
-    actions.append(&action_button(
-        "mail-reply-sender-symbolic",
-        gettext("Répondre"),
-    ));
     let entry = interactions::register(post);
+    let reply = action_button("mail-reply-sender-symbolic", gettext("Répondre"));
+    reply.set_action_name(Some("win.reply"));
+    reply.set_action_target_value(Some(&entry.key.to_variant()));
+    actions.append(&reply);
     actions.append(&interaction_button(&entry, Interaction::Repost, true));
     actions.append(&interaction_button(&entry, Interaction::Like, true));
     // Seuls les boutons prennent le focus, pas les cases du FlowBox.

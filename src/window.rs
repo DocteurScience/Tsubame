@@ -22,6 +22,7 @@ use crate::api;
 use crate::auth::{self, Session};
 use crate::column::{Column, ColumnKind};
 use crate::columns::{ColumnsView, Layout};
+use crate::compose;
 use crate::data::Post;
 use crate::interactions::{self, Change, Interaction};
 use crate::login::LoginPage;
@@ -760,8 +761,14 @@ impl State {
         self.stacked.show(Some(&post));
         self.shown_uri.replace(post.uri.clone());
 
-        // Réponses d'un post réel : les charger.
-        let (Some(uri), Some(session)) = (post.uri, self.session.borrow().clone()) else {
+        if let Some(uri) = post.uri {
+            self.load_replies(uri);
+        }
+    }
+
+    /// Charge les réponses du post affiché dans la discussion.
+    fn load_replies(self: &Rc<Self>, uri: String) {
+        let Some(session) = self.session.borrow().clone() else {
             return;
         };
         let task = runtime().spawn(api::replies(session, uri.clone()));
@@ -792,6 +799,34 @@ impl State {
                 ));
             }
         });
+    }
+
+    /// Ouvre la boîte de rédaction : nouveau post, ou réponse au post de clé
+    /// `reply_key`.
+    fn compose(self: &Rc<Self>, reply_key: Option<&str>) {
+        let reply_to = match reply_key {
+            Some(key) => match interactions::find(key) {
+                Some(entry) => Some(entry.post()),
+                None => return,
+            },
+            None => None,
+        };
+        let weak = Rc::downgrade(self);
+        compose::present(
+            &self.root_stack,
+            &self.toasts,
+            self.session.borrow().clone(),
+            reply_to,
+            move |parent_uri| {
+                // Une réponse au post affiché : recharger ses réponses.
+                let Some(state) = weak.upgrade() else { return };
+                if let Some(uri) = parent_uri
+                    && state.shown_uri.borrow().as_deref() == Some(uri.as_str())
+                {
+                    state.load_replies(uri);
+                }
+            },
+        );
     }
 
     fn clear_thread(&self) {
@@ -1076,6 +1111,23 @@ fn install_actions(window: &adw::ApplicationWindow, state: &Rc<State>) {
         s.close_column(k)
     }));
     window.add_action(&kind_action("show-column", state, |s, k| s.show_column(k)));
+    let compose = gio::SimpleAction::new("compose", None);
+    let weak = Rc::downgrade(state);
+    compose.connect_activate(move |_, _| {
+        if let Some(state) = weak.upgrade() {
+            state.compose(None);
+        }
+    });
+    window.add_action(&compose);
+    let reply = gio::SimpleAction::new("reply", Some(glib::VariantTy::STRING));
+    let weak = Rc::downgrade(state);
+    reply.connect_activate(move |_, param| {
+        if let (Some(state), Some(key)) = (weak.upgrade(), param.and_then(|p| p.str())) {
+            state.compose(Some(key));
+        }
+    });
+    window.add_action(&reply);
+
     for (name, which) in [
         ("toggle-like", Interaction::Like),
         ("toggle-repost", Interaction::Repost),
@@ -1210,7 +1262,21 @@ pub fn build(app: &adw::Application) -> adw::ApplicationWindow {
     }
 
     let switcher_bar = adw::ViewSwitcherBar::builder().stack(&stack).build();
-    let main_view = adw::ToolbarView::builder().content(&stack).build();
+    // En palier compact, « Nouveau post » flotte au-dessus des pages, comme
+    // dans la maquette Mobile.
+    let fab = gtk::Button::builder()
+        .icon_name("document-edit-symbolic")
+        .action_name("win.compose")
+        .halign(gtk::Align::End)
+        .valign(gtk::Align::End)
+        .visible(false)
+        .tooltip_text(gettext("Nouveau post"))
+        .css_classes(["circular", "suggested-action", "compose-fab"])
+        .build();
+    fab.update_property(&[gtk::accessible::Property::Label(&gettext("Nouveau post"))]);
+    let with_fab = gtk::Overlay::builder().child(&stack).build();
+    with_fab.add_overlay(&fab);
+    let main_view = adw::ToolbarView::builder().content(&with_fab).build();
     main_view.add_bottom_bar(&switcher_bar);
     let nav = adw::NavigationView::new();
     nav.add(
@@ -1246,6 +1312,15 @@ pub fn build(app: &adw::Application) -> adw::ApplicationWindow {
         .title_widget(&sidebar_title)
         .build();
     sidebar_header.pack_end(&menu_button);
+    // « Nouveau post », comme dans la maquette Colonnes.
+    let new_post = gtk::Button::builder()
+        .icon_name("document-edit-symbolic")
+        .action_name("win.compose")
+        .tooltip_text(gettext("Nouveau post"))
+        .css_classes(["suggested-action"])
+        .build();
+    new_post.update_property(&[gtk::accessible::Property::Label(&gettext("Nouveau post"))]);
+    sidebar_header.pack_start(&new_post);
     let sidebar_view = adw::ToolbarView::new();
     sidebar_view.add_top_bar(&sidebar_header);
     sidebar_view.set_content(Some(
@@ -1379,6 +1454,7 @@ pub fn build(app: &adw::Application) -> adw::ApplicationWindow {
     compact.add_setter(&outer_split, "collapsed", Some(&true.to_value()));
     compact.add_setter(&outer_split, "show-sidebar", Some(&false.to_value()));
     compact.add_setter(&switcher_bar, "reveal", Some(&true.to_value()));
+    compact.add_setter(&fab, "visible", Some(&true.to_value()));
     compact.add_setter(&notifications, "visible", Some(&true.to_value()));
     // La barre du bas ne garde que les quatre destinations principales.
     for page in &hidden_when_compact {
@@ -1437,6 +1513,7 @@ pub fn build(app: &adw::Application) -> adw::ApplicationWindow {
 
     let app = app.clone();
     app.set_accels_for_action("win.refresh", &["F5", "<Control>r"]);
+    app.set_accels_for_action("win.compose", &["<Control>n"]);
     app.set_accels_for_action("win.next-column", &["<Control>Page_Down"]);
     app.set_accels_for_action("win.previous-column", &["<Control>Page_Up"]);
     app.set_accels_for_action("win.move-current-right", &["<Control><Shift>Page_Down"]);

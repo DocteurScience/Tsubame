@@ -109,3 +109,20 @@ columnsview > .column headerbar {
 .post-action.active {
   color: @accent_color;
 }
+
+/* Boîte de rédaction. */
+.compose-text {
+  background: none;
+  font-size: 1.1em;
+}
+
+.compose-quote {
+  padding: 10px 12px;
+}
+
+/* Bouton flottant « Nouveau post » du palier compact. */
+.compose-fab {
+  min-width: 56px;
+  min-height: 56px;
+  margin: 18px;
+}

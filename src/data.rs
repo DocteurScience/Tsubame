@@ -22,6 +22,8 @@ pub struct Post {
     pub like_uri: Option<String>,
     /// Mon repost de ce post, s'il existe.
     pub repost_uri: Option<String>,
+    /// Premier post de la discussion, si ce post est une réponse.
+    pub reply_root: Option<StrongRef>,
     /// Contexte affiché au-dessus du nom : notification (« a répondu à
     /// votre post ») ou repost (« Nadia Safi a reposté »).
     pub context: Option<String>,
@@ -42,6 +44,13 @@ pub struct Post {
     pub thread: Vec<Reply>,
     /// Notification pas encore vue.
     pub unread: bool,
+}
+
+/// Référence à un post : son adresse et son contenu (CID).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StrongRef {
+    pub uri: String,
+    pub cid: String,
 }
 
 /// Image (ou vignette de vidéo) jointe à un post.
@@ -91,6 +100,7 @@ fn post(
         cid: None,
         like_uri: None,
         repost_uri: None,
+        reply_root: None,
         context: None,
         name: name.into(),
         handle: handle.into(),

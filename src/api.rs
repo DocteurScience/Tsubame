@@ -17,7 +17,7 @@ use chrono::{DateTime, Datelike, FixedOffset, Local, Timelike, Utc};
 use gettextrs::{gettext, ngettext};
 
 use crate::auth::Session;
-use crate::data::{Media, Post, Reply};
+use crate::data::{Media, Post, Reply, StrongRef};
 
 /// Fil « Discover » de Bluesky.
 pub const DISCOVER_FEED: &str =
@@ -177,6 +177,17 @@ fn name_or_handle(display_name: Option<&str>, handle: &str) -> String {
         .to_owned()
 }
 
+/// Racine de la discussion d'une réponse : `reply.root` de son
+/// enregistrement.
+fn reply_root(post: &PostView) -> Option<StrongRef> {
+    let record = serde_json::to_value(&post.record).ok()?;
+    let root = record.get("reply")?.get("root")?;
+    Some(StrongRef {
+        uri: root.get("uri")?.as_str()?.to_owned(),
+        cid: root.get("cid")?.as_str()?.to_owned(),
+    })
+}
+
 /// Texte du post : le champ `text` de l'enregistrement `app.bsky.feed.post`.
 fn record_text(post: &PostView) -> String {
     serde_json::to_value(&post.record)
@@ -245,6 +256,7 @@ pub fn post_from_view(post: &PostView, now: DateTime<Utc>) -> Post {
             .and_then(|cid| cid.as_str().map(str::to_owned)),
         like_uri: viewer.and_then(|v| v.like.clone()),
         repost_uri: viewer.and_then(|v| v.repost.clone()),
+        reply_root: reply_root(post),
         context: None,
         name: display_name(&post.author),
         handle: post.author.handle.as_str().to_owned(),
@@ -420,6 +432,7 @@ pub fn post_from_notification(
             cid: None,
             like_uri: None,
             repost_uri: None,
+            reply_root: None,
             context: None,
             name: String::new(),
             handle: String::new(),
@@ -567,6 +580,124 @@ pub async fn delete(session: Arc<Session>, record_uri: String) -> Result<(), Api
         .await
         .map(|_| ())
         .map_err(request_failed)
+}
+
+/// Post à publier.
+#[derive(Debug, Clone)]
+pub struct NewPost {
+    pub text: String,
+    /// Langues du post (codes BCP 47 : « fr », « en »…).
+    pub langs: Vec<String>,
+    /// Réponse : la racine de la discussion et le post auquel on répond.
+    pub reply: Option<(StrongRef, StrongRef)>,
+}
+
+/// Enregistrement `app.bsky.feed.post`. Les mentions dont l'identifiant
+/// n'a pas été résolu (`dids`) restent du texte simple.
+pub fn post_record(
+    post: &NewPost,
+    dids: &HashMap<String, String>,
+    created_at: &str,
+) -> serde_json::Value {
+    use crate::richtext::{Feature, detect};
+    use serde_json::json;
+
+    let facets: Vec<_> = detect(&post.text)
+        .into_iter()
+        .filter_map(|facet| {
+            let feature = match facet.feature {
+                Feature::Link(uri) => json!({"$type": "app.bsky.richtext.facet#link", "uri": uri}),
+                Feature::Tag(tag) => json!({"$type": "app.bsky.richtext.facet#tag", "tag": tag}),
+                Feature::Mention(handle) => json!({
+                    "$type": "app.bsky.richtext.facet#mention",
+                    "did": dids.get(&handle)?,
+                }),
+            };
+            Some(json!({
+                "index": {"byteStart": facet.start, "byteEnd": facet.end},
+                "features": [feature],
+            }))
+        })
+        .collect();
+    let mut record = json!({
+        "$type": "app.bsky.feed.post",
+        "text": post.text,
+        "createdAt": created_at,
+    });
+    if !post.langs.is_empty() {
+        record["langs"] = json!(post.langs);
+    }
+    if !facets.is_empty() {
+        record["facets"] = json!(facets);
+    }
+    if let Some((root, parent)) = &post.reply {
+        record["reply"] = json!({
+            "root": {"uri": root.uri, "cid": root.cid},
+            "parent": {"uri": parent.uri, "cid": parent.cid},
+        });
+    }
+    record
+}
+
+/// Publie un post ; renvoie sa référence.
+pub async fn publish(session: Arc<Session>, post: NewPost) -> Result<StrongRef, ApiError> {
+    use atrium_api::com::atproto::repo::create_record;
+    use atrium_api::types::string::{Datetime, Did, Handle, Nsid};
+
+    let api = session.api().await?;
+    // Mentions : identifiant → DID. Un identifiant inconnu reste du texte.
+    let mut dids = HashMap::new();
+    for facet in crate::richtext::detect(&post.text) {
+        if let crate::richtext::Feature::Mention(handle) = facet.feature
+            && !dids.contains_key(&handle)
+            && let Ok(valid) = Handle::new(handle.clone())
+            && let Ok(output) = api
+                .api
+                .com
+                .atproto
+                .identity
+                .resolve_handle(
+                    atrium_api::com::atproto::identity::resolve_handle::ParametersData {
+                        handle: valid,
+                    }
+                    .into(),
+                )
+                .await
+        {
+            dids.insert(handle, output.data.did.as_str().to_owned());
+        }
+    }
+    let created_at = Datetime::now();
+    let record = post_record(&post, &dids, created_at.as_str());
+    let record = serde_json::from_value(record).map_err(|_| invalid_post())?;
+    let output = api
+        .api
+        .com
+        .atproto
+        .repo
+        .create_record(
+            create_record::InputData {
+                collection: Nsid::new("app.bsky.feed.post".to_owned())
+                    .map_err(|_| invalid_post())?,
+                record,
+                repo: Did::new(session.account.did.clone())
+                    .map_err(|_| invalid_post())?
+                    .into(),
+                rkey: None,
+                swap_commit: None,
+                validate: None,
+            }
+            .into(),
+        )
+        .await
+        .map_err(request_failed)?;
+    Ok(StrongRef {
+        uri: output.data.uri,
+        cid: serde_json::to_value(&output.data.cid)
+            .ok()
+            .and_then(|cid| cid.as_str().map(str::to_owned))
+            .unwrap_or_default(),
+    })
 }
 
 fn month(month: u32) -> String {
@@ -953,6 +1084,78 @@ mod tests {
             Some("at://did:plc:moi/app.bsky.feed.like/1")
         );
         assert_eq!(post.repost_uri, None);
+    }
+
+    const CID: &str = "bafyreie5737gdxlw5i64vzichcalba3z2v5n6icifvx5xytvske7mr3hpm";
+
+    #[test]
+    fn new_posts_become_records() {
+        let root = StrongRef {
+            uri: "at://did:plc:lucie/app.bsky.feed.post/1".into(),
+            cid: CID.into(),
+        };
+        let parent = StrongRef {
+            uri: "at://did:plc:aya/app.bsky.feed.post/2".into(),
+            cid: CID.into(),
+        };
+        let post = NewPost {
+            text: "Merci @lucie.example.social et @inconnu.example ! #GNOME https://gnome.org"
+                .into(),
+            langs: vec!["fr".into()],
+            reply: Some((root, parent)),
+        };
+        let dids = HashMap::from([(
+            "lucie.example.social".to_owned(),
+            "did:plc:lucie".to_owned(),
+        )]);
+        let record = post_record(&post, &dids, "2026-11-20T15:00:00.000Z");
+        assert_eq!(record["$type"], "app.bsky.feed.post");
+        assert_eq!(record["langs"], serde_json::json!(["fr"]));
+        assert_eq!(record["reply"]["root"]["cid"], CID);
+        assert_eq!(
+            record["reply"]["parent"]["uri"],
+            "at://did:plc:aya/app.bsky.feed.post/2"
+        );
+        let facets = record["facets"].as_array().unwrap();
+        // La mention inconnue reste du texte : trois facettes, pas quatre.
+        assert_eq!(facets.len(), 3);
+        assert_eq!(facets[0]["features"][0]["did"], "did:plc:lucie");
+        assert_eq!(facets[0]["index"]["byteStart"], 6);
+        assert_eq!(facets[1]["features"][0]["tag"], "GNOME");
+        assert_eq!(facets[2]["features"][0]["uri"], "https://gnome.org");
+        // L'enregistrement est accepté par les types du protocole.
+        let _: atrium_api::app::bsky::feed::post::Record = serde_json::from_value(record).unwrap();
+    }
+
+    #[test]
+    fn plain_posts_have_no_facets_nor_reply() {
+        let post = NewPost {
+            text: "Bonjour".into(),
+            langs: Vec::new(),
+            reply: None,
+        };
+        let record = post_record(&post, &HashMap::new(), "2026-11-20T15:00:00.000Z");
+        assert!(record.get("facets").is_none());
+        assert!(record.get("reply").is_none());
+        assert!(record.get("langs").is_none());
+    }
+
+    #[test]
+    fn replies_keep_the_root_of_the_thread() {
+        let mut item: serde_json::Value = serde_json::from_str(FEED_ITEM).unwrap();
+        item["post"]["record"]["reply"] = serde_json::json!({
+            "root": {"uri": "at://did:plc:x/app.bsky.feed.post/root", "cid": "cidroot"},
+            "parent": {"uri": "at://did:plc:aya/app.bsky.feed.post/2", "cid": "cidparent"}
+        });
+        let item: FeedViewPost = serde_json::from_value(item).unwrap();
+        let post = post_from_feed(&item, now());
+        assert_eq!(
+            post.reply_root,
+            Some(StrongRef {
+                uri: "at://did:plc:x/app.bsky.feed.post/root".into(),
+                cid: "cidroot".into(),
+            })
+        );
     }
 
     #[test]

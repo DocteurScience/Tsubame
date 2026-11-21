@@ -39,6 +39,8 @@ pub struct Interactions {
     pub key: String,
     pub uri: Option<String>,
     pub cid: Option<String>,
+    /// Le post lui-même, pour y répondre.
+    post: RefCell<Post>,
     like: RefCell<Toggle>,
     repost: RefCell<Toggle>,
     watchers: RefCell<Vec<Watcher>>,
@@ -79,6 +81,7 @@ thread_local! {
 pub fn register(post: &Post) -> Rc<Interactions> {
     let key = key(post);
     if let Some(existing) = find(&key) {
+        existing.post.replace(post.clone());
         let (like, repost) = toggles(post);
         existing.refresh(Interaction::Like, like);
         existing.refresh(Interaction::Repost, repost);
@@ -89,6 +92,7 @@ pub fn register(post: &Post) -> Rc<Interactions> {
         key: key.clone(),
         uri: post.uri.clone(),
         cid: post.cid.clone(),
+        post: RefCell::new(post.clone()),
         like: RefCell::new(like),
         repost: RefCell::new(repost),
         watchers: RefCell::default(),
@@ -112,6 +116,10 @@ impl Interactions {
             Interaction::Like => &self.like,
             Interaction::Repost => &self.repost,
         }
+    }
+
+    pub fn post(&self) -> Post {
+        self.post.borrow().clone()
     }
 
     pub fn get(&self, which: Interaction) -> Toggle {
