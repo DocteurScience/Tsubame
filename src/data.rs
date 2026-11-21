@@ -16,6 +16,12 @@ pub enum Feed {
 pub struct Post {
     /// Adresse `at://` du post ; `None` pour les faux posts.
     pub uri: Option<String>,
+    /// Identifiant du contenu (CID), nécessaire pour aimer ou reposter.
+    pub cid: Option<String>,
+    /// Mon « j'aime » sur ce post (adresse de l'enregistrement), s'il existe.
+    pub like_uri: Option<String>,
+    /// Mon repost de ce post, s'il existe.
+    pub repost_uri: Option<String>,
     /// Contexte affiché au-dessus du nom : notification (« a répondu à
     /// votre post ») ou repost (« Nadia Safi a reposté »).
     pub context: Option<String>,
@@ -82,6 +88,9 @@ fn post(
 ) -> Post {
     Post {
         uri: None,
+        cid: None,
+        like_uri: None,
+        repost_uri: None,
         context: None,
         name: name.into(),
         handle: handle.into(),

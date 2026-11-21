@@ -23,6 +23,7 @@ use crate::auth::{self, Session};
 use crate::column::{Column, ColumnKind};
 use crate::columns::{ColumnsView, Layout};
 use crate::data::Post;
+use crate::interactions::{self, Change, Interaction};
 use crate::login::LoginPage;
 use crate::runtime::runtime;
 use crate::thread::ThreadView;
@@ -196,6 +197,7 @@ struct State {
     /// Indices des colonnes affichées par `ColumnsView`.
     visible_columns: RefCell<std::ops::Range<usize>>,
     root_stack: gtk::Stack,
+    toasts: adw::ToastOverlay,
     login: Rc<LoginPage>,
     sidebar_title: adw::WindowTitle,
     /// Compte connecté ; `None` avec les posts de démonstration.
@@ -927,6 +929,69 @@ impl State {
         }
     }
 
+    /// Aime ou reposte un post (ou annule) : l'affichage change tout de
+    /// suite, puis Bluesky confirme ; en cas d'échec, l'affichage revient en
+    /// arrière et un message l'explique. Sans compte, la bascule est locale.
+    fn toggle(self: &Rc<Self>, key: &str, which: Interaction) {
+        let Some(entry) = interactions::find(key) else {
+            return;
+        };
+        let Some(change) = entry.begin(which) else {
+            return;
+        };
+        let session = self.session.borrow().clone();
+        let (Some(session), Some(uri), Some(cid)) = (session, entry.uri.clone(), entry.cid.clone())
+        else {
+            entry.finish(which, &change, Ok(None));
+            return;
+        };
+        let task = runtime().spawn({
+            let change = change.clone();
+            async move {
+                match change {
+                    Change::Do => api::create(session, which, uri, cid).await.map(Some),
+                    Change::Undo(Some(record)) => api::delete(session, record).await.map(|()| None),
+                    Change::Undo(None) => Ok(None),
+                }
+            }
+        });
+        let weak = Rc::downgrade(self);
+        glib::spawn_future_local(async move {
+            let result = task
+                .await
+                .unwrap_or_else(|_| Err(api::ApiError::new(gettext("Requête interrompue."))));
+            match result {
+                Ok(record) => entry.finish(which, &change, Ok(record)),
+                Err(error) => {
+                    entry.finish(which, &change, Err(()));
+                    let Some(state) = weak.upgrade() else { return };
+                    if error.expired {
+                        state.session_expired(&error.message);
+                        return;
+                    }
+                    let title = match (which, &change) {
+                        (Interaction::Like, Change::Do) => {
+                            gettext("Le j'aime n'a pas été enregistré.")
+                        }
+                        (Interaction::Like, Change::Undo(_)) => {
+                            gettext("Le j'aime n'a pas été retiré.")
+                        }
+                        (Interaction::Repost, Change::Do) => {
+                            gettext("Le repost n'a pas été enregistré.")
+                        }
+                        (Interaction::Repost, Change::Undo(_)) => {
+                            gettext("Le repost n'a pas été retiré.")
+                        }
+                    };
+                    let toast = adw::Toast::new(&title);
+                    toast.set_timeout(5);
+                    glib::g_debug!("tsubame", "{title} {}", error.message);
+                    state.toasts.add_toast(toast);
+                }
+            }
+        });
+    }
+
     fn load_all(self: &Rc<Self>) {
         let kinds: Vec<_> = self.columns.borrow().iter().map(|c| c.kind).collect();
         for kind in kinds {
@@ -1011,6 +1076,19 @@ fn install_actions(window: &adw::ApplicationWindow, state: &Rc<State>) {
         s.close_column(k)
     }));
     window.add_action(&kind_action("show-column", state, |s, k| s.show_column(k)));
+    for (name, which) in [
+        ("toggle-like", Interaction::Like),
+        ("toggle-repost", Interaction::Repost),
+    ] {
+        let action = gio::SimpleAction::new(name, Some(glib::VariantTy::STRING));
+        let weak = Rc::downgrade(state);
+        action.connect_activate(move |_, param| {
+            if let (Some(state), Some(key)) = (weak.upgrade(), param.and_then(|p| p.str())) {
+                state.toggle(key, which);
+            }
+        });
+        window.add_action(&action);
+    }
     window.add_action(&kind_action("refresh-column", state, |s, k| {
         s.load(Target::Home(k), false)
     }));
@@ -1200,7 +1278,10 @@ pub fn build(app: &adw::Application) -> adw::ApplicationWindow {
         .build();
     root_stack.add_named(&login.root, Some("login"));
     root_stack.add_named(&outer_split, Some("main"));
-    window.set_content(Some(&root_stack));
+    // Messages brefs (échec d'un j'aime…) au-dessus de tout le reste.
+    let toasts = adw::ToastOverlay::new();
+    toasts.set_child(Some(&root_stack));
+    window.set_content(Some(&toasts));
 
     let narrow = adw::Breakpoint::new(adw::BreakpointCondition::parse(NARROW_BREAKPOINT).unwrap());
     let compact =
@@ -1231,6 +1312,7 @@ pub fn build(app: &adw::Application) -> adw::ApplicationWindow {
         compact: compact.clone(),
         visible_columns: RefCell::default(),
         root_stack: root_stack.clone(),
+        toasts: toasts.clone(),
         login: login.clone(),
         sidebar_title,
         session: RefCell::default(),

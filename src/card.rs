@@ -6,6 +6,8 @@ use gettextrs::{gettext, ngettext};
 
 use crate::data::{Media, Post, Reply};
 use crate::images;
+use crate::interactions::{self, Interaction, Interactions, Toggle};
+use std::rc::Rc;
 
 const AVATAR_SIZE: i32 = 40;
 const AVATAR_SIZE_LARGE: i32 = 48;
@@ -164,23 +166,101 @@ fn stats(post: &Post) -> gtk::Box {
             &[&n(post.replies)],
         ),
     ));
-    row.append(&stat_button(
-        "media-playlist-repeat-symbolic",
-        post.reposts,
-        fill(
-            ngettext("Reposter, {} repost", "Reposter, {} reposts", post.reposts),
-            &[&n(post.reposts)],
-        ),
-    ));
-    row.append(&stat_button(
-        "emblem-favorite-symbolic",
-        post.likes,
-        fill(
-            ngettext("Aimer, {} j'aime", "Aimer, {} j'aime", post.likes),
-            &[&n(post.likes)],
-        ),
-    ));
+    let entry = interactions::register(post);
+    row.append(&interaction_button(&entry, Interaction::Repost, false));
+    row.append(&interaction_button(&entry, Interaction::Like, false));
     row
+}
+
+/// Libellé accessible (et info-bulle) d'un bouton J'aime ou Reposter.
+fn interaction_label(which: Interaction, toggle: &Toggle) -> String {
+    let count = toggle.count;
+    let text = match (which, toggle.active) {
+        (Interaction::Like, false) => ngettext("Aimer, {} j'aime", "Aimer, {} j'aime", count),
+        (Interaction::Like, true) => ngettext(
+            "Ne plus aimer, {} j'aime",
+            "Ne plus aimer, {} j'aime",
+            count,
+        ),
+        (Interaction::Repost, false) => {
+            ngettext("Reposter, {} repost", "Reposter, {} reposts", count)
+        }
+        (Interaction::Repost, true) => ngettext(
+            "Annuler le repost, {} repost",
+            "Annuler le repost, {} reposts",
+            count,
+        ),
+    };
+    fill(text, &[&count.to_string()])
+}
+
+/// Texte du bouton dans la discussion : « J'aime · 48 », « Aimé · 49 »…
+fn interaction_text(which: Interaction, toggle: &Toggle) -> String {
+    let text = match (which, toggle.active) {
+        (Interaction::Like, false) => gettext("J'aime · {}"),
+        (Interaction::Like, true) => gettext("Aimé · {}"),
+        (Interaction::Repost, false) => gettext("Reposter · {}"),
+        (Interaction::Repost, true) => gettext("Reposté · {}"),
+    };
+    fill(text, &[&toggle.count.to_string()])
+}
+
+/// Bouton J'aime ou Reposter, relié à l'état partagé du post : il suit les
+/// changements faits depuis une autre carte du même post.
+fn interaction_button(entry: &Rc<Interactions>, which: Interaction, detailed: bool) -> gtk::Button {
+    let (icon, action) = match which {
+        Interaction::Like => ("emblem-favorite-symbolic", "win.toggle-like"),
+        Interaction::Repost => ("media-playlist-repeat-symbolic", "win.toggle-repost"),
+    };
+    let content = adw::ButtonContent::builder().icon_name(icon).build();
+    let button = gtk::Button::builder()
+        .child(&content)
+        .action_name(action)
+        .action_target(&entry.key.to_variant())
+        .build();
+    if detailed {
+        button.set_halign(gtk::Align::Start);
+        button.add_css_class("post-action");
+    } else {
+        button.add_css_class("flat");
+        button.add_css_class("post-stat");
+    }
+    let update = move |button: &gtk::Button, content: &adw::ButtonContent, toggle: &Toggle| {
+        content.set_label(&if detailed {
+            interaction_text(which, toggle)
+        } else {
+            toggle.count.to_string()
+        });
+        let label = interaction_label(which, toggle);
+        button.set_tooltip_text(Some(&label));
+        button.update_property(&[gtk::accessible::Property::Label(&label)]);
+        button.update_state(&[gtk::accessible::State::Pressed(if toggle.active {
+            gtk::AccessibleTristate::True
+        } else {
+            gtk::AccessibleTristate::False
+        })]);
+        if toggle.active {
+            button.add_css_class("active");
+        } else {
+            button.remove_css_class("active");
+        }
+    };
+    update(&button, &content, &entry.get(which));
+    let weak_button = button.downgrade();
+    let weak_content = content.downgrade();
+    entry.connect(move |changed, toggle| {
+        if changed == which
+            && let (Some(button), Some(content)) = (weak_button.upgrade(), weak_content.upgrade())
+        {
+            update(&button, &content, toggle);
+        }
+    });
+    // La carte garde l'état du post en vie tant qu'elle est affichée.
+    let entry = entry.clone();
+    button.connect_destroy(move |_| {
+        let _ = &entry;
+    });
+    button
 }
 
 fn card_frame(avatar_size: i32, name: &str, avatar_url: Option<&str>) -> (gtk::Box, gtk::Box) {
@@ -283,14 +363,9 @@ pub fn post_detail(post: &Post) -> gtk::Box {
         "mail-reply-sender-symbolic",
         gettext("Répondre"),
     ));
-    actions.append(&action_button(
-        "media-playlist-repeat-symbolic",
-        fill(gettext("Reposter · {}"), &[&post.reposts.to_string()]),
-    ));
-    actions.append(&action_button(
-        "emblem-favorite-symbolic",
-        fill(gettext("J'aime · {}"), &[&post.likes.to_string()]),
-    ));
+    let entry = interactions::register(post);
+    actions.append(&interaction_button(&entry, Interaction::Repost, true));
+    actions.append(&interaction_button(&entry, Interaction::Like, true));
     // Seuls les boutons prennent le focus, pas les cases du FlowBox.
     let mut child = actions.first_child();
     while let Some(widget) = child {

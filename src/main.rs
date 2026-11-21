@@ -10,6 +10,7 @@ mod columns;
 mod data;
 mod i18n;
 mod images;
+mod interactions;
 mod login;
 mod runtime;
 mod settings;

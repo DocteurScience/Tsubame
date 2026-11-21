@@ -103,3 +103,9 @@ columnsview > .column headerbar {
 .post-card.unread {
   background-color: mix(@card_bg_color, @accent_bg_color, 0.08);
 }
+
+/* Post aimé ou reposté. */
+.post-stat.active,
+.post-action.active {
+  color: @accent_color;
+}

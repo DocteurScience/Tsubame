@@ -237,8 +237,14 @@ fn count(value: Option<i64>) -> u32 {
 
 pub fn post_from_view(post: &PostView, now: DateTime<Utc>) -> Post {
     let indexed = parse_datetime(post.indexed_at.as_str());
+    let viewer = post.viewer.as_ref();
     Post {
         uri: Some(post.uri.clone()),
+        cid: serde_json::to_value(&post.cid)
+            .ok()
+            .and_then(|cid| cid.as_str().map(str::to_owned)),
+        like_uri: viewer.and_then(|v| v.like.clone()),
+        repost_uri: viewer.and_then(|v| v.repost.clone()),
         context: None,
         name: display_name(&post.author),
         handle: post.author.handle.as_str().to_owned(),
@@ -411,6 +417,9 @@ pub fn post_from_notification(
         // de la notification, s'il y en a un.
         None => Post {
             uri: None,
+            cid: None,
+            like_uri: None,
+            repost_uri: None,
             context: None,
             name: String::new(),
             handle: String::new(),
@@ -441,6 +450,123 @@ pub fn post_from_notification(
     }
     post.unread = !notification.is_read;
     Some(post)
+}
+
+/// Ce qu'on peut faire sur un post : l'aimer ou le reposter.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Interaction {
+    Like,
+    Repost,
+}
+
+impl Interaction {
+    fn collection(self) -> &'static str {
+        match self {
+            Interaction::Like => "app.bsky.feed.like",
+            Interaction::Repost => "app.bsky.feed.repost",
+        }
+    }
+}
+
+fn invalid_post() -> ApiError {
+    ApiError::new(gettext("Ce post ne peut pas être modifié."))
+}
+
+/// Découpe une adresse `at://dépôt/collection/clé`.
+pub fn parse_record_uri(uri: &str) -> Option<(&str, &str, &str)> {
+    let mut parts = uri.strip_prefix("at://")?.split('/');
+    let (repo, collection, rkey) = (parts.next()?, parts.next()?, parts.next()?);
+    if parts.next().is_some() || [repo, collection, rkey].iter().any(|p| p.is_empty()) {
+        return None;
+    }
+    Some((repo, collection, rkey))
+}
+
+/// Aime ou reposte le post `uri` (de contenu `cid`) ; renvoie l'adresse de
+/// l'enregistrement créé, qui sert à l'annuler.
+pub async fn create(
+    session: Arc<Session>,
+    interaction: Interaction,
+    uri: String,
+    cid: String,
+) -> Result<String, ApiError> {
+    use atrium_api::com::atproto::repo::{create_record, strong_ref};
+    use atrium_api::types::TryIntoUnknown;
+    use atrium_api::types::string::{Datetime, Did, Nsid};
+
+    let api = session.api().await?;
+    let subject: strong_ref::Main = strong_ref::MainData {
+        cid: cid.parse().map_err(|_| invalid_post())?,
+        uri,
+    }
+    .into();
+    let record = match interaction {
+        Interaction::Like => atrium_api::app::bsky::feed::like::Record::from(
+            atrium_api::app::bsky::feed::like::RecordData {
+                created_at: Datetime::now(),
+                subject,
+                via: None,
+            },
+        )
+        .try_into_unknown(),
+        Interaction::Repost => atrium_api::app::bsky::feed::repost::Record::from(
+            atrium_api::app::bsky::feed::repost::RecordData {
+                created_at: Datetime::now(),
+                subject,
+                via: None,
+            },
+        )
+        .try_into_unknown(),
+    }
+    .map_err(|_| invalid_post())?;
+    let output = api
+        .api
+        .com
+        .atproto
+        .repo
+        .create_record(
+            create_record::InputData {
+                collection: Nsid::new(interaction.collection().to_owned())
+                    .map_err(|_| invalid_post())?,
+                record,
+                repo: Did::new(session.account.did.clone())
+                    .map_err(|_| invalid_post())?
+                    .into(),
+                rkey: None,
+                swap_commit: None,
+                validate: None,
+            }
+            .into(),
+        )
+        .await
+        .map_err(request_failed)?;
+    Ok(output.data.uri)
+}
+
+/// Annule un « j'aime » ou un repost : supprime son enregistrement.
+pub async fn delete(session: Arc<Session>, record_uri: String) -> Result<(), ApiError> {
+    use atrium_api::com::atproto::repo::delete_record;
+    use atrium_api::types::string::{Nsid, RecordKey};
+
+    let (repo, collection, rkey) = parse_record_uri(&record_uri).ok_or_else(invalid_post)?;
+    let api = session.api().await?;
+    api.api
+        .com
+        .atproto
+        .repo
+        .delete_record(
+            delete_record::InputData {
+                collection: Nsid::new(collection.to_owned()).map_err(|_| invalid_post())?,
+                repo: repo.parse().map_err(|_| invalid_post())?,
+                rkey: RecordKey::new(rkey.to_owned()).map_err(|_| invalid_post())?,
+                swap_commit: None,
+                swap_record: None,
+            }
+            .into(),
+        )
+        .await
+        .map(|_| ())
+        .map_err(request_failed)
 }
 
 fn month(month: u32) -> String {
@@ -792,6 +918,41 @@ mod tests {
             r#"{"$type": "app.bsky.feed.post", "text": "", "createdAt": "2026-11-20T14:20:00.000Z"}"#,
         );
         assert!(post_from_notification(&unknown, &HashMap::new(), now()).is_none());
+    }
+
+    #[test]
+    fn record_uris_are_split() {
+        assert_eq!(
+            parse_record_uri("at://did:plc:moi/app.bsky.feed.like/3kxyz"),
+            Some(("did:plc:moi", "app.bsky.feed.like", "3kxyz"))
+        );
+        assert_eq!(parse_record_uri("https://bsky.app/profile/x"), None);
+        assert_eq!(
+            parse_record_uri("at://did:plc:moi/app.bsky.feed.like"),
+            None
+        );
+        assert_eq!(parse_record_uri("at://did:plc:moi//3kxyz"), None);
+        assert_eq!(parse_record_uri("at://a/b/c/d"), None);
+    }
+
+    #[test]
+    fn viewer_state_and_cid_are_kept() {
+        let mut item: serde_json::Value = serde_json::from_str(FEED_ITEM).unwrap();
+        item["post"]["viewer"] = serde_json::json!({
+            "like": "at://did:plc:moi/app.bsky.feed.like/1",
+            "repost": null
+        });
+        let item: FeedViewPost = serde_json::from_value(item).unwrap();
+        let post = post_from_feed(&item, now());
+        assert_eq!(
+            post.cid.as_deref(),
+            Some("bafyreie5737gdxlw5i64vzichcalba3z2v5n6icifvx5xytvske7mr3hpm")
+        );
+        assert_eq!(
+            post.like_uri.as_deref(),
+            Some("at://did:plc:moi/app.bsky.feed.like/1")
+        );
+        assert_eq!(post.repost_uri, None);
     }
 
     #[test]
