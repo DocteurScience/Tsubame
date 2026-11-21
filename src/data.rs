@@ -46,6 +46,25 @@ pub struct Post {
     pub unread: bool,
 }
 
+/// Profil d'un compte.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Profile {
+    pub did: String,
+    pub handle: String,
+    /// Nom affiché, ou l'identifiant s'il n'y en a pas.
+    pub name: String,
+    pub bio: String,
+    pub avatar: Option<String>,
+    pub banner: Option<String>,
+    pub followers: u64,
+    pub follows: u64,
+    pub posts: u64,
+    /// Mon abonnement à ce compte (adresse de l'enregistrement), s'il existe.
+    pub following: Option<String>,
+    /// Ce compte me suit.
+    pub follows_me: bool,
+}
+
 /// Référence à un post : son adresse et son contenu (CID).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StrongRef {

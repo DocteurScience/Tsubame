@@ -148,3 +148,22 @@ columnsview > .column headerbar {
   min-height: 44px;
   min-width: 44px;
 }
+
+/* Nom et avatar des auteurs : liens vers leur profil. */
+.author-link {
+  padding: 0 4px;
+  margin-left: -4px;
+  min-height: 0;
+}
+
+.avatar-button {
+  padding: 0;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* Profil. */
+.profile-banner-frame {
+  border-radius: 12px;
+  background-color: mix(@window_bg_color, @accent_bg_color, 0.25);
+}

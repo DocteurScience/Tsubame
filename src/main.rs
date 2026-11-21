@@ -14,6 +14,8 @@ mod images;
 mod interactions;
 mod login;
 mod photo;
+mod post_list;
+mod profile;
 mod richtext;
 mod runtime;
 mod settings;

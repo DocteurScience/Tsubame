@@ -32,14 +32,33 @@ fn label(text: &str, classes: &[&str]) -> gtk::Label {
 }
 
 /// Ligne « nom · heure » en haut d'une carte.
-fn meta(name: &str, time: &str) -> gtk::Box {
+/// Ouvre le profil de `handle` au clic.
+fn link_to_profile(button: &gtk::Button, name: &str, handle: &str) {
+    button.set_action_name(Some("win.open-profile"));
+    button.set_action_target_value(Some(&handle.to_variant()));
+    let label = gettext("Voir le profil de {}").replace("{}", name);
+    button.set_tooltip_text(Some(&format!("@{handle}")));
+    button.update_property(&[gtk::accessible::Property::Label(&label)]);
+}
+
+/// Ligne « nom · heure » ; le nom ouvre le profil.
+fn meta(name: &str, handle: &str, time: &str) -> gtk::Box {
     let row = gtk::Box::new(gtk::Orientation::Horizontal, 6);
-    let name = label(name, &["heading"]);
-    name.set_wrap(false);
-    name.set_ellipsize(gtk::pango::EllipsizeMode::End);
+    let name_label = label(name, &["heading"]);
+    name_label.set_wrap(false);
+    name_label.set_ellipsize(gtk::pango::EllipsizeMode::End);
+    if handle.is_empty() {
+        row.append(&name_label);
+    } else {
+        let button = gtk::Button::builder()
+            .child(&name_label)
+            .css_classes(["flat", "author-link"])
+            .build();
+        link_to_profile(&button, name, handle);
+        row.append(&button);
+    }
     let time = label(time, &["dim-label", "caption"]);
     time.set_wrap(false);
-    row.append(&name);
     row.append(&time);
     row
 }
@@ -266,7 +285,12 @@ fn interaction_button(entry: &Rc<Interactions>, which: Interaction, detailed: bo
     button
 }
 
-fn card_frame(avatar_size: i32, name: &str, avatar_url: Option<&str>) -> (gtk::Box, gtk::Box) {
+fn card_frame(
+    avatar_size: i32,
+    name: &str,
+    handle: &str,
+    avatar_url: Option<&str>,
+) -> (gtk::Box, gtk::Box) {
     let card = gtk::Box::builder()
         .orientation(gtk::Orientation::Horizontal)
         .spacing(10)
@@ -292,21 +316,37 @@ fn card_frame(avatar_size: i32, name: &str, avatar_url: Option<&str>) -> (gtk::B
         .spacing(4)
         .hexpand(true)
         .build();
-    card.append(&avatar);
+    // L'avatar ouvre aussi le profil.
+    if handle.is_empty() {
+        card.append(&avatar);
+    } else {
+        let button = gtk::Button::builder()
+            .child(&avatar)
+            .valign(gtk::Align::Start)
+            .css_classes(["flat", "circular", "avatar-button"])
+            .build();
+        link_to_profile(&button, name, handle);
+        card.append(&button);
+    }
     card.append(&body);
     (card, body)
 }
 
 /// Carte d'un post dans le fil.
 pub fn post_card(post: &Post) -> gtk::Box {
-    let (card, body) = card_frame(AVATAR_SIZE, &post.name, post.avatar.as_deref());
+    let (card, body) = card_frame(
+        AVATAR_SIZE,
+        &post.name,
+        &post.handle,
+        post.avatar.as_deref(),
+    );
     if post.unread {
         card.add_css_class("unread");
     }
     if let Some(context) = &post.context {
         body.append(&label(context, &["dim-label", "caption"]));
     }
-    body.append(&meta(&post.name, &post.time));
+    body.append(&meta(&post.name, &post.handle, &post.time));
     if !post.text.is_empty() {
         body.append(&label(&post.text, &[]));
     }
@@ -319,9 +359,14 @@ pub fn post_card(post: &Post) -> gtk::Box {
 
 /// Carte d'une réponse dans le volet de discussion.
 pub fn reply_card(reply: &Reply) -> gtk::Box {
-    let (card, body) = card_frame(AVATAR_SIZE, &reply.name, reply.avatar.as_deref());
+    let (card, body) = card_frame(
+        AVATAR_SIZE,
+        &reply.name,
+        &reply.handle,
+        reply.avatar.as_deref(),
+    );
     card.set_tooltip_text(Some(&format!("@{}", reply.handle)));
-    body.append(&meta(&reply.name, &reply.time));
+    body.append(&meta(&reply.name, &reply.handle, &reply.time));
     body.append(&label(&reply.text, &[]));
     card
 }
@@ -341,7 +386,12 @@ fn action_button(icon: &str, text: String) -> gtk::Button {
 
 /// Post ouvert en grand en tête du volet de discussion.
 pub fn post_detail(post: &Post) -> gtk::Box {
-    let (card, body) = card_frame(AVATAR_SIZE_LARGE, &post.name, post.avatar.as_deref());
+    let (card, body) = card_frame(
+        AVATAR_SIZE_LARGE,
+        &post.name,
+        &post.handle,
+        post.avatar.as_deref(),
+    );
     card.add_css_class("post-detail");
 
     body.append(&label(&post.name, &["title-4"]));

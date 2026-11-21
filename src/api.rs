@@ -17,7 +17,7 @@ use chrono::{DateTime, Datelike, FixedOffset, Local, Timelike, Utc};
 use gettextrs::{gettext, ngettext};
 
 use crate::auth::Session;
-use crate::data::{Media, Post, Reply, StrongRef};
+use crate::data::{Media, Post, Profile, Reply, StrongRef};
 
 /// Fil « Discover » de Bluesky.
 pub const DISCOVER_FEED: &str =
@@ -35,6 +35,31 @@ pub enum Source {
     Feed(String),
     /// Notifications (`listNotifications`).
     Notifications,
+    /// Posts d'un compte (`getAuthorFeed`), par son DID ou identifiant.
+    Author { actor: String, filter: AuthorFilter },
+    /// Posts aimés par un compte (`getActorLikes`) : seulement le sien.
+    Likes(String),
+}
+
+/// Onglets d'un profil.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AuthorFilter {
+    /// Posts et reposts, sans les réponses.
+    Posts,
+    /// Posts et réponses.
+    Replies,
+    /// Posts avec image ou vidéo.
+    Media,
+}
+
+impl AuthorFilter {
+    fn api_name(self) -> &'static str {
+        match self {
+            AuthorFilter::Posts => "posts_no_replies",
+            AuthorFilter::Replies => "posts_with_replies",
+            AuthorFilter::Media => "posts_with_media",
+        }
+    }
 }
 
 /// Une page de posts et le curseur de la suivante.
@@ -82,6 +107,44 @@ pub async fn load(
     let limit = PAGE_SIZE.try_into().ok();
     let (feed, cursor) = match source {
         Source::Notifications => return notifications(&api, cursor).await,
+        Source::Author { actor, filter } => {
+            let output = api
+                .api
+                .app
+                .bsky
+                .feed
+                .get_author_feed(
+                    atrium_api::app::bsky::feed::get_author_feed::ParametersData {
+                        actor: actor.parse().map_err(|_| invalid_actor())?,
+                        cursor,
+                        filter: Some(filter.api_name().to_owned()),
+                        include_pins: Some(filter == AuthorFilter::Posts),
+                        limit,
+                    }
+                    .into(),
+                )
+                .await
+                .map_err(request_failed)?;
+            (output.data.feed, output.data.cursor)
+        }
+        Source::Likes(actor) => {
+            let output = api
+                .api
+                .app
+                .bsky
+                .feed
+                .get_actor_likes(
+                    atrium_api::app::bsky::feed::get_actor_likes::ParametersData {
+                        actor: actor.parse().map_err(|_| invalid_actor())?,
+                        cursor,
+                        limit,
+                    }
+                    .into(),
+                )
+                .await
+                .map_err(request_failed)?;
+            (output.data.feed, output.data.cursor)
+        }
         Source::Timeline => {
             let output = api
                 .api
@@ -463,6 +526,85 @@ pub fn post_from_notification(
     }
     post.unread = !notification.is_read;
     Some(post)
+}
+
+fn invalid_actor() -> ApiError {
+    ApiError::new(gettext("Ce compte n'existe pas."))
+}
+
+pub fn profile_from_view(
+    profile: &atrium_api::app::bsky::actor::defs::ProfileViewDetailed,
+) -> Profile {
+    let viewer = profile.viewer.as_ref();
+    let count = |value: Option<i64>| value.unwrap_or(0).max(0) as u64;
+    Profile {
+        did: profile.did.as_str().to_owned(),
+        handle: profile.handle.as_str().to_owned(),
+        name: name_or_handle(profile.display_name.as_deref(), profile.handle.as_str()),
+        bio: profile.description.clone().unwrap_or_default(),
+        avatar: profile.avatar.clone(),
+        banner: profile.banner.clone(),
+        followers: count(profile.followers_count),
+        follows: count(profile.follows_count),
+        posts: count(profile.posts_count),
+        following: viewer.and_then(|v| v.following.clone()),
+        follows_me: viewer.is_some_and(|v| v.followed_by.is_some()),
+    }
+}
+
+/// Profil d'un compte, par son DID ou identifiant.
+pub async fn profile(session: Arc<Session>, actor: String) -> Result<Profile, ApiError> {
+    let api = session.api().await?;
+    let output = api
+        .api
+        .app
+        .bsky
+        .actor
+        .get_profile(
+            atrium_api::app::bsky::actor::get_profile::ParametersData {
+                actor: actor.parse().map_err(|_| invalid_actor())?,
+            }
+            .into(),
+        )
+        .await
+        .map_err(request_failed)?;
+    Ok(profile_from_view(&output))
+}
+
+/// Suit le compte `did` ; renvoie l'adresse de l'abonnement, qui sert à
+/// l'annuler avec `delete`.
+pub async fn follow(session: Arc<Session>, did: String) -> Result<String, ApiError> {
+    use atrium_api::com::atproto::repo::create_record;
+    use atrium_api::types::string::{Datetime, Did, Nsid};
+
+    let api = session.api().await?;
+    let record = serde_json::json!({
+        "$type": "app.bsky.graph.follow",
+        "subject": did,
+        "createdAt": Datetime::now().as_str(),
+    });
+    let output = api
+        .api
+        .com
+        .atproto
+        .repo
+        .create_record(
+            create_record::InputData {
+                collection: Nsid::new("app.bsky.graph.follow".to_owned())
+                    .map_err(|_| invalid_actor())?,
+                record: serde_json::from_value(record).map_err(|_| invalid_actor())?,
+                repo: Did::new(session.account.did.clone())
+                    .map_err(|_| invalid_actor())?
+                    .into(),
+                rkey: None,
+                swap_commit: None,
+                validate: None,
+            }
+            .into(),
+        )
+        .await
+        .map_err(request_failed)?;
+    Ok(output.data.uri)
 }
 
 /// Ce qu'on peut faire sur un post : l'aimer ou le reposter.
@@ -1242,6 +1384,40 @@ mod tests {
                 cid: "cidroot".into(),
             })
         );
+    }
+
+    #[test]
+    fn profiles_are_read() {
+        let view: atrium_api::app::bsky::actor::defs::ProfileViewDetailed = serde_json::from_str(
+            r#"{
+                    "did": "did:plc:lucie",
+                    "handle": "lucie.example.social",
+                    "displayName": "Lucie Morel",
+                    "description": "Développeuse GTK et traductrice.",
+                    "avatar": "https://cdn.example/avatar/lucie.jpg",
+                    "followersCount": 1284,
+                    "followsCount": 312,
+                    "postsCount": 2906,
+                    "viewer": {
+                        "following": "at://did:plc:moi/app.bsky.graph.follow/1",
+                        "followedBy": "at://did:plc:lucie/app.bsky.graph.follow/2"
+                    }
+                }"#,
+        )
+        .unwrap();
+        let profile = profile_from_view(&view);
+        assert_eq!(profile.name, "Lucie Morel");
+        assert_eq!(profile.bio, "Développeuse GTK et traductrice.");
+        assert_eq!(
+            (profile.followers, profile.follows, profile.posts),
+            (1284, 312, 2906)
+        );
+        assert_eq!(
+            profile.following.as_deref(),
+            Some("at://did:plc:moi/app.bsky.graph.follow/1")
+        );
+        assert!(profile.follows_me);
+        assert_eq!(profile.banner, None);
     }
 
     #[test]

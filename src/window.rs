@@ -26,6 +26,7 @@ use crate::compose;
 use crate::data::Post;
 use crate::interactions::{self, Change, Interaction};
 use crate::login::LoginPage;
+use crate::profile::{self, ProfilePage};
 use crate::runtime::runtime;
 use crate::thread::ThreadView;
 
@@ -199,6 +200,9 @@ struct State {
     visible_columns: RefCell<std::ops::Range<usize>>,
     root_stack: gtk::Stack,
     toasts: adw::ToastOverlay,
+    /// Page « Profil » : mon profil, ou une invitation à se connecter.
+    my_profile_bin: adw::Bin,
+    my_profile: RefCell<Option<Rc<ProfilePage>>>,
     login: Rc<LoginPage>,
     sidebar_title: adw::WindowTitle,
     /// Compte connecté ; `None` avec les posts de démonstration.
@@ -428,6 +432,7 @@ impl State {
         self.session.replace(session);
         self.clear_thread();
         self.load_all();
+        self.update_my_profile();
         self.root_stack.set_visible_child_name("main");
         if let Some(column) = self.columns.borrow().get(self.current.get()) {
             column.focus();
@@ -441,6 +446,7 @@ impl State {
         // faux posts, cachés derrière l'écran de connexion.
         self.clear_thread();
         self.load_all();
+        self.update_my_profile();
         self.logout_action.set_enabled(false);
         self.sidebar_title.set_subtitle("");
         self.login.show_form(message);
@@ -832,6 +838,105 @@ impl State {
         );
     }
 
+    /// Ce qu'une page de profil reçoit de la fenêtre.
+    fn profile_host(self: &Rc<Self>) -> profile::Host {
+        let session = self.session.borrow().clone();
+        let me = session.as_ref().map(|s| s.account.did.clone());
+        let weak = Rc::downgrade(self);
+        let open_post = Box::new(move |post: Post| {
+            if let Some(state) = weak.upgrade() {
+                state.open_post_page(post);
+            }
+        });
+        let weak = Rc::downgrade(self);
+        let expired = Box::new(move |message: String| {
+            if let Some(state) = weak.upgrade() {
+                state.session_expired(&message);
+            }
+        });
+        profile::Host {
+            session,
+            me,
+            toasts: self.toasts.clone(),
+            open_post,
+            expired,
+        }
+    }
+
+    /// Empile le profil de `actor` (DID ou identifiant).
+    fn open_profile(self: &Rc<Self>, actor: &str) {
+        let page = ProfilePage::new(actor, self.profile_host());
+        self.nav.push(&page.navigation_page());
+    }
+
+    /// Empile la discussion d'un post (ouvert depuis un profil) et charge
+    /// ses réponses.
+    fn open_post_page(self: &Rc<Self>, post: Post) {
+        let view = Rc::new(ThreadView::new());
+        view.set_selector_visible(false);
+        view.show(Some(&post));
+        let page = adw::NavigationPage::builder()
+            .title(gettext("Discussion"))
+            .child(&view.root)
+            .build();
+        let keep = view.clone();
+        page.connect_destroy(move |_| {
+            let _ = &keep;
+        });
+        self.nav.push(&page);
+        let (Some(uri), Some(session)) = (post.uri, self.session.borrow().clone()) else {
+            return;
+        };
+        let task = runtime().spawn(api::replies(session, uri));
+        let weak = Rc::downgrade(self);
+        glib::spawn_future_local(async move {
+            let result = task.await.unwrap_or_else(|_| {
+                Err(api::ApiError::new(gettext(
+                    "Les réponses n'ont pas pu être chargées.",
+                )))
+            });
+            if let Err(error) = &result
+                && error.expired
+            {
+                if let Some(state) = weak.upgrade() {
+                    state.session_expired(&error.message);
+                }
+                return;
+            }
+            view.set_replies(Some(
+                result
+                    .as_ref()
+                    .map(Vec::as_slice)
+                    .map_err(|e| e.message.as_str()),
+            ));
+        });
+    }
+
+    /// Page « Profil » : mon profil, ou une invitation à se connecter.
+    fn update_my_profile(self: &Rc<Self>) {
+        let session = self.session.borrow().clone();
+        match session {
+            Some(session) => {
+                let page = ProfilePage::new(&session.account.did, self.profile_host());
+                self.my_profile_bin.set_child(Some(&page.root));
+                self.my_profile.replace(Some(page));
+            }
+            None => {
+                self.my_profile.replace(None);
+                let view = adw::ToolbarView::new();
+                view.add_top_bar(&adw::HeaderBar::new());
+                view.set_content(Some(
+                    &adw::StatusPage::builder()
+                        .icon_name("avatar-default-symbolic")
+                        .title(gettext("Profil"))
+                        .description(gettext("Connectez-vous pour voir votre profil."))
+                        .build(),
+                ));
+                self.my_profile_bin.set_child(Some(&view));
+            }
+        }
+    }
+
     fn clear_thread(&self) {
         self.shown_uri.replace(None);
         self.pane.show(None);
@@ -1114,6 +1219,15 @@ fn install_actions(window: &adw::ApplicationWindow, state: &Rc<State>) {
         s.close_column(k)
     }));
     window.add_action(&kind_action("show-column", state, |s, k| s.show_column(k)));
+    let open_profile = gio::SimpleAction::new("open-profile", Some(glib::VariantTy::STRING));
+    let weak = Rc::downgrade(state);
+    open_profile.connect_activate(move |_, param| {
+        if let (Some(state), Some(actor)) = (weak.upgrade(), param.and_then(|p| p.str())) {
+            state.open_profile(actor);
+        }
+    });
+    window.add_action(&open_profile);
+
     let compose = gio::SimpleAction::new("compose", None);
     let weak = Rc::downgrade(state);
     compose.connect_activate(move |_, _| {
@@ -1248,13 +1362,16 @@ pub fn build(app: &adw::Application) -> adw::ApplicationWindow {
     );
     notifications.set_visible(false);
     let mut hidden_when_compact = Vec::new();
+    // « Profil » : mon profil une fois connecté.
+    let my_profile_bin = adw::Bin::new();
     for page in &pages[1..] {
-        let stack_page = stack.add_titled_with_icon(
-            &placeholder_page(page.icon, &page.title),
-            Some(page.name),
-            &page.title,
-            page.icon,
-        );
+        let child: gtk::Widget = if page.name == "profile" {
+            my_profile_bin.clone().upcast()
+        } else {
+            placeholder_page(page.icon, &page.title).upcast()
+        };
+        let stack_page =
+            stack.add_titled_with_icon(&child, Some(page.name), &page.title, page.icon);
         if let Some(badge) = page.badge {
             stack_page.set_badge_number(badge);
             stack_page.set_needs_attention(true);
@@ -1391,6 +1508,8 @@ pub fn build(app: &adw::Application) -> adw::ApplicationWindow {
         visible_columns: RefCell::default(),
         root_stack: root_stack.clone(),
         toasts: toasts.clone(),
+        my_profile_bin,
+        my_profile: RefCell::default(),
         login: login.clone(),
         sidebar_title,
         session: RefCell::default(),

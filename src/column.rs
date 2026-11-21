@@ -1,6 +1,5 @@
 //! Une colonne de cartes : en-tête (titre, fermeture) et liste de posts.
 
-use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 use adw::prelude::*;
@@ -8,8 +7,8 @@ use gettextrs::gettext;
 use gtk::gio;
 
 use crate::api::{ApiError, DISCOVER_FEED, Page, Source};
-use crate::card;
 use crate::data::{self, Feed, Post};
+use crate::post_list::{Load, PostList};
 
 /// Ce qu'une colonne affiche. Chaque sorte s'ouvre au plus une fois.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -78,14 +77,6 @@ impl ColumnKind {
     }
 }
 
-/// Ce qu'une colonne affiche : chargement, liste de cartes, liste vide,
-/// erreur, ou colonne pas encore reliée à Bluesky.
-const LOADING: &str = "loading";
-const LIST: &str = "list";
-const EMPTY: &str = "empty";
-const ERROR: &str = "error";
-const UNAVAILABLE: &str = "unavailable";
-
 pub struct Column {
     pub kind: ColumnKind,
     pub root: adw::ToolbarView,
@@ -97,92 +88,19 @@ pub struct Column {
     options: gtk::MenuButton,
     moves: gio::Menu,
     refresh: gtk::Button,
-    retry: gtk::Button,
-    scroll: gtk::ScrolledWindow,
-    stack: gtk::Stack,
-    error: adw::StatusPage,
-    posts: Rc<RefCell<Vec<Post>>>,
-    /// Curseur de la page suivante ; `None` à la fin du fil.
-    cursor: RefCell<Option<String>>,
-    loading: Cell<bool>,
-    /// Numéro du chargement en cours : un résultat d'un chargement dépassé
-    /// (actualisation entre-temps) est ignoré.
-    generation: Cell<u64>,
-}
-
-/// Chargement autorisé par `Column::begin_load`.
-pub struct Load {
-    pub generation: u64,
-    pub cursor: Option<String>,
-    pub more: bool,
+    /// Les cartes et leurs états.
+    pub posts: PostList,
 }
 
 impl Column {
     /// `columns_menu` liste les colonnes ouvertes ; il sert au sélecteur de
     /// titre quand une seule colonne est affichée.
     pub fn new(kind: ColumnKind, columns_menu: &gio::Menu) -> Self {
-        let list = gtk::ListBox::builder()
-            .selection_mode(gtk::SelectionMode::Single)
-            .margin_top(12)
-            .margin_bottom(12)
-            .margin_start(12)
-            .margin_end(12)
-            .css_classes(["post-list"])
-            .build();
-        list.update_property(&[gtk::accessible::Property::Label(&kind.title())]);
-        let scroll = gtk::ScrolledWindow::builder()
-            .hscrollbar_policy(gtk::PolicyType::Never)
-            .vexpand(true)
-            .child(
-                &adw::Clamp::builder()
-                    .maximum_size(crate::columns::COLUMN_MAX_WIDTH)
-                    .tightening_threshold(crate::columns::COLUMN_MIN_WIDTH)
-                    .child(&list)
-                    .build(),
-            )
-            .build();
-
-        let spinner = gtk::Spinner::builder()
-            .spinning(true)
-            .width_request(32)
-            .height_request(32)
-            .halign(gtk::Align::Center)
-            .valign(gtk::Align::Center)
-            .build();
-        spinner.update_property(&[gtk::accessible::Property::Label(&gettext("Chargement"))]);
-        let retry = gtk::Button::builder()
-            .label(gettext("Réessayer"))
-            .halign(gtk::Align::Center)
-            .css_classes(["pill"])
-            .build();
-        let error = adw::StatusPage::builder()
-            .icon_name("network-error-symbolic")
-            .title(gettext("Chargement impossible"))
-            .child(&retry)
-            .css_classes(["compact"])
-            .build();
-        let stack = gtk::Stack::new();
-        stack.add_named(&spinner, Some(LOADING));
-        stack.add_named(&scroll, Some(LIST));
-        stack.add_named(
-            &adw::StatusPage::builder()
-                .icon_name("view-list-symbolic")
-                .title(gettext("Rien à afficher pour l'instant"))
-                .css_classes(["compact"])
-                .build(),
-            Some(EMPTY),
+        let posts = PostList::new(
+            &kind.title(),
+            &gettext("Cette colonne n'est pas encore reliée à Bluesky."),
         );
-        stack.add_named(&error, Some(ERROR));
-        stack.add_named(
-            &adw::StatusPage::builder()
-                .icon_name("view-list-symbolic")
-                .title(gettext("Pas encore disponible"))
-                .description(gettext("Cette colonne n'est pas encore reliée à Bluesky."))
-                .css_classes(["compact"])
-                .build(),
-            Some(UNAVAILABLE),
-        );
-        stack.set_visible_child_name(LOADING);
+        let list = posts.list.clone();
 
         // Titre simple, ou menu des colonnes ouvertes quand une seule colonne
         // est visible (comme « Following ▾ » dans la maquette Mobile).
@@ -251,7 +169,7 @@ impl Column {
         header.pack_end(&options);
 
         let root = adw::ToolbarView::builder()
-            .content(&stack)
+            .content(&posts.root)
             .css_classes(["column"])
             .build();
         root.add_top_bar(&header);
@@ -267,25 +185,12 @@ impl Column {
             options,
             moves,
             refresh,
-            retry,
-            scroll,
-            stack,
-            error,
-            posts: Rc::default(),
-            cursor: RefCell::default(),
-            loading: Cell::new(false),
-            generation: Cell::new(0),
+            posts,
         }
     }
 
-    /// Appelle `f` avec le post sélectionné dans la colonne (ou `None`
-    /// quand la sélection est vidée).
     pub fn connect_post_selected(&self, f: impl Fn(&gtk::ListBox, Option<Post>) + 'static) {
-        let posts = self.posts.clone();
-        self.list.connect_row_selected(move |list, row| {
-            let post = row.and_then(|row| posts.borrow().get(row.index() as usize).cloned());
-            f(list, post);
-        });
+        self.posts.connect_post_selected(f);
     }
 
     /// « Actualiser » et « Réessayer » appellent `f`.
@@ -293,126 +198,43 @@ impl Column {
         let f = Rc::new(f);
         let g = f.clone();
         self.refresh.connect_clicked(move |_| f());
-        self.retry.connect_clicked(move |_| g());
+        self.posts.connect_retry(move || g());
     }
 
-    /// Appelle `f` quand on arrive en bas de la liste, pour charger la suite.
     pub fn connect_end_reached(&self, f: impl Fn() + 'static) {
-        self.scroll.connect_edge_reached(move |_, edge| {
-            if edge == gtk::PositionType::Bottom {
-                f();
-            }
-        });
+        self.posts.connect_end_reached(f);
     }
 
-    /// Commence un chargement : depuis le début (`more` faux, actualisation)
-    /// ou la page suivante. `None` si rien n'est à charger : suite déjà en
-    /// cours, ou fin du fil.
+    /// Voir `PostList::begin_load` ; « Actualiser » est grisé pendant le
+    /// chargement.
     pub fn begin_load(&self, more: bool) -> Option<Load> {
-        if more {
-            if self.loading.get() || self.posts.borrow().is_empty() {
-                return None;
-            }
-            let cursor = self.cursor.borrow().clone()?;
-            self.loading.set(true);
-            return Some(Load {
-                generation: self.generation.get(),
-                cursor: Some(cursor),
-                more,
-            });
+        let load = self.posts.begin_load(more);
+        if load.as_ref().is_some_and(|load| !load.more) {
+            self.refresh.set_sensitive(false);
         }
-        self.generation.set(self.generation.get() + 1);
-        self.loading.set(true);
-        self.refresh.set_sensitive(false);
-        // Une liste déjà remplie reste visible pendant l'actualisation.
-        if self.posts.borrow().is_empty() {
-            self.stack.set_visible_child_name(LOADING);
-        }
-        Some(Load {
-            generation: self.generation.get(),
-            cursor: None,
-            more,
-        })
+        load
     }
 
-    /// Termine un chargement commencé par `begin_load`.
     pub fn finish_load(&self, load: &Load, result: Result<Page, ApiError>) {
-        if load.generation != self.generation.get() {
-            return;
-        }
-        self.loading.set(false);
-        self.refresh.set_sensitive(true);
-        match result {
-            Ok(page) => {
-                if !load.more {
-                    self.list.remove_all();
-                    self.posts.borrow_mut().clear();
-                }
-                for post in &page.posts {
-                    self.list.append(&post_row(post));
-                }
-                self.posts.borrow_mut().extend(page.posts);
-                self.cursor.replace(page.cursor);
-                let empty = self.posts.borrow().is_empty();
-                self.stack
-                    .set_visible_child_name(if empty { EMPTY } else { LIST });
-            }
-            // La suite n'a pas pu être chargée : on garde ce qui est
-            // affiché, et le curseur pour réessayer au prochain défilement.
-            Err(_) if load.more => {}
-            Err(ApiError { message, .. }) => {
-                self.error.set_description(Some(&message));
-                self.stack.set_visible_child_name(ERROR);
-            }
-        }
+        self.posts.finish_load(load, result);
+        self.refresh.set_sensitive(!self.posts.is_loading());
     }
 
-    /// Notifications pas encore vues parmi les posts chargés.
     pub fn unread_count(&self) -> u32 {
-        self.posts
-            .borrow()
-            .iter()
-            .filter(|post| post.unread)
-            .count() as u32
+        self.posts.unread_count()
     }
 
-    /// Marque tous les posts comme vus, à l'écran.
     pub fn mark_all_read(&self) {
-        for post in self.posts.borrow_mut().iter_mut() {
-            post.unread = false;
-        }
-        let mut row = self.list.first_child();
-        while let Some(widget) = row {
-            if let Some(card) = widget
-                .downcast_ref::<gtk::ListBoxRow>()
-                .and_then(|row| row.child())
-            {
-                card.remove_css_class("unread");
-            }
-            row = widget.next_sibling();
-        }
+        self.posts.mark_all_read();
     }
 
     /// Faux posts, sans compte.
     pub fn show_demo(&self) {
-        let load = self
-            .begin_load(false)
-            .expect("un chargement complet est toujours permis");
-        let page = Page {
-            posts: self.kind.demo_posts(),
-            cursor: None,
-        };
-        self.finish_load(&load, Ok(page));
+        self.posts.show_posts(self.kind.demo_posts());
     }
 
-    /// Colonne pas encore reliée à Bluesky.
     pub fn show_unavailable(&self) {
-        self.generation.set(self.generation.get() + 1);
-        self.loading.set(false);
-        self.list.remove_all();
-        self.posts.borrow_mut().clear();
-        self.cursor.replace(None);
-        self.stack.set_visible_child_name(UNAVAILABLE);
+        self.posts.show_unavailable();
     }
 
     /// Ne propose dans le menu que les déplacements possibles depuis la
@@ -464,27 +286,8 @@ impl Column {
 
     /// Donne le focus à la carte sélectionnée, ou à la première.
     pub fn focus(&self) {
-        let row = self
-            .list
-            .selected_row()
-            .or_else(|| self.list.row_at_index(0));
-        if let Some(row) = row {
-            row.grab_focus();
-        }
+        self.posts.focus();
     }
-}
-
-/// Rangée d'une carte, avec une description pour les lecteurs d'écran.
-fn post_row(post: &Post) -> gtk::ListBoxRow {
-    let row = gtk::ListBoxRow::builder()
-        .child(&card::post_card(post))
-        .build();
-    let description = match &post.context {
-        Some(context) => format!("{context}. {} : {}", post.name, post.text),
-        None => format!("{} : {}", post.name, post.text),
-    };
-    row.update_property(&[gtk::accessible::Property::Label(&description)]);
-    row
 }
 
 #[cfg(test)]
