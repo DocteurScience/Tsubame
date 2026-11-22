@@ -223,6 +223,7 @@ pub fn present(
         .can_target(false)
         .css_classes(["dim-label"])
         .build();
+    crate::mentions::attach(&text, session.clone());
     let editor = gtk::Overlay::builder().child(&text).build();
     editor.add_overlay(&placeholder);
     let row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
@@ -516,6 +517,7 @@ pub fn present(
             update.clone(),
             author.clone(),
         );
+        let session = session.clone();
         Rc::new(move |initial: &str| {
             if followups.borrow().len() >= MAX_FOLLOWUPS {
                 return;
@@ -529,6 +531,7 @@ pub fn present(
                 .css_classes(["compose-text"])
                 .build();
             view.buffer().set_text(initial);
+            crate::mentions::attach(&view, session.clone());
             let number = followups.borrow().len() + 2;
             view.update_property(&[gtk::accessible::Property::Label(
                 &gettext("Post {} du fil").replace("{}", &number.to_string()),

@@ -15,6 +15,7 @@ src/explore.rs
 src/feed_page.rs
 src/login.rs
 src/main.rs
+src/mentions.rs
 src/messages.rs
 src/moderation.rs
 src/post_list.rs

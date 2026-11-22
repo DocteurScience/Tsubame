@@ -771,6 +771,37 @@ pub async fn search_actors(session: Arc<Session>, query: String) -> Result<Vec<A
     Ok(output.data.actors.iter().map(actor_from_view).collect())
 }
 
+/// Comptes dont l'identifiant ou le nom commence par `query`, pour
+/// compléter une mention (`searchActorsTypeahead`).
+pub async fn typeahead(session: Arc<Session>, query: String) -> Result<Vec<Actor>, ApiError> {
+    let api = session.api().await?;
+    let output = Box::pin(
+        api.api.app.bsky.actor.search_actors_typeahead(
+            atrium_api::app::bsky::actor::search_actors_typeahead::ParametersData {
+                limit: 8.try_into().ok(),
+                q: Some(query),
+                term: None,
+            }
+            .into(),
+        ),
+    )
+    .await
+    .map_err(request_failed)?;
+    Ok(output
+        .data
+        .actors
+        .iter()
+        .map(|actor| Actor {
+            did: actor.did.as_str().to_owned(),
+            handle: actor.handle.as_str().to_owned(),
+            name: display_name(actor),
+            bio: String::new(),
+            avatar: actor.avatar.clone(),
+            following: actor.viewer.as_ref().and_then(|v| v.following.clone()),
+        })
+        .collect())
+}
+
 /// Sujets du moment (`getTrendingTopics`).
 pub async fn trending(session: Arc<Session>) -> Result<Vec<Topic>, ApiError> {
     let api = session.api().await?;

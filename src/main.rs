@@ -18,6 +18,7 @@ mod i18n;
 mod images;
 mod interactions;
 mod login;
+mod mentions;
 mod messages;
 mod moderation;
 mod photo;
