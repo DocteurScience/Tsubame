@@ -7,7 +7,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 use adw::prelude::*;
-use gettextrs::gettext;
+use gettextrs::{gettext, pgettext};
 use gtk::glib;
 
 use crate::api::{self, ApiError, Page, Source};
@@ -112,7 +112,7 @@ pub fn actor_row(
         move || {
             let followed = following.borrow().is_some();
             button.set_label(&if followed {
-                gettext("Abonné")
+                pgettext("bouton : vous suivez ce compte", "Abonné")
             } else {
                 gettext("Suivre")
             });

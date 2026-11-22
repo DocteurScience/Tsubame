@@ -14,7 +14,7 @@ use atrium_api::app::bsky::feed::get_post_thread::OutputThreadRefs;
 use atrium_api::app::bsky::notification::list_notifications::Notification;
 use atrium_api::types::Union;
 use chrono::{DateTime, Datelike, FixedOffset, Local, Timelike, Utc};
-use gettextrs::{gettext, ngettext};
+use gettextrs::{gettext, ngettext, pgettext};
 
 use crate::auth::Session;
 use crate::data::{Actor, List, Media, Post, Profile, Reply, StrongRef, Topic};
@@ -1228,7 +1228,7 @@ impl People {
         match self {
             People::Followers(_) => gettext("Abonnés"),
             People::Follows(_) => gettext("Abonnements"),
-            People::Likers(_) => gettext("J'aime"),
+            People::Likers(_) => pgettext("comptes qui ont aimé un post", "J'aime"),
             People::Reposters(_) => gettext("Reposts"),
         }
     }
@@ -1819,9 +1819,12 @@ pub fn relative_time(then: DateTime<FixedOffset>, now: DateTime<Utc>) -> String 
         let local = then.with_timezone(&Local);
         let current_year = now.with_timezone(&Local).year();
         if local.year() == current_year {
-            format!("{} {}", local.day(), month(local.month()))
+            day_month(local.day(), local.month())
         } else {
-            format!("{} {} {}", local.day(), month(local.month()), local.year())
+            pgettext("jour, mois abrégé et année", "{day} {month} {year}")
+                .replace("{day}", &local.day().to_string())
+                .replace("{month}", &month(local.month()))
+                .replace("{year}", &local.year().to_string())
         }
     }
 }
@@ -1829,14 +1832,21 @@ pub fn relative_time(then: DateTime<FixedOffset>, now: DateTime<Utc>) -> String 
 /// Date complète du volet de discussion : « 20 nov. 2026, 14:32 ».
 pub fn full_date(then: DateTime<FixedOffset>) -> String {
     let local = then.with_timezone(&Local);
-    format!(
-        "{} {} {}, {:02}:{:02}",
-        local.day(),
-        month(local.month()),
-        local.year(),
-        local.hour(),
-        local.minute()
-    )
+    pgettext("date et heure d'un post", "{day} {month} {year}, {time}")
+        .replace("{day}", &local.day().to_string())
+        .replace("{month}", &month(local.month()))
+        .replace("{year}", &local.year().to_string())
+        .replace(
+            "{time}",
+            &format!("{:02}:{:02}", local.hour(), local.minute()),
+        )
+}
+
+/// « 20 nov. » (ou « Nov 20 » selon la langue).
+pub fn day_month(day: u32, month_number: u32) -> String {
+    pgettext("jour et mois abrégé", "{day} {month}")
+        .replace("{day}", &day.to_string())
+        .replace("{month}", &month(month_number))
 }
 
 #[cfg(test)]

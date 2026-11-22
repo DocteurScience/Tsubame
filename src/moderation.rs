@@ -9,7 +9,7 @@
 use std::cell::RefCell;
 use std::sync::Arc;
 
-use gettextrs::gettext;
+use gettextrs::{gettext, pgettext};
 use serde_json::{Value, json};
 
 use crate::api::{self, ApiError, request_failed};
@@ -51,9 +51,9 @@ impl Visibility {
 
     pub fn title(self) -> String {
         match self {
-            Visibility::Show => gettext("Afficher"),
-            Visibility::Warn => gettext("Avertir"),
-            Visibility::Hide => gettext("Masquer"),
+            Visibility::Show => pgettext("réglage d'une étiquette de contenu", "Afficher"),
+            Visibility::Warn => pgettext("réglage d'une étiquette de contenu", "Avertir"),
+            Visibility::Hide => pgettext("réglage d'une étiquette de contenu", "Masquer"),
         }
     }
 }

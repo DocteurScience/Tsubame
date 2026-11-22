@@ -7,7 +7,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 use adw::prelude::*;
-use gettextrs::{gettext, ngettext};
+use gettextrs::{gettext, ngettext, pgettext};
 use gtk::{gio, glib};
 
 use crate::api::{self, ApiError, AuthorFilter, Page, Source};
@@ -33,7 +33,7 @@ impl Tab {
             Tab::Posts => gettext("Posts"),
             Tab::Replies => gettext("Réponses"),
             Tab::Media => gettext("Médias"),
-            Tab::Likes => gettext("J'aime"),
+            Tab::Likes => pgettext("onglet du profil", "J'aime"),
         }
     }
 
@@ -51,14 +51,17 @@ impl Tab {
     }
 }
 
-/// Nombre avec séparateur des milliers à la française : « 1 284 ».
+/// Nombre avec le séparateur des milliers de la langue : « 1 284 », « 1,284 ».
 pub fn format_count(count: u64) -> String {
+    // Espace fine insécable (U+202F, écrite telle quelle : xgettext ne lit
+    // pas « \u{…} ») en français ; chaque traduction donne le sien (« , »
+    // en anglais).
+    let separator = pgettext("séparateur des milliers", " ");
     let digits = count.to_string();
     let mut out = String::new();
     for (i, digit) in digits.chars().enumerate() {
         if i > 0 && (digits.len() - i).is_multiple_of(3) {
-            // Espace fine insécable.
-            out.push('\u{202f}');
+            out.push_str(&separator);
         }
         out.push(digit);
     }
@@ -670,7 +673,7 @@ fn profile_menu(profile: &Profile) -> gio::Menu {
     let mute = if profile.muted {
         gettext("Ne plus masquer")
     } else {
-        gettext("Masquer")
+        pgettext("masquer un compte", "Masquer")
     };
     moderation.append(Some(&mute), Some("profile.mute"));
     let block = if profile.blocking.is_some() {

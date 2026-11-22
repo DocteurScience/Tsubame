@@ -32,7 +32,7 @@ mod tests {
     #[test]
     fn translated_strings_are_not_split_across_lines() {
         let pattern = regex::Regex::new(
-            r#"\bn?gettext\(\s*(?:"(?:[^"\\]|\\.)*"\s*,\s*)*"(?:[^"\\]|\\.)*\\\n"#,
+            r#"\b(?:n|p|np)?gettext\(\s*(?:"(?:[^"\\]|\\.)*"\s*,\s*)*"(?:[^"\\]|\\.)*\\\n"#,
         )
         .unwrap();
         let mut offenders = Vec::new();
@@ -65,7 +65,10 @@ mod tests {
     /// (`data.rs`) passent par une variable, déjà extraite ailleurs.
     #[test]
     fn translated_strings_are_literals() {
-        let pattern = regex::Regex::new(r#"\bn?gettext\(\s*[^"\s)]"#).unwrap();
+        let pattern = regex::Regex::new(
+            r#"\b(?:n|np)?gettext\(\s*[^"\s)]|\bpgettext\(\s*"[^"]*",\s*[^"\s)]"#,
+        )
+        .unwrap();
         let mut offenders = Vec::new();
         let mut dirs = vec![std::path::PathBuf::from(concat!(
             env!("CARGO_MANIFEST_DIR"),

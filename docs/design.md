@@ -124,7 +124,8 @@ Fils (`src/api.rs`) :
 - Le français est la langue source : les chaînes sont écrites en français dans le code, avec `gettext` et `ngettext` (`gettext-rs`), domaine `tsubame`. Le modèle `po/tsubame.pot` se génère avec `ninja -C <build> tsubame-pot` (non versionné) ; `po/LINGUAS` liste les traductions, installées par Meson.
 - xgettext lit le Rust comme du C. Deux règles, vérifiées par des tests (`src/i18n.rs`) : une chaîne traduite tient sur une ligne (sans « \ » de continuation, qui y garderait l'indentation) et elle est littérale (`gettext(variable)` ne serait jamais extrait). Le nombre d'un compteur se place dans la chaîne traduite (« {} abonnés »), pas devant.
 - Traduction anglaise : `po/en.po`, complète. Vérifiée en installant dans un préfixe et en lançant avec `LANG=en_US.UTF-8`.
-- Pas encore : séparateur de milliers selon la langue (« 1 284 » partout), dates et noms de mois selon la langue au-delà des abréviations traduites, contexte (`pgettext`) pour les chaînes ambiguës (« Abonné », « Following »).
+- Contexte (`pgettext`) pour les chaînes qui changent de sens : « Masquer » (un compte : « Mute » ; une étiquette : « Hide »), « Afficher », « Avertir », « J'aime » (onglet, liste), « Abonné », « Citer ». Le séparateur des milliers (« séparateur des milliers ») et l'ordre des dates (« {day} {month} », « {day} {month} {year}, {time} ») sont des chaînes traduites : « 1,284 », « Nov 20 » en anglais. Une chaîne traduite contient les caractères eux-mêmes, pas « \u{…} », que xgettext ne lit pas.
+- Pas encore : heure sur 12 heures selon la langue ; dates et durées des posts de démonstration, écrites en français dans les données.
 
 ## Limites de la proposition
 

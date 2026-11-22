@@ -10,7 +10,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 use adw::prelude::*;
-use gettextrs::gettext;
+use gettextrs::{gettext, pgettext};
 use gtk::{gdk, gio, glib};
 
 use crate::api::{self, NewImage, NewPost};
@@ -94,7 +94,7 @@ pub fn present(
         .title(if replying {
             gettext("Répondre")
         } else if quoting > 0 {
-            gettext("Citer")
+            pgettext("titre de la boîte de rédaction", "Citer")
         } else {
             gettext("Nouveau post")
         })

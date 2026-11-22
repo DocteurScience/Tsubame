@@ -2,7 +2,7 @@
 //! dans le volet de discussion.
 
 use adw::prelude::*;
-use gettextrs::{gettext, ngettext};
+use gettextrs::{gettext, ngettext, pgettext};
 use gtk::gio;
 
 use crate::data::{Media, Post, Reply};
@@ -194,7 +194,7 @@ fn add_warning(overlay: &gtk::Overlay, content: &gtk::Widget, warning: &str) {
         .build();
     inner.append(&title);
     let show = gtk::Button::builder()
-        .label(gettext("Afficher"))
+        .label(pgettext("voir une image floutée", "Afficher"))
         .halign(gtk::Align::Center)
         .css_classes(["pill"])
         .build();

@@ -62,7 +62,7 @@ fn list_time(then: DateTime<chrono::FixedOffset>, now: DateTime<Utc>) -> String 
     } else if today.pred_opt() == Some(day) {
         gettext("hier")
     } else {
-        format!("{} {}", local.day(), api::month(local.month()))
+        api::day_month(local.day(), local.month())
     }
 }
 
@@ -74,7 +74,7 @@ fn day_label(then: DateTime<chrono::FixedOffset>, now: DateTime<Utc>) -> String 
     } else if today.pred_opt() == Some(day) {
         gettext("Hier")
     } else {
-        format!("{} {}", day.day(), api::month(day.month()))
+        api::day_month(day.day(), day.month())
     }
 }
 
