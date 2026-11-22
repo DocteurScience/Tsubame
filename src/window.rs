@@ -904,13 +904,15 @@ impl State {
 
     /// Ouvre la boîte de rédaction : nouveau post, ou réponse au post de clé
     /// `reply_key`.
-    fn compose(self: &Rc<Self>, reply_key: Option<&str>) {
-        let reply_to = match reply_key {
-            Some(key) => match interactions::find(key) {
-                Some(entry) => Some(entry.post()),
-                None => return,
-            },
-            None => None,
+    /// Boîte de rédaction : nouveau post, réponse au post `reply_key` ou
+    /// citation du post `quote_key`.
+    fn compose(self: &Rc<Self>, reply_key: Option<&str>, quote_key: Option<&str>) {
+        let find = |key: Option<&str>| match key {
+            Some(key) => interactions::find(key).map(|entry| Some(entry.post())),
+            None => Some(None),
+        };
+        let (Some(reply_to), Some(quote)) = (find(reply_key), find(quote_key)) else {
+            return;
         };
         let weak = Rc::downgrade(self);
         compose::present(
@@ -918,6 +920,7 @@ impl State {
             &self.toasts,
             self.session.borrow().clone(),
             reply_to,
+            quote,
             move |parent_uri| {
                 // Une réponse au post affiché : recharger ses réponses.
                 let Some(state) = weak.upgrade() else { return };
@@ -1718,7 +1721,7 @@ fn install_actions(window: &adw::ApplicationWindow, state: &Rc<State>) {
     let weak = Rc::downgrade(state);
     compose.connect_activate(move |_, _| {
         if let Some(state) = weak.upgrade() {
-            state.compose(None);
+            state.compose(None, None);
         }
     });
     window.add_action(&compose);
@@ -1726,10 +1729,28 @@ fn install_actions(window: &adw::ApplicationWindow, state: &Rc<State>) {
     let weak = Rc::downgrade(state);
     reply.connect_activate(move |_, param| {
         if let (Some(state), Some(key)) = (weak.upgrade(), param.and_then(|p| p.str())) {
-            state.compose(Some(key));
+            state.compose(Some(key), None);
         }
     });
     window.add_action(&reply);
+    let quote = gio::SimpleAction::new("quote", Some(glib::VariantTy::STRING));
+    let weak = Rc::downgrade(state);
+    quote.connect_activate(move |_, param| {
+        if let (Some(state), Some(key)) = (weak.upgrade(), param.and_then(|p| p.str())) {
+            state.compose(None, Some(key));
+        }
+    });
+    window.add_action(&quote);
+    let open_post = gio::SimpleAction::new("open-post", Some(glib::VariantTy::STRING));
+    let weak = Rc::downgrade(state);
+    open_post.connect_activate(move |_, param| {
+        if let (Some(state), Some(key)) = (weak.upgrade(), param.and_then(|p| p.str()))
+            && let Some(entry) = interactions::find(key)
+        {
+            state.open_post_page(entry.post());
+        }
+    });
+    window.add_action(&open_post);
 
     for (name, which) in [
         ("toggle-like", Interaction::Like),

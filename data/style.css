@@ -213,3 +213,17 @@ columnsview > .column headerbar {
 .profile-count label {
   font-weight: normal;
 }
+
+/* Post cité dans une carte. */
+.quote-card {
+  margin-top: 6px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid alpha(currentColor, 0.15);
+  background: none;
+  font-weight: normal;
+}
+
+button.quote-card:hover {
+  background-color: alpha(currentColor, 0.05);
+}

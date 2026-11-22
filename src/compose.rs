@@ -65,12 +65,16 @@ pub fn present(
     toasts: &adw::ToastOverlay,
     session: Option<Arc<Session>>,
     reply_to: Option<Post>,
+    quote: Option<Post>,
     on_published: impl Fn(Option<String>) + 'static,
 ) {
     let replying = reply_to.is_some();
+    let quoting = usize::from(quote.is_some());
     let dialog = adw::Dialog::builder()
         .title(if replying {
             gettext("Répondre")
+        } else if quoting > 0 {
+            gettext("Citer")
         } else {
             gettext("Nouveau post")
         })
@@ -101,8 +105,12 @@ pub fn present(
         .margin_end(12)
         .build();
 
-    // Post auquel on répond, en rappel.
-    if let Some(post) = &reply_to {
+    // Post auquel on répond, ou post cité, en rappel.
+    let reminder = reply_to
+        .as_ref()
+        .map(|post| (post, gettext("En réponse à {}")))
+        .or_else(|| quote.as_ref().map(|post| (post, gettext("Citation de {}"))));
+    if let Some((post, title)) = reminder {
         let quoted = gtk::Box::builder()
             .orientation(gtk::Orientation::Vertical)
             .spacing(4)
@@ -110,7 +118,7 @@ pub fn present(
             .build();
         quoted.append(
             &gtk::Label::builder()
-                .label(gettext("En réponse à {}").replace("{}", &post.name))
+                .label(title.replace("{}", &post.name))
                 .xalign(0.0)
                 .css_classes(["caption-heading", "dim-label"])
                 .build(),
@@ -312,7 +320,8 @@ pub fn present(
             let images = attachments.borrow().len();
             images_area.set_visible(images > 0);
             add_image.set_sensitive(images < MAX_IMAGES && !busy.get());
-            let result = validate(&value, images);
+            // Une citation suffit, sans texte ni image.
+            let result = validate(&value, images + quoting);
             let count = match result {
                 Ok(n) | Err(n) => n,
             };
@@ -333,6 +342,8 @@ pub fn present(
         let update = update.clone();
         text.buffer().connect_changed(move |_| update());
     }
+    // État de départ : une citation peut se publier sans texte.
+    update();
 
     // Ajouter des images : sélecteur de fichiers du système (portail en
     // Flatpak).
@@ -436,6 +447,12 @@ pub fn present(
             cid: post.cid.clone()?,
         })
     });
+    let quote_ref = quote.as_ref().and_then(|post| {
+        Some(StrongRef {
+            uri: post.uri.clone()?,
+            cid: post.cid.clone()?,
+        })
+    });
     let reply = parent_ref.clone().map(|parent| {
         let root = reply_to
             .as_ref()
@@ -465,7 +482,7 @@ pub fn present(
                 .iter()
                 .map(|a| (a.bytes.to_vec(), a.alt.borrow().trim().to_owned()))
                 .collect();
-            if validate(&value, images.len()).is_err() || busy.get() {
+            if validate(&value, images.len() + quoting).is_err() || busy.get() {
                 return;
             }
             let Some(session) = session.clone() else {
@@ -486,6 +503,7 @@ pub fn present(
                 langs: vec![language.get().to_owned()],
                 reply: reply.clone(),
                 images: Vec::new(),
+                quote: quote_ref.clone(),
             };
             let task = runtime().spawn(async move {
                 // Images réduites et réencodées hors de la boucle GTK.

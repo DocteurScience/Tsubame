@@ -436,6 +436,66 @@ pub fn post_from_view(post: &PostView, now: DateTime<Utc>) -> Post {
         unread: false,
         labels: labels(post),
         pinned: viewer.and_then(|v| v.pinned).unwrap_or(false),
+        quote: quote(post, now),
+    }
+}
+
+/// Post cité par `post` (citation seule ou avec des images).
+fn quote(post: &PostView, now: DateTime<Utc>) -> Option<Box<Post>> {
+    use atrium_api::app::bsky::embed::record::ViewRecordRefs;
+    let view = match post.embed.as_ref()? {
+        Union::Refs(PostViewEmbedRefs::AppBskyEmbedRecordView(view)) => &**view,
+        Union::Refs(PostViewEmbedRefs::AppBskyEmbedRecordWithMediaView(with_media)) => {
+            &with_media.record
+        }
+        _ => return None,
+    };
+    let unavailable = |text: String| {
+        let mut post = crate::data::Post::unavailable();
+        post.text = text;
+        Some(Box::new(post))
+    };
+    match &view.record {
+        Union::Refs(ViewRecordRefs::ViewRecord(record)) => {
+            let indexed = parse_datetime(record.indexed_at.as_str());
+            let value = serde_json::to_value(&record.value).unwrap_or_default();
+            let mut quoted = crate::data::Post::unavailable();
+            quoted.uri = Some(record.uri.clone());
+            quoted.cid = serde_json::to_value(&record.cid)
+                .ok()
+                .and_then(|cid| cid.as_str().map(str::to_owned));
+            quoted.name = display_name(&record.author);
+            quoted.handle = record.author.handle.as_str().to_owned();
+            quoted.avatar = record.author.avatar.clone();
+            quoted.time = indexed.map(|t| relative_time(t, now)).unwrap_or_default();
+            quoted.date = indexed.map(full_date).unwrap_or_default();
+            quoted.text = value
+                .get("text")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or_default()
+                .to_owned();
+            quoted.replies = count(record.reply_count);
+            quoted.reposts = count(record.repost_count);
+            quoted.likes = count(record.like_count);
+            quoted.labels = record
+                .labels
+                .iter()
+                .flatten()
+                .filter(|label| label.neg != Some(true))
+                .map(|label| label.val.clone())
+                .collect();
+            Some(Box::new(quoted))
+        }
+        Union::Refs(ViewRecordRefs::ViewNotFound(_)) => {
+            unavailable(gettext("Le post cité a été supprimé."))
+        }
+        Union::Refs(ViewRecordRefs::ViewBlocked(_)) => unavailable(gettext(
+            "Le post cité n'est pas visible : un blocage l'empêche.",
+        )),
+        Union::Refs(ViewRecordRefs::ViewDetached(_)) => {
+            unavailable(gettext("Son auteur a retiré la citation de ce post."))
+        }
+        _ => None,
     }
 }
 
@@ -641,6 +701,7 @@ pub fn post_from_notification(
             unread: false,
             labels: Vec::new(),
             pinned: false,
+            quote: None,
         },
     };
     let author = &notification.author;
@@ -1179,6 +1240,8 @@ pub struct NewPost {
     pub reply: Option<(StrongRef, StrongRef)>,
     /// Images jointes (4 au plus), prêtes à l'envoi.
     pub images: Vec<NewImage>,
+    /// Post cité.
+    pub quote: Option<StrongRef>,
 }
 
 #[derive(Debug, Clone)]
@@ -1244,6 +1307,20 @@ pub fn post_record(
             })
             .collect();
         record["embed"] = json!({"$type": "app.bsky.embed.images", "images": images});
+    }
+    if let Some(quote) = &post.quote {
+        let quoted = json!({
+            "$type": "app.bsky.embed.record",
+            "record": {"uri": quote.uri, "cid": quote.cid},
+        });
+        record["embed"] = match record.get("embed").cloned() {
+            Some(media) => json!({
+                "$type": "app.bsky.embed.recordWithMedia",
+                "record": quoted,
+                "media": media,
+            }),
+            None => quoted,
+        };
     }
     if let Some((root, parent)) = &post.reply {
         record["reply"] = json!({
@@ -1763,6 +1840,7 @@ mod tests {
                 .into(),
             langs: vec!["fr".into()],
             reply: Some((root, parent)),
+            quote: None,
             images: Vec::new(),
         };
         let dids = HashMap::from([(
@@ -1803,6 +1881,7 @@ mod tests {
             text: String::new(),
             langs: vec!["fr".into()],
             reply: None,
+            quote: None,
             images: vec![image("Lever de soleil sur le Vercors"), image("")],
         };
         let blob = serde_json::json!({
@@ -1828,11 +1907,89 @@ mod tests {
     }
 
     #[test]
+    fn quotes_are_embedded_alone_or_with_images() {
+        let quoted = StrongRef {
+            uri: "at://did:plc:lucie/app.bsky.feed.post/1".into(),
+            cid: CID.into(),
+        };
+        let mut post = NewPost {
+            text: "Bien vu".into(),
+            langs: vec!["fr".into()],
+            reply: None,
+            quote: Some(quoted),
+            images: Vec::new(),
+        };
+        let record = post_record(&post, &HashMap::new(), "2026-11-20T15:00:00.000Z", &[]);
+        assert_eq!(record["embed"]["$type"], "app.bsky.embed.record");
+        assert_eq!(
+            record["embed"]["record"]["uri"],
+            "at://did:plc:lucie/app.bsky.feed.post/1"
+        );
+        let _: atrium_api::app::bsky::feed::post::Record = serde_json::from_value(record).unwrap();
+
+        post.images = vec![NewImage {
+            prepared: crate::photo::Prepared {
+                bytes: Vec::new(),
+                mime: "image/jpeg",
+                width: 10,
+                height: 10,
+            },
+            alt: String::new(),
+        }];
+        let blob = serde_json::json!({
+            "$type": "blob", "ref": {"$link": CID}, "mimeType": "image/jpeg", "size": 1
+        });
+        let record = post_record(&post, &HashMap::new(), "2026-11-20T15:00:00.000Z", &[blob]);
+        let embed = &record["embed"];
+        assert_eq!(embed["$type"], "app.bsky.embed.recordWithMedia");
+        assert_eq!(embed["record"]["$type"], "app.bsky.embed.record");
+        assert_eq!(embed["record"]["record"]["cid"], CID);
+        assert_eq!(embed["media"]["$type"], "app.bsky.embed.images");
+        let _: atrium_api::app::bsky::feed::post::Record = serde_json::from_value(record).unwrap();
+    }
+
+    #[test]
+    fn quoted_posts_are_read() {
+        let mut item: serde_json::Value = serde_json::from_str(FEED_ITEM).unwrap();
+        item["post"]["embed"] = serde_json::json!({
+            "$type": "app.bsky.embed.record#view",
+            "record": {
+                "$type": "app.bsky.embed.record#viewRecord",
+                "uri": "at://did:plc:lucie/app.bsky.feed.post/1",
+                "cid": CID,
+                "author": {"did": "did:plc:lucie", "handle": "lucie.example.social", "displayName": "Lucie Morel"},
+                "value": {"$type": "app.bsky.feed.post", "text": "GNOME 49 est sorti", "createdAt": "2026-11-20T14:00:00.000Z"},
+                "indexedAt": "2026-11-20T14:00:00.000Z"
+            }
+        });
+        let item: FeedViewPost = serde_json::from_value(item.clone()).unwrap();
+        let quoted = post_from_feed(&item, now()).quote.unwrap();
+        assert_eq!(quoted.name, "Lucie Morel");
+        assert_eq!(quoted.text, "GNOME 49 est sorti");
+        assert_eq!(quoted.cid.as_deref(), Some(CID));
+
+        let mut item: serde_json::Value = serde_json::from_str(FEED_ITEM).unwrap();
+        item["post"]["embed"] = serde_json::json!({
+            "$type": "app.bsky.embed.record#view",
+            "record": {
+                "$type": "app.bsky.embed.record#viewNotFound",
+                "uri": "at://did:plc:lucie/app.bsky.feed.post/1",
+                "notFound": true
+            }
+        });
+        let item: FeedViewPost = serde_json::from_value(item).unwrap();
+        let quoted = post_from_feed(&item, now()).quote.unwrap();
+        assert_eq!(quoted.uri, None);
+        assert_eq!(quoted.text, "Le post cité a été supprimé.");
+    }
+
+    #[test]
     fn plain_posts_have_no_facets_nor_reply() {
         let post = NewPost {
             text: "Bonjour".into(),
             langs: Vec::new(),
             reply: None,
+            quote: None,
             images: Vec::new(),
         };
         let record = post_record(&post, &HashMap::new(), "2026-11-20T15:00:00.000Z", &[]);

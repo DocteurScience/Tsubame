@@ -51,6 +51,39 @@ pub struct Post {
     pub labels: Vec<String>,
     /// Post épinglé en haut du profil de son auteur.
     pub pinned: bool,
+    /// Post cité. Sans adresse : supprimé ou invisible, avec la raison
+    /// dans le texte.
+    pub quote: Option<Box<Post>>,
+}
+
+impl Post {
+    /// Post vide, sans auteur : base des posts cités ou introuvables.
+    pub fn unavailable() -> Self {
+        Post {
+            uri: None,
+            cid: None,
+            like_uri: None,
+            repost_uri: None,
+            bookmarked: false,
+            reply_root: None,
+            context: None,
+            name: String::new(),
+            handle: String::new(),
+            time: String::new(),
+            date: String::new(),
+            text: String::new(),
+            avatar: None,
+            media: None,
+            replies: 0,
+            reposts: 0,
+            likes: 0,
+            thread: Vec::new(),
+            unread: false,
+            labels: Vec::new(),
+            pinned: false,
+            quote: None,
+        }
+    }
 }
 
 /// Liste de comptes (curation ou modération).
@@ -246,6 +279,7 @@ fn post(
         unread: false,
         labels: Vec::new(),
         pinned: false,
+        quote: None,
     }
 }
 
@@ -371,17 +405,20 @@ pub fn posts(feed: Feed) -> Vec<Post> {
                     63,
                 )
             },
-            post(
-                "Nadia Safi",
-                "nadia.example.social",
-                "3 h",
-                "20 nov., 11:40",
-                "Le glossaire de traduction est à jour : une cinquantaine de termes \
-                 harmonisés cette semaine.",
-                2,
-                4,
-                39,
-            ),
+            // Citation d'un autre post.
+            Post {
+                quote: Some(Box::new(lucie_gnome_49())),
+                ..post(
+                    "Nadia Safi",
+                    "nadia.example.social",
+                    "3 h",
+                    "20 nov., 11:40",
+                    "Et la traduction française est complète, glossaire à jour compris.",
+                    2,
+                    4,
+                    39,
+                )
+            },
             post(
                 "Romain Bailly",
                 "romain.example.social",

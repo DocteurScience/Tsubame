@@ -267,6 +267,9 @@ fn more_menu(post: &Post, key: &str) -> gtk::MenuButton {
     let menu = gio::Menu::new();
     let sharing = gio::Menu::new();
     sharing.append_item(&item(gettext("Copier le lien"), "win.copy-link", key));
+    if !post.handle.is_empty() {
+        sharing.append_item(&item(gettext("Citer le post…"), "win.quote", key));
+    }
     menu.append_section(None, &sharing);
     if crate::interactions::is_mine(post) {
         let mine = gio::Menu::new();
@@ -483,8 +486,81 @@ pub fn post_card(post: &Post) -> gtk::Box {
     if let Some(m) = &post.media {
         body.append(&media(m, crate::moderation::media_warning(post)));
     }
+    if let Some(quoted) = &post.quote {
+        body.append(&quote_card(quoted));
+    }
     body.append(&stats(post));
     card
+}
+
+/// Post cité, en petite carte dans celle du post. Un clic l'ouvre ; un
+/// post supprimé ou invisible n'affiche que la raison.
+fn quote_card(quoted: &Post) -> gtk::Widget {
+    let body = gtk::Box::builder()
+        .orientation(gtk::Orientation::Vertical)
+        .spacing(4)
+        .build();
+    if quoted.handle.is_empty() {
+        body.append(&label(&quoted.text, &["dim-label"]));
+        let frame = gtk::Box::builder().css_classes(["quote-card"]).build();
+        frame.append(&body);
+        return frame.upcast();
+    }
+    let header = gtk::Box::builder().spacing(6).build();
+    let avatar = adw::Avatar::builder()
+        .size(20)
+        .text(&quoted.name)
+        .show_initials(true)
+        .build();
+    if let Some(url) = &quoted.avatar {
+        let weak = avatar.downgrade();
+        images::load(url, move |texture| {
+            if let Some(avatar) = weak.upgrade() {
+                avatar.set_custom_image(Some(texture));
+            }
+        });
+    }
+    header.append(&avatar);
+    let name = label(&quoted.name, &["heading"]);
+    name.set_ellipsize(gtk::pango::EllipsizeMode::End);
+    name.set_wrap(false);
+    header.append(&name);
+    let detail = label(
+        &format!("@{} · {}", quoted.handle, quoted.time),
+        &["dim-label", "caption"],
+    );
+    detail.set_ellipsize(gtk::pango::EllipsizeMode::End);
+    detail.set_wrap(false);
+    detail.set_hexpand(true);
+    header.append(&detail);
+    body.append(&header);
+    if !quoted.text.is_empty() {
+        let text = label(&quoted.text, &[]);
+        text.set_lines(6);
+        text.set_ellipsize(gtk::pango::EllipsizeMode::End);
+        body.append(&text);
+    }
+    // Le post cité peut déjà être affiché ailleurs : on garde son état
+    // (j'aime, repost) plutôt que de le remplacer par la vue de citation,
+    // qui n'en a pas.
+    let key = crate::interactions::key(quoted);
+    let entry =
+        crate::interactions::find(&key).unwrap_or_else(|| crate::interactions::register(quoted));
+    let button = gtk::Button::builder()
+        .child(&body)
+        .css_classes(["quote-card"])
+        .action_name("win.open-post")
+        .action_target(&entry.key.to_variant())
+        .build();
+    button.update_property(&[gtk::accessible::Property::Label(&fill(
+        gettext("Post cité de {} : {}"),
+        &[&quoted.name, &quoted.text],
+    ))]);
+    // La carte garde l'entrée en vie, pour que le clic la retrouve.
+    button.connect_destroy(move |_| {
+        let _ = &entry;
+    });
+    button.upcast()
 }
 
 /// Carte d'une réponse dans le volet de discussion.
@@ -532,6 +608,9 @@ pub fn post_detail(post: &Post) -> gtk::Box {
     body.append(&label(&post.text, &["post-detail-text"]));
     if let Some(m) = &post.media {
         body.append(&media(m, crate::moderation::media_warning(post)));
+    }
+    if let Some(quoted) = &post.quote {
+        body.append(&quote_card(quoted));
     }
 
     // Les boutons passent à la ligne quand le volet est étroit.
