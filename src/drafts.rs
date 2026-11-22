@@ -14,6 +14,9 @@ pub struct Draft {
     /// Identifiant : l'heure de la première sauvegarde (RFC 3339).
     pub id: String,
     pub text: String,
+    /// Posts suivants du fil, le cas échéant.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub more: Vec<String>,
     pub lang: String,
     /// Heure de la dernière sauvegarde (RFC 3339).
     pub saved: String,
@@ -84,6 +87,7 @@ mod tests {
         Draft {
             id: id.into(),
             text: text.into(),
+            more: Vec::new(),
             lang: "fr".into(),
             saved: id.into(),
         }

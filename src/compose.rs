@@ -21,6 +21,25 @@ use crate::photo;
 use crate::richtext::{MAX_GRAPHEMES, grapheme_count};
 use crate::runtime::runtime;
 
+/// Posts ajoutés au fil, au plus, après le premier.
+const MAX_FOLLOWUPS: usize = 9;
+
+/// Post suivant du fil : sa ligne, son texte et son compteur.
+struct Followup {
+    row: gtk::Box,
+    view: gtk::TextView,
+    counter: gtk::Label,
+}
+
+impl Followup {
+    fn text(&self) -> String {
+        let buffer = self.view.buffer();
+        buffer
+            .text(&buffer.start_iter(), &buffer.end_iter(), false)
+            .to_string()
+    }
+}
+
 /// Langues proposées, sous leur propre nom.
 const LANGUAGES: [(&str, &str); 6] = [
     ("fr", "Français"),
@@ -245,6 +264,25 @@ pub fn present(
     );
     content.insert_child_after(&images_area, Some(&row));
 
+    // Fil : posts suivants (texte seul), publiés en réponses successives.
+    let thread_box = gtk::Box::builder()
+        .orientation(gtk::Orientation::Vertical)
+        .spacing(12)
+        .build();
+    let add_to_thread = gtk::Button::builder()
+        .child(
+            &adw::ButtonContent::builder()
+                .icon_name("list-add-symbolic")
+                .label(gettext("Ajouter un post au fil"))
+                .build(),
+        )
+        .halign(gtk::Align::Start)
+        .css_classes(["flat"])
+        .build();
+    thread_box.append(&add_to_thread);
+    content.insert_child_after(&thread_box, Some(&images_area));
+    let followups: Rc<RefCell<Vec<Followup>>> = Rc::default();
+
     // Barre du bas : langue, compteur.
     let language = Rc::new(Cell::new(default_language()));
     let language_menu = gio::Menu::new();
@@ -402,6 +440,8 @@ pub fn present(
             images_area,
             drafts_button,
             saved_drafts,
+            followups,
+            add_to_thread,
         ) = (
             publish.clone(),
             counter.clone(),
@@ -414,6 +454,8 @@ pub fn present(
             images_area.clone(),
             drafts_button.clone(),
             saved_drafts.clone(),
+            followups.clone(),
+            add_to_thread.clone(),
         );
         Rc::new(move || {
             let buffer = text.buffer();
@@ -435,15 +477,136 @@ pub fn present(
                 counter.add_css_class("dim-label");
             }
             placeholder.set_visible(value.is_empty());
+            // Posts suivants : chacun non vide et sous la limite.
+            let mut thread_ok = true;
+            let mut thread_empty = true;
+            for followup in followups.borrow().iter() {
+                let value = followup.text();
+                let count = grapheme_count(&value);
+                followup
+                    .counter
+                    .set_label(&format!("{count} / {MAX_GRAPHEMES}"));
+                let bad = value.trim().is_empty() || count > MAX_GRAPHEMES;
+                if count > MAX_GRAPHEMES {
+                    followup.counter.add_css_class("error");
+                } else {
+                    followup.counter.remove_css_class("error");
+                }
+                thread_ok &= !bad;
+                thread_empty &= value.trim().is_empty();
+            }
+            add_to_thread.set_sensitive(followups.borrow().len() < MAX_FOLLOWUPS && !busy.get());
             drafts_button
                 .set_visible(value.is_empty() && can_draft && !saved_drafts.borrow().is_empty());
-            publish.set_sensitive(result.is_ok() && !busy.get());
-            dialog.set_can_close(value.trim().is_empty() && images == 0);
+            publish.set_sensitive(result.is_ok() && thread_ok && !busy.get());
+            dialog.set_can_close(value.trim().is_empty() && images == 0 && thread_empty);
         })
     };
     {
         let update = update.clone();
         text.buffer().connect_changed(move |_| update());
+    }
+
+    // Ajouter un post au fil (vide, ou avec le texte d'un brouillon).
+    let add_followup: Rc<dyn Fn(&str)> = {
+        let (thread_box, add_to_thread, followups, update, author) = (
+            thread_box.clone(),
+            add_to_thread.clone(),
+            followups.clone(),
+            update.clone(),
+            author.clone(),
+        );
+        Rc::new(move |initial: &str| {
+            if followups.borrow().len() >= MAX_FOLLOWUPS {
+                return;
+            }
+            let view = gtk::TextView::builder()
+                .wrap_mode(gtk::WrapMode::WordChar)
+                .accepts_tab(false)
+                .hexpand(true)
+                .height_request(60)
+                .top_margin(6)
+                .css_classes(["compose-text"])
+                .build();
+            view.buffer().set_text(initial);
+            let number = followups.borrow().len() + 2;
+            view.update_property(&[gtk::accessible::Property::Label(
+                &gettext("Post {} du fil").replace("{}", &number.to_string()),
+            )]);
+            let counter = gtk::Label::builder()
+                .halign(gtk::Align::End)
+                .css_classes(["dim-label", "numeric", "caption"])
+                .build();
+            let remove = gtk::Button::builder()
+                .icon_name("window-close-symbolic")
+                .tooltip_text(gettext("Retirer ce post du fil"))
+                .valign(gtk::Align::Start)
+                .css_classes(["flat", "circular"])
+                .build();
+            remove.update_property(&[gtk::accessible::Property::Label(&gettext(
+                "Retirer ce post du fil",
+            ))]);
+            let column = gtk::Box::builder()
+                .orientation(gtk::Orientation::Vertical)
+                .hexpand(true)
+                .build();
+            column.append(&view);
+            column.append(&counter);
+            let row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
+            row.append(
+                &adw::Avatar::builder()
+                    .size(32)
+                    .text(&author)
+                    .show_initials(true)
+                    .valign(gtk::Align::Start)
+                    .margin_start(4)
+                    .margin_end(4)
+                    .build(),
+            );
+            row.append(&column);
+            row.append(&remove);
+            thread_box.insert_child_after(
+                &row,
+                followups
+                    .borrow()
+                    .last()
+                    .map(|f| f.row.upcast_ref::<gtk::Widget>()),
+            );
+            if followups.borrow().is_empty() {
+                thread_box.reorder_child_after(&row, None::<&gtk::Widget>);
+            }
+            thread_box.reorder_child_after(&add_to_thread, Some(&row));
+            {
+                let update = update.clone();
+                view.buffer().connect_changed(move |_| update());
+            }
+            {
+                let (followups, thread_box, update) =
+                    (followups.clone(), thread_box.clone(), update.clone());
+                let weak_row = row.downgrade();
+                remove.connect_clicked(move |_| {
+                    let Some(row) = weak_row.upgrade() else {
+                        return;
+                    };
+                    followups.borrow_mut().retain(|f| f.row != row);
+                    thread_box.remove(&row);
+                    update();
+                });
+            }
+            followups.borrow_mut().push(Followup {
+                row,
+                view: view.clone(),
+                counter,
+            });
+            update();
+            if initial.is_empty() {
+                view.grab_focus();
+            }
+        })
+    };
+    {
+        let add_followup = add_followup.clone();
+        add_to_thread.connect_clicked(move |_| add_followup(""));
     }
 
     // Brouillons : la liste, et le choix d'un brouillon qui remplit la boîte.
@@ -456,6 +619,7 @@ pub fn present(
             language_action.clone(),
             drafts_button.clone(),
         );
+        let (followups, add_followup) = (followups.clone(), add_followup.clone());
         drafts_list.connect_row_activated(move |_, row| {
             let draft = saved_drafts.borrow().get(row.index() as usize).cloned();
             let Some(draft) = draft else { return };
@@ -463,6 +627,14 @@ pub fn present(
             draft_id.replace(Some(draft.id.clone()));
             language_action.change_state(&draft.lang.to_variant());
             text.buffer().set_text(&draft.text);
+            for followup in followups.borrow_mut().drain(..) {
+                if let Some(parent) = followup.row.parent().and_downcast::<gtk::Box>() {
+                    parent.remove(&followup.row);
+                }
+            }
+            for more in &draft.more {
+                add_followup(more);
+            }
             text.grab_focus();
         });
     }
@@ -588,6 +760,7 @@ pub fn present(
             attachments.clone(),
             error.clone(),
         );
+        let followups = followups.clone();
         dialog.connect_close_attempt(move |dialog| {
             let has_images = !attachments.borrow().is_empty();
             let body = if can_draft && has_images {
@@ -631,6 +804,12 @@ pub fn present(
                 draft_id.clone(),
                 error.clone(),
             );
+            let more: Vec<String> = followups
+                .borrow()
+                .iter()
+                .map(Followup::text)
+                .filter(|t| !t.trim().is_empty())
+                .collect();
             confirm.connect_response(Some("save"), move |_, _| {
                 let Some(dialog) = weak.upgrade() else { return };
                 let buffer = text.buffer();
@@ -640,6 +819,7 @@ pub fn present(
                     text: buffer
                         .text(&buffer.start_iter(), &buffer.end_iter(), false)
                         .to_string(),
+                    more: more.clone(),
                     lang: language.get().to_owned(),
                     saved: now,
                 };
@@ -695,7 +875,19 @@ pub fn present(
             attachments.clone(),
             draft_id.clone(),
         );
+        let followups = followups.clone();
         move || {
+            let more: Vec<String> = followups
+                .borrow()
+                .iter()
+                .map(|f| f.text().trim().to_owned())
+                .collect();
+            if more
+                .iter()
+                .any(|t| t.is_empty() || grapheme_count(t) > MAX_GRAPHEMES)
+            {
+                return;
+            }
             let buffer = text.buffer();
             let value = buffer
                 .text(&buffer.start_iter(), &buffer.end_iter(), false)
@@ -748,8 +940,39 @@ pub fn present(
                     post.images.push(NewImage { prepared, alt });
                 }
                 // En boîte : le futur de publication est profond.
-                Box::pin(api::publish(session, post)).await
+                let langs = post.langs.clone();
+                let root = post.reply.as_ref().map(|(root, _)| root.clone());
+                let published = Box::pin(api::publish(session.clone(), post)).await?;
+                // Posts suivants : chacun répond au précédent. Un échec
+                // arrête le fil, sans rien republier.
+                let root = root.unwrap_or_else(|| published.post.clone());
+                let mut parent = published.post.clone();
+                let mut failure = None;
+                let mut done = 0;
+                for text in more {
+                    let next = NewPost {
+                        text,
+                        langs: langs.clone(),
+                        reply: Some((root.clone(), parent.clone())),
+                        images: Vec::new(),
+                        quote: None,
+                        reply_rule: api::ReplyRule::Everyone,
+                        no_quotes: false,
+                    };
+                    match Box::pin(api::publish(session.clone(), next)).await {
+                        Ok(next) => {
+                            parent = next.post;
+                            done += 1;
+                        }
+                        Err(error) => {
+                            failure = Some(error);
+                            break;
+                        }
+                    }
+                }
+                Ok((published, done, failure))
             });
+            let total = followups.borrow().len();
             let (dialog, text, publish, error, toasts, busy, on_published, parent_uri) = (
                 dialog.clone(),
                 text.clone(),
@@ -769,12 +992,19 @@ pub fn present(
                 });
                 busy.set(false);
                 match result {
-                    Ok(published) => {
-                        toasts.add_toast(adw::Toast::new(&if published.gates_failed {
+                    Ok((published, done, failure)) => {
+                        toasts.add_toast(adw::Toast::new(&if let Some(failure) = failure {
+                            glib::g_debug!("tsubame", "fil : {}", failure.message);
+                            gettext("Fil publié en partie : {} posts sur {}.")
+                                .replacen("{}", &(done + 1).to_string(), 1)
+                                .replacen("{}", &(total + 1).to_string(), 1)
+                        } else if published.gates_failed {
                             gettext(
                                 "Post publié, mais ses réglages de réponse et de citation \
                                  n'ont pas été enregistrés.",
                             )
+                        } else if total > 0 {
+                            gettext("Fil publié.")
                         } else if parent_uri.is_some() {
                             gettext("Réponse publiée.")
                         } else {

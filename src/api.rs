@@ -1324,9 +1324,10 @@ pub fn gate_records(
     records
 }
 
-/// Publication réussie. `gates_failed` : les réglages de réponse ou de citation
+/// Post publié. `gates_failed` : les réglages de réponse ou de citation
 /// n'ont pas pu être enregistrés, alors que le post l'a été.
 pub struct Published {
+    pub post: StrongRef,
     pub gates_failed: bool,
 }
 
@@ -1547,7 +1548,10 @@ pub async fn publish(session: Arc<Session>, post: NewPost) -> Result<Published, 
             gates_failed = true;
         }
     }
-    Ok(Published { gates_failed })
+    Ok(Published {
+        post: published,
+        gates_failed,
+    })
 }
 
 fn glib_debug(message: &str) {
