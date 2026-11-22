@@ -1093,6 +1093,26 @@ impl State {
         });
     }
 
+    /// Comptes qui ont aimé le post `key`.
+    fn show_likers(self: &Rc<Self>, key: &str) {
+        self.show_people(key, api::People::Likers);
+    }
+
+    fn show_reposters(self: &Rc<Self>, key: &str) {
+        self.show_people(key, api::People::Reposters);
+    }
+
+    fn show_people(self: &Rc<Self>, key: &str, people: fn(String) -> api::People) {
+        let Some(post) = interactions::find(key).map(|entry| entry.post()) else {
+            return;
+        };
+        let subtitle = gettext("Post de {}").replace("{}", &post.name);
+        let host = self.profile_host();
+        let page =
+            crate::feed_page::people_page(people(post.uri.unwrap_or_default()), &subtitle, &host);
+        (host.push)(page);
+    }
+
     /// Supprimer un de mes posts, après confirmation.
     fn confirm_delete(self: &Rc<Self>, key: &str) {
         let (Some(window), Some(post)) = (
@@ -1696,6 +1716,8 @@ fn install_actions(window: &adw::ApplicationWindow, state: &Rc<State>) {
         ("report-post", State::report_post),
         ("report-author", State::report_author),
         ("delete-post", State::confirm_delete),
+        ("show-likers", State::show_likers),
+        ("show-reposters", State::show_reposters),
         ("pin-post", State::toggle_pin),
     ] {
         let action = gio::SimpleAction::new(name, Some(glib::VariantTy::STRING));

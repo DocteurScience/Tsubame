@@ -624,6 +624,58 @@ fn action_button(icon: &str, text: String) -> gtk::Button {
         .build()
 }
 
+/// « 31 j'aime · 2 reposts » sous le post ouvert : chaque compteur ouvre la
+/// liste des comptes concernés. Les compteurs suivent les interactions.
+fn people_links(entry: &Rc<Interactions>) -> gtk::Box {
+    let row = gtk::Box::builder().spacing(4).margin_top(6).build();
+    let link = |action: &str| {
+        let label = gtk::Label::builder().use_markup(true).build();
+        let button = gtk::Button::builder()
+            .child(&label)
+            .action_name(action)
+            .action_target(&entry.key.to_variant())
+            .css_classes(["flat", "profile-count"])
+            .build();
+        (button, label)
+    };
+    let (likes, likes_label) = link("win.show-likers");
+    let (reposts, reposts_label) = link("win.show-reposters");
+    row.append(&likes);
+    row.append(&reposts);
+    // Références faibles : l'état du post survit aux cartes.
+    let widgets = [
+        (likes.downgrade(), likes_label.downgrade()),
+        (reposts.downgrade(), reposts_label.downgrade()),
+    ];
+    let update = move |which: Interaction, toggle: &Toggle| {
+        let index = match which {
+            Interaction::Like => 0,
+            Interaction::Repost => 1,
+            Interaction::Bookmark => return,
+        };
+        let (Some(button), Some(label)) = (widgets[index].0.upgrade(), widgets[index].1.upgrade())
+        else {
+            return;
+        };
+        let (one, many, tooltip) = match which {
+            Interaction::Like => ("{} j'aime", "{} j'aime", gettext("Voir qui a aimé")),
+            _ => ("{} repost", "{} reposts", gettext("Voir qui a reposté")),
+        };
+        let words = ngettext(one, many, toggle.count);
+        label.set_label(&format!(
+            "<b>{}</b> {}",
+            toggle.count,
+            gtk::glib::markup_escape_text(words.trim_start_matches("{} "))
+        ));
+        button.set_tooltip_text(Some(&tooltip));
+        button.set_visible(toggle.count > 0);
+    };
+    update(Interaction::Like, &entry.get(Interaction::Like));
+    update(Interaction::Repost, &entry.get(Interaction::Repost));
+    entry.connect(move |which, toggle| update(which, toggle));
+    row
+}
+
 /// Post ouvert en grand en tête du volet de discussion.
 pub fn post_detail(post: &Post) -> gtk::Box {
     let (card, body) = card_frame(
@@ -656,6 +708,7 @@ pub fn post_detail(post: &Post) -> gtk::Box {
         .margin_top(8)
         .build();
     let entry = interactions::register(post);
+    body.append(&people_links(&entry));
     let reply = action_button("mail-reply-sender-symbolic", gettext("Répondre"));
     reply.set_action_name(Some("win.reply"));
     reply.set_action_target_value(Some(&entry.key.to_variant()));

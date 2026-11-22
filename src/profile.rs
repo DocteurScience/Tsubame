@@ -393,10 +393,14 @@ impl ProfilePage {
                 } else {
                     profile.did.clone()
                 };
-                (page.host.push)(crate::feed_page::connections_page(
-                    &actor,
+                let people = if followers {
+                    api::People::Followers(actor)
+                } else {
+                    api::People::Follows(actor)
+                };
+                (page.host.push)(crate::feed_page::people_page(
+                    people,
                     &profile.name,
-                    followers,
                     &page.host,
                 ));
             });

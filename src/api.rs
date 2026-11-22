@@ -1196,8 +1196,101 @@ pub async fn list_members(session: Arc<Session>, uri: String) -> Result<Vec<Acto
         .collect())
 }
 
+/// Liste de comptes : abonnés ou abonnements d'un compte (DID ou
+/// identifiant), comptes qui ont aimé ou reposté un post (adresse).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum People {
+    Followers(String),
+    Follows(String),
+    Likers(String),
+    Reposters(String),
+}
+
+impl People {
+    pub fn title(&self) -> String {
+        match self {
+            People::Followers(_) => gettext("Abonnés"),
+            People::Follows(_) => gettext("Abonnements"),
+            People::Likers(_) => gettext("J'aime"),
+            People::Reposters(_) => gettext("Reposts"),
+        }
+    }
+
+    pub fn empty(&self) -> String {
+        match self {
+            People::Followers(_) => gettext("Aucun abonné pour l'instant."),
+            People::Follows(_) => gettext("Aucun abonnement pour l'instant."),
+            People::Likers(_) => gettext("Personne n'a encore aimé ce post."),
+            People::Reposters(_) => gettext("Personne n'a encore reposté ce post."),
+        }
+    }
+}
+
+/// Une page de la liste, par 50, avec la suite.
+pub async fn people(
+    session: Arc<Session>,
+    people: People,
+    cursor: Option<String>,
+) -> Result<(Vec<Actor>, Option<String>), ApiError> {
+    use atrium_api::app::bsky::feed::{get_likes, get_reposted_by};
+    match people {
+        People::Followers(actor) => Box::pin(connections(session, actor, true, cursor)).await,
+        People::Follows(actor) => Box::pin(connections(session, actor, false, cursor)).await,
+        People::Likers(uri) => {
+            let api = session.api().await?;
+            let output = Box::pin(
+                api.api.app.bsky.feed.get_likes(
+                    get_likes::ParametersData {
+                        cid: None,
+                        cursor,
+                        limit: 50.try_into().ok(),
+                        uri,
+                    }
+                    .into(),
+                ),
+            )
+            .await
+            .map_err(request_failed)?;
+            Ok((
+                output
+                    .data
+                    .likes
+                    .iter()
+                    .map(|like| actor_from_view(&like.actor))
+                    .collect(),
+                output.data.cursor,
+            ))
+        }
+        People::Reposters(uri) => {
+            let api = session.api().await?;
+            let output = Box::pin(
+                api.api.app.bsky.feed.get_reposted_by(
+                    get_reposted_by::ParametersData {
+                        cid: None,
+                        cursor,
+                        limit: 50.try_into().ok(),
+                        uri,
+                    }
+                    .into(),
+                ),
+            )
+            .await
+            .map_err(request_failed)?;
+            Ok((
+                output
+                    .data
+                    .reposted_by
+                    .iter()
+                    .map(actor_from_view)
+                    .collect(),
+                output.data.cursor,
+            ))
+        }
+    }
+}
+
 /// Abonnés (`followers` vrai) ou abonnements d'un compte, par pages de 50.
-pub async fn connections(
+async fn connections(
     session: Arc<Session>,
     actor: String,
     followers: bool,

@@ -354,19 +354,10 @@ impl ListsPage {
     }
 }
 
-/// Abonnés (`followers` vrai) ou abonnements du compte `actor`, avec la
-/// suite au défilement.
-pub fn connections_page(
-    actor: &str,
-    name: &str,
-    followers: bool,
-    host: &Host,
-) -> adw::NavigationPage {
-    let title = if followers {
-        gettext("Abonnés")
-    } else {
-        gettext("Abonnements")
-    };
+/// Liste de comptes (abonnés, abonnements, j'aime, reposts), avec la
+/// suite au défilement. `subtitle` : le compte ou le post concerné.
+pub fn people_page(people: api::People, subtitle: &str, host: &Host) -> adw::NavigationPage {
+    let title = people.title();
     let rows = boxed_list(&title);
     let scroll = scrolled(&rows);
     let stack = gtk::Stack::new();
@@ -377,7 +368,7 @@ pub fn connections_page(
     let root = adw::ToolbarView::builder().content(&stack).build();
     root.add_top_bar(
         &adw::HeaderBar::builder()
-            .title_widget(&adw::WindowTitle::new(&title, name))
+            .title_widget(&adw::WindowTitle::new(&title, subtitle))
             .build(),
     );
     let page = adw::NavigationPage::builder()
@@ -397,8 +388,7 @@ pub fn connections_page(
     // Page suivante : `None` avant la première, `Some(None)` à la fin.
     struct Loader {
         session: std::sync::Arc<crate::auth::Session>,
-        actor: String,
-        followers: bool,
+        people: api::People,
         rows: gtk::ListBox,
         stack: gtk::Stack,
         error: adw::StatusPage,
@@ -417,10 +407,9 @@ pub fn connections_page(
             if self.loading.replace(true) {
                 return;
             }
-            let task = runtime().spawn(api::connections(
+            let task = runtime().spawn(api::people(
                 self.session.clone(),
-                self.actor.clone(),
-                self.followers,
+                self.people.clone(),
                 cursor,
             ));
             let weak = Rc::downgrade(self);
@@ -443,11 +432,7 @@ pub fn connections_page(
                         this.cursor
                             .replace(Some(cursor.filter(|_| !actors.is_empty())));
                         if first && actors.is_empty() {
-                            this.error.set_title(&if this.followers {
-                                gettext("Aucun abonné pour l'instant.")
-                            } else {
-                                gettext("Aucun abonnement pour l'instant.")
-                            });
+                            this.error.set_title(&this.people.empty());
                             this.stack.set_visible_child_name("error");
                         } else {
                             this.stack.set_visible_child_name("list");
@@ -465,8 +450,7 @@ pub fn connections_page(
     }
     let loader = Rc::new(Loader {
         session,
-        actor: actor.to_owned(),
-        followers,
+        people,
         rows,
         stack,
         error,
