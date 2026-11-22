@@ -1398,7 +1398,7 @@ impl State {
     fn load(self: &Rc<Self>, target: Target, more: bool) {
         let session = self.session.borrow().clone();
         self.with_column(target, |column| {
-            let (session, source) = match (session, column.kind.source()) {
+            let (session, source) = match (session, column.source()) {
                 (None, _) => {
                     if !more {
                         column.show_demo();

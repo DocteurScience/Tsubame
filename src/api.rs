@@ -35,6 +35,8 @@ pub enum Source {
     Feed(String),
     /// Notifications (`listNotifications`).
     Notifications,
+    /// Mentions, réponses et citations seulement.
+    Mentions,
     /// Posts d'un compte (`getAuthorFeed`), par son DID ou identifiant.
     Author { actor: String, filter: AuthorFilter },
     /// Posts aimés par un compte (`getActorLikes`) : seulement le sien.
@@ -112,7 +114,10 @@ pub async fn load(
     let api = session.api().await?;
     let limit = PAGE_SIZE.try_into().ok();
     let (feed, cursor) = match source {
-        Source::Notifications => return notifications(&api, cursor).await,
+        Source::Notifications => return notifications(&api, cursor, None).await,
+        Source::Mentions => {
+            return notifications(&api, cursor, Some(MENTION_REASONS)).await;
+        }
         Source::Bookmarks => {
             let output = api
                 .api
@@ -580,7 +585,14 @@ async fn posts_by_uri(
     Ok(posts)
 }
 
-async fn notifications(api: &crate::auth::Api, cursor: Option<String>) -> Result<Page, ApiError> {
+/// Raisons de notification gardées par le filtre « Mentions ».
+pub const MENTION_REASONS: &[&str] = &["mention", "reply", "quote"];
+
+async fn notifications(
+    api: &crate::auth::Api,
+    cursor: Option<String>,
+    reasons: Option<&[&str]>,
+) -> Result<Page, ApiError> {
     let output = api
         .api
         .app
@@ -591,7 +603,7 @@ async fn notifications(api: &crate::auth::Api, cursor: Option<String>) -> Result
                 cursor,
                 limit: PAGE_SIZE.try_into().ok(),
                 priority: None,
-                reasons: None,
+                reasons: reasons.map(|r| r.iter().map(|r| (*r).to_owned()).collect()),
                 seen_at: None,
             }
             .into(),

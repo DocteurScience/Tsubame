@@ -522,6 +522,20 @@ pub fn posts(feed: Feed) -> Vec<Post> {
 
 /// Notifications : posts précédés d'un contexte, comme dans la maquette
 /// `Colonnes.dc.html`.
+/// Notifications de démonstration qui sont des mentions, réponses ou
+/// citations.
+pub fn demo_mentions() -> Vec<Post> {
+    let kept = [
+        gettextrs::gettext("a répondu à votre post"),
+        gettextrs::gettext("vous a mentionné"),
+        gettextrs::gettext("a cité votre post"),
+    ];
+    notifications()
+        .into_iter()
+        .filter(|post| post.context.as_ref().is_some_and(|c| kept.contains(c)))
+        .collect()
+}
+
 pub fn notifications() -> Vec<Post> {
     // Les deux plus récentes ne sont pas encore vues.
     let mut unread = 2;
@@ -590,4 +604,21 @@ pub fn notifications() -> Vec<Post> {
             ),
         ),
     ]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn demo_mentions_keep_replies_and_mentions_only() {
+        let all = notifications();
+        let mentions = demo_mentions();
+        assert!(!mentions.is_empty());
+        assert!(mentions.len() < all.len());
+        assert!(mentions.iter().all(|post| {
+            let context = post.context.as_deref().unwrap_or_default();
+            !context.contains("aimé")
+        }));
+    }
 }

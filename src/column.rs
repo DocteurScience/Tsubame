@@ -1,5 +1,6 @@
 //! Une colonne de cartes : en-tête (titre, fermeture) et liste de posts.
 
+use std::cell::Cell;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -157,6 +158,10 @@ pub struct Column {
     refresh: gtk::Button,
     /// Les cartes et leurs états.
     pub posts: PostList,
+    /// Notifications : « Mentions » choisi plutôt que « Toutes ».
+    mentions_only: Rc<Cell<bool>>,
+    /// Boutons « Toutes » et « Mentions » (colonne Notifications).
+    filters: Vec<gtk::ToggleButton>,
 }
 
 impl Column {
@@ -241,6 +246,41 @@ impl Column {
             .build();
         root.add_top_bar(&header);
 
+        // Notifications : « Toutes » ou « Mentions » (boutons liés, à
+        // remplacer par AdwToggleGroup avec libadwaita 1.7).
+        let mentions_only = Rc::new(Cell::new(false));
+        let mut filters = Vec::new();
+        if kind == ColumnKind::Notifications {
+            let bar = gtk::Box::builder()
+                .css_classes(["linked"])
+                .halign(gtk::Align::Center)
+                .margin_top(6)
+                .margin_bottom(6)
+                .accessible_role(gtk::AccessibleRole::Group)
+                .build();
+            bar.update_property(&[gtk::accessible::Property::Label(&gettext(
+                "Notifications à afficher",
+            ))]);
+            for (label, mentions) in [(gettext("Toutes"), false), (gettext("Mentions"), true)] {
+                let button = gtk::ToggleButton::builder()
+                    .label(label)
+                    .active(!mentions)
+                    .build();
+                if let Some(first) = filters.first() {
+                    button.set_group(Some(first));
+                }
+                let mentions_only = mentions_only.clone();
+                button.connect_toggled(move |button| {
+                    if button.is_active() {
+                        mentions_only.set(mentions);
+                    }
+                });
+                bar.append(&button);
+                filters.push(button);
+            }
+            root.add_top_bar(&bar);
+        }
+
         Self {
             kind,
             root,
@@ -253,6 +293,16 @@ impl Column {
             moves,
             refresh,
             posts,
+            mentions_only,
+            filters,
+        }
+    }
+
+    /// Source à charger, d'après le genre de colonne et le filtre choisi.
+    pub fn source(&self) -> Option<Source> {
+        match self.kind {
+            ColumnKind::Notifications if self.mentions_only.get() => Some(Source::Mentions),
+            kind => kind.source(),
         }
     }
 
@@ -264,6 +314,14 @@ impl Column {
     pub fn connect_refresh(&self, f: impl Fn() + 'static) {
         let f = Rc::new(f);
         let g = f.clone();
+        for filter in &self.filters {
+            let f = f.clone();
+            filter.connect_toggled(move |button| {
+                if button.is_active() {
+                    f();
+                }
+            });
+        }
         self.refresh.connect_clicked(move |_| f());
         self.posts.connect_retry(move || g());
     }
@@ -297,6 +355,10 @@ impl Column {
 
     /// Faux posts, sans compte.
     pub fn show_demo(&self) {
+        if self.mentions_only.get() {
+            self.posts.show_posts(data::demo_mentions());
+            return;
+        }
         self.posts.show_posts(self.kind.demo_posts());
     }
 
