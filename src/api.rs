@@ -619,16 +619,89 @@ async fn notifications(
     uris.sort();
     uris.dedup();
     let posts = posts_by_uri(api, uris).await?;
-    let now = Utc::now();
     Ok(Page {
-        posts: output
-            .data
-            .notifications
-            .iter()
-            .filter_map(|n| post_from_notification(n, &posts, now))
-            .collect(),
+        posts: grouped_notifications(&output.data.notifications, &posts, Utc::now()),
         cursor: output.data.cursor,
     })
+}
+
+/// Clé de regroupement : les j'aime, reposts et abonnements d'une page se
+/// regroupent par raison et par post concerné.
+fn group_key(notification: &Notification) -> Option<(String, String)> {
+    match notification.reason.as_str() {
+        "like" | "repost" | "like-via-repost" | "repost-via-repost" | "follow" => Some((
+            notification.reason.clone(),
+            subject_uri(notification).unwrap_or_default().to_owned(),
+        )),
+        _ => None,
+    }
+}
+
+/// « Aya Koné et 3 autres ont aimé votre post ».
+fn group_context(reason: &str, name: &str, others: usize) -> Option<String> {
+    let n = others.min(u32::MAX as usize) as u32;
+    let text = match reason {
+        "like" => ngettext(
+            "{name} et {n} autre ont aimé votre post",
+            "{name} et {n} autres ont aimé votre post",
+            n,
+        ),
+        "repost" => ngettext(
+            "{name} et {n} autre ont reposté votre post",
+            "{name} et {n} autres ont reposté votre post",
+            n,
+        ),
+        "like-via-repost" => ngettext(
+            "{name} et {n} autre ont aimé votre repost",
+            "{name} et {n} autres ont aimé votre repost",
+            n,
+        ),
+        "repost-via-repost" => ngettext(
+            "{name} et {n} autre ont reposté votre repost",
+            "{name} et {n} autres ont reposté votre repost",
+            n,
+        ),
+        "follow" => ngettext(
+            "{name} et {n} autre vous suivent",
+            "{name} et {n} autres vous suivent",
+            n,
+        ),
+        _ => return None,
+    };
+    Some(text.replace("{name}", name).replace("{n}", &n.to_string()))
+}
+
+/// Cartes d'une page de notifications, les j'aime, reposts et abonnements
+/// d'un même post réunis en une carte : celle du plus récent, avec le
+/// nombre des autres. Non lue si l'une d'elles ne l'est pas.
+pub fn grouped_notifications(
+    notifications: &[Notification],
+    posts: &HashMap<String, PostView>,
+    now: DateTime<Utc>,
+) -> Vec<Post> {
+    let mut cards: Vec<Post> = Vec::new();
+    // Clé → (indice de la carte, nombre d'autres).
+    let mut groups: HashMap<(String, String), (usize, usize)> = HashMap::new();
+    for notification in notifications {
+        let key = group_key(notification);
+        if let Some(key) = &key
+            && let Some((index, others)) = groups.get_mut(key)
+        {
+            *others += 1;
+            let card = &mut cards[*index];
+            card.unread |= !notification.is_read;
+            card.context = group_context(&notification.reason, &card.name, *others);
+            continue;
+        }
+        let Some(card) = post_from_notification(notification, posts, now) else {
+            continue;
+        };
+        if let Some(key) = key {
+            groups.insert(key, (cards.len(), 0));
+        }
+        cards.push(card);
+    }
+    cards
 }
 
 /// Marque les notifications comme vues (`updateSeen`).
@@ -1915,6 +1988,63 @@ mod tests {
         );
         assert_eq!(post.time, "40 min");
         assert!(post.unread);
+    }
+
+    #[test]
+    fn likes_and_follows_are_grouped() {
+        let subject = Some("at://did:plc:moi/app.bsky.feed.post/1");
+        let like_record = r#"{"$type": "app.bsky.feed.like", "subject": {"uri": "at://did:plc:moi/app.bsky.feed.post/1", "cid": "x"}, "createdAt": "2026-11-20T14:20:00.000Z"}"#;
+        let follow_record = r#"{"$type": "app.bsky.graph.follow", "subject": "did:plc:moi", "createdAt": "2026-11-20T14:20:00.000Z"}"#;
+        let reply_record = r#"{"$type": "app.bsky.feed.post", "text": "Bravo", "createdAt": "2026-11-20T14:20:00.000Z"}"#;
+        let mut read_like = notification(
+            "like",
+            "at://did:plc:pierre/app.bsky.feed.like/2",
+            subject,
+            like_record,
+        );
+        read_like.is_read = true;
+        let notifications = vec![
+            notification(
+                "like",
+                "at://did:plc:pierre/app.bsky.feed.like/1",
+                subject,
+                like_record,
+            ),
+            notification(
+                "follow",
+                "at://did:plc:pierre/app.bsky.graph.follow/1",
+                None,
+                follow_record,
+            ),
+            notification(
+                "reply",
+                "at://did:plc:pierre/app.bsky.feed.post/r",
+                None,
+                reply_record,
+            ),
+            read_like.clone(),
+            read_like,
+            notification(
+                "follow",
+                "at://did:plc:pierre/app.bsky.graph.follow/2",
+                None,
+                follow_record,
+            ),
+        ];
+        let posts = HashMap::from([(my_post().uri.clone(), my_post())]);
+        let cards = grouped_notifications(&notifications, &posts, now());
+        assert_eq!(cards.len(), 3);
+        assert_eq!(
+            cards[0].context.as_deref(),
+            Some("Pierre Delmas et 2 autres ont aimé votre post")
+        );
+        assert!(cards[0].unread);
+        assert_eq!(
+            cards[1].context.as_deref(),
+            Some("Pierre Delmas et 1 autre vous suivent")
+        );
+        // Les réponses restent chacune sur sa carte.
+        assert_eq!(cards[2].context.as_deref(), Some("a répondu à votre post"));
     }
 
     #[test]

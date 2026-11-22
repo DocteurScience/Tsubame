@@ -578,7 +578,7 @@ pub fn notifications() -> Vec<Post> {
             ),
         ),
         notification(
-            "a aimé et reposté votre post",
+            "Pierre Delmas et 4 autres ont aimé votre post",
             post(
                 "Pierre Delmas",
                 "pierre.example.social",
