@@ -434,7 +434,26 @@ pub fn post_from_view(post: &PostView, now: DateTime<Utc>) -> Post {
         likes: count(post.like_count),
         thread: Vec::new(),
         unread: false,
+        labels: labels(post),
     }
+}
+
+/// Étiquettes du post et de son auteur, sans celles qui sont annulées.
+fn labels(post: &PostView) -> Vec<String> {
+    let mut labels: Vec<String> = Vec::new();
+    for label in post
+        .labels
+        .iter()
+        .flatten()
+        .chain(post.author.labels.iter().flatten())
+    {
+        if label.neg == Some(true) {
+            labels.retain(|value| *value != label.val);
+        } else if !labels.contains(&label.val) {
+            labels.push(label.val.clone());
+        }
+    }
+    labels
 }
 
 pub fn post_from_feed(item: &FeedViewPost, now: DateTime<Utc>) -> Post {
@@ -614,6 +633,7 @@ pub fn post_from_notification(
             likes: 0,
             thread: Vec::new(),
             unread: false,
+            labels: Vec::new(),
         },
     };
     let author = &notification.author;
@@ -1425,6 +1445,30 @@ mod tests {
         let item: FeedViewPost = serde_json::from_value(item).unwrap();
         let post = post_from_feed(&item, now());
         assert_eq!(post.context.as_deref(), Some("En réponse à Aya Koné"));
+    }
+
+    #[test]
+    fn labels_of_the_post_and_its_author_are_kept() {
+        let post: PostView = serde_json::from_str(
+            r#"{
+                "uri": "at://did:plc:r/app.bsky.feed.post/1",
+                "cid": "bafyreie5737gdxlw5i64vzichcalba3z2v5n6icifvx5xytvske7mr3hpm",
+                "author": {"did": "did:plc:r", "handle": "romain.example.social",
+                    "labels": [{"src": "did:plc:m", "uri": "did:plc:r", "val": "nudity", "cts": "2026-11-20T14:56:00.000Z"}]},
+                "record": {"$type": "app.bsky.feed.post", "text": "Bonjour", "createdAt": "2026-11-20T14:56:00.000Z"},
+                "labels": [
+                    {"src": "did:plc:m", "uri": "at://did:plc:r/app.bsky.feed.post/1", "val": "graphic-media", "cts": "2026-11-20T14:56:00.000Z"},
+                    {"src": "did:plc:m", "uri": "at://did:plc:r/app.bsky.feed.post/1", "val": "porn", "cts": "2026-11-20T14:56:00.000Z"},
+                    {"src": "did:plc:m", "uri": "at://did:plc:r/app.bsky.feed.post/1", "val": "porn", "neg": true, "cts": "2026-11-20T14:57:00.000Z"}
+                ],
+                "indexedAt": "2026-11-20T14:56:00.000Z"
+            }"#,
+        )
+        .unwrap();
+        assert_eq!(
+            post_from_view(&post, now()).labels,
+            vec!["graphic-media".to_owned(), "nudity".to_owned()]
+        );
     }
 
     #[test]

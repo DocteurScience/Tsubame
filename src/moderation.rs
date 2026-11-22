@@ -205,18 +205,71 @@ pub fn contains_muted_word(text: &str, muted: &[String]) -> bool {
     })
 }
 
+/// Ce que demandent les étiquettes d'un contenu, avec l'étiquette qui
+/// décide. « !hide » et « !warn » viennent de la modération de Bluesky et
+/// ne se règlent pas ; le contenu pour adultes désactivé masque ses
+/// étiquettes. Les étiquettes inconnues sont ignorées.
+pub fn decide(preferences: &[Value], labels: &[String]) -> Option<(Visibility, String)> {
+    let adult = adult_content(preferences);
+    labels
+        .iter()
+        .filter_map(|label| {
+            let visibility = match label.as_str() {
+                "!hide" => Visibility::Hide,
+                "!warn" => Visibility::Warn,
+                l if is_adult_label(l) && !adult => Visibility::Hide,
+                l if LABELS.iter().any(|(known, _)| *known == l) => {
+                    label_visibility(preferences, l)
+                }
+                _ => return None,
+            };
+            Some((visibility, label.clone()))
+        })
+        .max_by_key(|(visibility, _)| *visibility as u8)
+        .filter(|(visibility, _)| *visibility != Visibility::Show)
+}
+
+/// Titre de l'avertissement affiché sur un contenu étiqueté.
+pub fn warning_title(label: &str) -> String {
+    match label {
+        "!warn" | "!hide" => gettext("Contenu signalé par la modération"),
+        other => label_title(other),
+    }
+}
+
 thread_local! {
-    /// Mots masqués du compte connecté, appliqués à l'affichage des posts.
+    /// Préférences du compte connecté (ou celles par défaut), appliquées à
+    /// l'affichage des posts.
+    static PREFERENCES: RefCell<Vec<Value>> = RefCell::default();
+    /// Mots masqués tirés de ces préférences.
     static MUTED: RefCell<Vec<String>> = RefCell::default();
 }
 
-pub fn set_muted_words(words: Vec<String>) {
-    MUTED.with_borrow_mut(|muted| *muted = words);
+/// Préférences à appliquer aux fils ; vide au départ et sans compte.
+pub fn set_preferences(preferences: Vec<Value>) {
+    MUTED.with_borrow_mut(|muted| *muted = muted_words(&preferences));
+    PREFERENCES.with_borrow_mut(|current| *current = preferences);
 }
 
-/// Post à cacher : il contient un mot masqué.
+/// Post à cacher : il contient un mot masqué, ou une étiquette le masque.
 pub fn is_hidden(post: &Post) -> bool {
     MUTED.with_borrow(|muted| !muted.is_empty() && contains_muted_word(&post.text, muted))
+        || matches!(media_warning_visibility(post), Some((Visibility::Hide, _)))
+}
+
+fn media_warning_visibility(post: &Post) -> Option<(Visibility, String)> {
+    if post.labels.is_empty() {
+        return None;
+    }
+    PREFERENCES.with_borrow(|preferences| decide(preferences, &post.labels))
+}
+
+/// Avertissement à mettre sur les images du post, s'il en faut un.
+pub fn media_warning(post: &Post) -> Option<String> {
+    match media_warning_visibility(post) {
+        Some((Visibility::Warn, label)) => Some(warning_title(&label)),
+        _ => None,
+    }
 }
 
 // --- Appels à l'API ---
@@ -426,6 +479,38 @@ pub async fn labeler_names(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn labels(values: &[&str]) -> Vec<String> {
+        values.iter().map(|v| v.to_string()).collect()
+    }
+
+    #[test]
+    fn labels_follow_the_preferences() {
+        let none: Vec<Value> = Vec::new();
+        assert_eq!(decide(&none, &labels(&["nudity"])), None);
+        assert_eq!(
+            decide(&none, &labels(&["graphic-media"])),
+            Some((Visibility::Warn, "graphic-media".into()))
+        );
+        // Contenu pour adultes désactivé : masqué quel que soit le réglage.
+        assert_eq!(
+            decide(&none, &labels(&["sexual"])).unwrap().0,
+            Visibility::Hide
+        );
+        let mut prefs = Vec::new();
+        set_adult_content(&mut prefs, true);
+        assert_eq!(
+            decide(&prefs, &labels(&["sexual"])).unwrap().0,
+            Visibility::Warn
+        );
+        set_label_visibility(&mut prefs, "graphic-media", Visibility::Show);
+        assert_eq!(decide(&prefs, &labels(&["graphic-media", "custom"])), None);
+        // L'étiquette la plus forte l'emporte.
+        assert_eq!(
+            decide(&prefs, &labels(&["sexual", "!hide"])),
+            Some((Visibility::Hide, "!hide".into()))
+        );
+    }
 
     fn prefs() -> Vec<Value> {
         serde_json::from_value(json!([

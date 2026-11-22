@@ -46,6 +46,9 @@ pub struct Post {
     pub thread: Vec<Reply>,
     /// Notification pas encore vue.
     pub unread: bool,
+    /// Étiquettes de contenu du post et de son auteur (« graphic-media »,
+    /// « porn », « !hide »…).
+    pub labels: Vec<String>,
 }
 
 /// Liste de comptes (curation ou modération).
@@ -235,6 +238,7 @@ fn post(
         likes,
         thread: Vec::new(),
         unread: false,
+        labels: Vec::new(),
     }
 }
 
@@ -342,6 +346,24 @@ pub fn posts(feed: Feed) -> Vec<Post> {
                 6,
                 57,
             ),
+            // Post étiqueté : son image est floutée sous un avertissement.
+            Post {
+                media: Some(Media::with_alt(
+                    "Plaie suturée sur la patte d'un chien, juste après l'intervention.",
+                )),
+                labels: vec!["graphic-media".into()],
+                ..post(
+                    "Inès Garnier",
+                    "ines.example.social",
+                    "2 h",
+                    "20 nov., 12:20",
+                    "Dernier jour de stage à la clinique vétérinaire : Filou est reparti \
+                     avec six points de suture et beaucoup de friandises.",
+                    4,
+                    1,
+                    63,
+                )
+            },
             post(
                 "Nadia Safi",
                 "nadia.example.social",

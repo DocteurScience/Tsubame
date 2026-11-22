@@ -505,7 +505,7 @@ impl State {
         self.clear_thread();
         self.load_all();
         self.load_pinned_feeds();
-        self.load_muted_words();
+        self.load_moderation();
         self.columns_changed();
         self.update_my_profile();
         self.update_explore();
@@ -523,7 +523,7 @@ impl State {
         // Ne rien garder du compte à l'écran : les colonnes repassent aux
         // faux posts, cachés derrière l'écran de connexion.
         self.clear_thread();
-        moderation::set_muted_words(Vec::new());
+        moderation::set_preferences(Vec::new());
         self.load_all();
         self.update_my_profile();
         self.update_explore();
@@ -1008,7 +1008,7 @@ impl State {
         });
     }
 
-    /// Préférences (modération). Changer les mots masqués refiltre les fils.
+    /// Préférences (modération). Chaque changement refiltre les fils.
     fn show_preferences(self: &Rc<Self>) {
         let weak = Rc::downgrade(self);
         preferences::present(&self.root_stack, self.session.borrow().clone(), move || {
@@ -1018,23 +1018,20 @@ impl State {
         });
     }
 
-    /// Mots masqués du compte, appliqués aux fils.
-    fn load_muted_words(self: &Rc<Self>) {
-        moderation::set_muted_words(Vec::new());
+    /// Préférences de modération du compte, appliquées aux fils.
+    fn load_moderation(self: &Rc<Self>) {
+        moderation::set_preferences(Vec::new());
         let Some(session) = self.session.borrow().clone() else {
             return;
         };
         let task = runtime().spawn(moderation::preferences(session));
         let weak = Rc::downgrade(self);
         glib::spawn_future_local(async move {
-            if let Ok(Ok(preferences)) = task.await {
-                let words = moderation::muted_words(&preferences);
-                if !words.is_empty()
-                    && let Some(state) = weak.upgrade()
-                {
-                    moderation::set_muted_words(words);
-                    state.load_all();
-                }
+            if let Ok(Ok(preferences)) = task.await
+                && let Some(state) = weak.upgrade()
+            {
+                moderation::set_preferences(preferences);
+                state.load_all();
             }
         });
     }

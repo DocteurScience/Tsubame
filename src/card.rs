@@ -86,7 +86,7 @@ fn badge(text: &str, accessible: &str, halign: gtk::Align, valign: gtk::Align) -
 /// Image jointe : la miniature, chargée en arrière-plan, ou un emplacement
 /// vide pour les faux posts. Pastille « ALT » quand un texte alternatif
 /// existe, « +N » quand le post a d'autres images.
-fn media(media: &Media) -> gtk::Widget {
+fn media(media: &Media, warning: Option<String>) -> gtk::Widget {
     let height = media
         .aspect_ratio
         .filter(|(width, height)| *width > 0 && *height > 0)
@@ -151,7 +151,66 @@ fn media(media: &Media) -> gtk::Widget {
             gtk::Align::Start,
         ));
     }
+    if let Some(warning) = warning {
+        add_warning(&overlay, &content, &warning);
+    }
     overlay.upcast()
+}
+
+/// Image floutée sous un avertissement, avec « Afficher » pour la voir.
+fn add_warning(overlay: &gtk::Overlay, content: &gtk::Widget, warning: &str) {
+    content.add_css_class("media-blurred");
+    // Le texte alternatif décrit ce qui est caché : on ne le lit pas avant.
+    content.set_can_target(false);
+    let badges: Vec<gtk::Widget> =
+        std::iter::successors(content.next_sibling(), |w| w.next_sibling()).collect();
+    for badge in &badges {
+        badge.set_visible(false);
+    }
+    let shield = gtk::Box::builder()
+        .orientation(gtk::Orientation::Vertical)
+        .spacing(6)
+        .halign(gtk::Align::Fill)
+        .valign(gtk::Align::Fill)
+        .css_classes(["media-warning"])
+        .build();
+    let inner = gtk::Box::builder()
+        .orientation(gtk::Orientation::Vertical)
+        .spacing(8)
+        .vexpand(true)
+        .valign(gtk::Align::Center)
+        .build();
+    inner.append(
+        &gtk::Image::builder()
+            .icon_name("dialog-warning-symbolic")
+            .pixel_size(24)
+            .build(),
+    );
+    let title = gtk::Label::builder()
+        .label(warning)
+        .wrap(true)
+        .justify(gtk::Justification::Center)
+        .css_classes(["heading"])
+        .build();
+    inner.append(&title);
+    let show = gtk::Button::builder()
+        .label(gettext("Afficher"))
+        .halign(gtk::Align::Center)
+        .css_classes(["pill"])
+        .build();
+    show.update_property(&[gtk::accessible::Property::Description(warning)]);
+    inner.append(&show);
+    shield.append(&inner);
+    overlay.add_overlay(&shield);
+    let content = content.clone();
+    show.connect_clicked(move |_| {
+        content.remove_css_class("media-blurred");
+        content.set_can_target(true);
+        for badge in &badges {
+            badge.set_visible(true);
+        }
+        shield.set_visible(false);
+    });
 }
 
 /// Bouton d'action à icône et compteur. Le nom accessible décrit l'action et
@@ -398,7 +457,7 @@ pub fn post_card(post: &Post) -> gtk::Box {
         body.append(&label(&post.text, &[]));
     }
     if let Some(m) = &post.media {
-        body.append(&media(m));
+        body.append(&media(m, crate::moderation::media_warning(post)));
     }
     body.append(&stats(post));
     card
@@ -448,7 +507,7 @@ pub fn post_detail(post: &Post) -> gtk::Box {
     ));
     body.append(&label(&post.text, &["post-detail-text"]));
     if let Some(m) = &post.media {
-        body.append(&media(m));
+        body.append(&media(m, crate::moderation::media_warning(post)));
     }
 
     // Les boutons passent à la ligne quand le volet est étroit.

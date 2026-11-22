@@ -193,3 +193,13 @@ columnsview > .column headerbar {
 .bubble.failed {
   opacity: 0.55;
 }
+
+/* Image d'un post étiqueté, floutée jusqu'au clic sur « Afficher ». */
+.media-blurred {
+  filter: blur(24px);
+}
+
+.media-warning {
+  background-color: alpha(@card_bg_color, 0.6);
+  padding: 12px;
+}

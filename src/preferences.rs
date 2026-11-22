@@ -43,8 +43,8 @@ struct Dialog {
     dialog: adw::PreferencesDialog,
     session: Option<Arc<Session>>,
     preferences: RefCell<Vec<Value>>,
-    /// Mots masqués changés : les fils doivent être refiltrés.
-    on_words_changed: Rc<dyn Fn()>,
+    /// Préférences changées : les fils doivent être refiltrés.
+    on_changed: Rc<dyn Fn()>,
     muted_count: gtk::Label,
     blocked_count: gtk::Label,
     words_count: gtk::Label,
@@ -86,7 +86,7 @@ fn subpage(title: &str, content: &impl IsA<gtk::Widget>) -> adw::NavigationPage 
 pub fn present(
     parent: &impl IsA<gtk::Widget>,
     session: Option<Arc<Session>>,
-    on_words_changed: impl Fn() + 'static,
+    on_changed: impl Fn() + 'static,
 ) {
     let dialog = adw::PreferencesDialog::builder()
         .title(gettext("Préférences"))
@@ -157,7 +157,7 @@ pub fn present(
         dialog: dialog.clone(),
         session,
         preferences: RefCell::default(),
-        on_words_changed: Rc::new(on_words_changed),
+        on_changed: Rc::new(on_changed),
         muted_count,
         blocked_count,
         words_count,
@@ -300,10 +300,8 @@ impl Dialog {
         change.apply(&mut self.preferences.borrow_mut());
         let words = moderation::muted_words(&self.preferences.borrow());
         self.words_count.set_label(&words.len().to_string());
-        if matches!(change, Change::AddWord(_) | Change::RemoveWord(_)) {
-            moderation::set_muted_words(words);
-            (self.on_words_changed)();
-        }
+        moderation::set_preferences(self.preferences.borrow().clone());
+        (self.on_changed)();
         let Some(session) = self.session.clone() else {
             return;
         };
