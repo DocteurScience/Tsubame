@@ -268,11 +268,25 @@ fn more_menu(post: &Post, key: &str) -> gtk::MenuButton {
     let sharing = gio::Menu::new();
     sharing.append_item(&item(gettext("Copier le lien"), "win.copy-link", key));
     menu.append_section(None, &sharing);
+    if crate::interactions::is_mine(post) {
+        let mine = gio::Menu::new();
+        mine.append_item(&item(
+            if post.pinned {
+                gettext("Retirer du haut du profil")
+            } else {
+                gettext("Épingler sur le profil")
+            },
+            "win.pin-post",
+            key,
+        ));
+        mine.append_item(&item(gettext("Supprimer le post…"), "win.delete-post", key));
+        menu.append_section(None, &mine);
+    }
     let reporting = gio::Menu::new();
     {
         reporting.append_item(&item(gettext("Signaler le post…"), "win.report-post", key));
     }
-    if !post.handle.is_empty() {
+    if !post.handle.is_empty() && !crate::interactions::is_mine(post) {
         let author = gio::Menu::new();
         author.append_item(&item(
             gettext("Masquer @{}").replace("{}", &post.handle),

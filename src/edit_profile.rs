@@ -124,8 +124,62 @@ pub async fn load(session: Arc<Session>) -> Result<(String, String), ApiError> {
     Ok((text("displayName"), text("description")))
 }
 
-pub async fn save(session: Arc<Session>, edit: ProfileEdit) -> Result<(), ApiError> {
+/// Épingle un post (adresse et CID) en haut du profil, ou retire l'épingle.
+pub async fn set_pinned(
+    session: Arc<Session>,
+    post: Option<(String, String)>,
+) -> Result<(), ApiError> {
+    let (mut record, cid) = Box::pin(current(&session)).await?;
+    apply_pinned(&mut record, post);
+    Box::pin(put(&session, record, cid)).await
+}
+
+pub fn apply_pinned(record: &mut Value, post: Option<(String, String)>) {
+    if !record.is_object() {
+        *record = json!({});
+    }
+    let map = record.as_object_mut().expect("objet");
+    map.insert("$type".into(), json!(COLLECTION));
+    match post {
+        Some((uri, cid)) => {
+            map.insert("pinnedPost".into(), json!({"uri": uri, "cid": cid}));
+        }
+        None => {
+            map.remove("pinnedPost");
+        }
+    }
+}
+
+/// Réécrit le profil, s'il n'a pas changé depuis sa lecture (`cid`).
+async fn put(session: &Session, record: Value, cid: Option<Cid>) -> Result<(), ApiError> {
     use atrium_api::com::atproto::repo::put_record;
+    let record = serde_json::from_value(record)
+        .map_err(|_| ApiError::new(gettext("Le profil n'a pas pu être enregistré.")))?;
+    let api = session.api().await?;
+    Box::pin(
+        api.api.com.atproto.repo.put_record(
+            put_record::InputData {
+                collection: Nsid::new(COLLECTION.to_owned()).expect("NSID"),
+                record,
+                repo: session
+                    .account
+                    .did
+                    .parse()
+                    .map_err(|_| ApiError::new(gettext("Compte invalide.")))?,
+                rkey: RecordKey::new("self".to_owned()).expect("clé"),
+                swap_commit: None,
+                swap_record: cid,
+                validate: None,
+            }
+            .into(),
+        ),
+    )
+    .await
+    .map_err(request_failed)?;
+    Ok(())
+}
+
+pub async fn save(session: Arc<Session>, edit: ProfileEdit) -> Result<(), ApiError> {
     let (mut record, cid) = Box::pin(current(&session)).await?;
     let api = session.api().await?;
     let mut blobs = Vec::new();
@@ -153,29 +207,7 @@ pub async fn save(session: Arc<Session>, edit: ProfileEdit) -> Result<(), ApiErr
     let banner = blobs.pop().flatten();
     let avatar = blobs.pop().flatten();
     apply(&mut record, &edit, avatar, banner);
-    let record = serde_json::from_value(record)
-        .map_err(|_| ApiError::new(gettext("Le profil n'a pas pu être enregistré.")))?;
-    Box::pin(
-        api.api.com.atproto.repo.put_record(
-            put_record::InputData {
-                collection: Nsid::new(COLLECTION.to_owned()).expect("NSID"),
-                record,
-                repo: session
-                    .account
-                    .did
-                    .parse()
-                    .map_err(|_| ApiError::new(gettext("Compte invalide.")))?,
-                rkey: RecordKey::new("self".to_owned()).expect("clé"),
-                swap_commit: None,
-                swap_record: cid,
-                validate: None,
-            }
-            .into(),
-        ),
-    )
-    .await
-    .map_err(request_failed)?;
-    Ok(())
+    Box::pin(put(&session, record, cid)).await
 }
 
 /// Compteur « n / max », en couleur d'erreur au-delà.
@@ -630,5 +662,21 @@ mod tests {
             None,
         );
         assert_eq!(empty, json!({"$type": COLLECTION, "displayName": "Moi"}));
+    }
+
+    #[test]
+    fn pinning_keeps_the_rest_of_the_profile() {
+        let mut record = json!({"$type": COLLECTION, "displayName": "Moi"});
+        apply_pinned(
+            &mut record,
+            Some(("at://did:plc:moi/app.bsky.feed.post/1".into(), "c".into())),
+        );
+        assert_eq!(
+            record["pinnedPost"]["uri"],
+            "at://did:plc:moi/app.bsky.feed.post/1"
+        );
+        assert_eq!(record["displayName"], "Moi");
+        apply_pinned(&mut record, None);
+        assert_eq!(record, json!({"$type": COLLECTION, "displayName": "Moi"}));
     }
 }

@@ -435,6 +435,7 @@ pub fn post_from_view(post: &PostView, now: DateTime<Utc>) -> Post {
         thread: Vec::new(),
         unread: false,
         labels: labels(post),
+        pinned: viewer.and_then(|v| v.pinned).unwrap_or(false),
     }
 }
 
@@ -464,11 +465,16 @@ pub fn post_from_feed(item: &FeedViewPost, now: DateTime<Utc>) -> Post {
         }
         _ => None,
     };
+    let pinned_here = matches!(
+        &item.reason,
+        Some(Union::Refs(FeedViewPostReasonRefs::ReasonPin(_)))
+    );
     let replying_to = item.reply.as_ref().and_then(|reply| match &reply.parent {
         Union::Refs(ReplyRefParentRefs::PostView(parent)) => Some(display_name(&parent.author)),
         _ => None,
     });
     post.context = match (reposted_by, replying_to) {
+        _ if pinned_here => Some(gettext("Épinglé")),
         (Some(by), _) => Some(gettext("{} a reposté").replace("{}", &by)),
         (None, Some(to)) => Some(gettext("En réponse à {}").replace("{}", &to)),
         (None, None) => None,
@@ -634,6 +640,7 @@ pub fn post_from_notification(
             thread: Vec::new(),
             unread: false,
             labels: Vec::new(),
+            pinned: false,
         },
     };
     let author = &notification.author;
@@ -1720,8 +1727,10 @@ mod tests {
         let mut item: serde_json::Value = serde_json::from_str(FEED_ITEM).unwrap();
         item["post"]["viewer"] = serde_json::json!({
             "like": "at://did:plc:moi/app.bsky.feed.like/1",
-            "repost": null
+            "repost": null,
+            "pinned": true
         });
+        item["reason"] = serde_json::json!({"$type": "app.bsky.feed.defs#reasonPin"});
         let item: FeedViewPost = serde_json::from_value(item).unwrap();
         let post = post_from_feed(&item, now());
         assert_eq!(
@@ -1733,6 +1742,8 @@ mod tests {
             Some("at://did:plc:moi/app.bsky.feed.like/1")
         );
         assert_eq!(post.repost_uri, None);
+        assert!(post.pinned);
+        assert_eq!(post.context.as_deref(), Some("Épinglé"));
     }
 
     const CID: &str = "bafyreie5737gdxlw5i64vzichcalba3z2v5n6icifvx5xytvske7mr3hpm";

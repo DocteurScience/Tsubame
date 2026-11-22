@@ -49,6 +49,8 @@ pub struct Post {
     /// Étiquettes de contenu du post et de son auteur (« graphic-media »,
     /// « porn », « !hide »…).
     pub labels: Vec<String>,
+    /// Post épinglé en haut du profil de son auteur.
+    pub pinned: bool,
 }
 
 /// Liste de comptes (curation ou modération).
@@ -243,6 +245,7 @@ fn post(
         thread: Vec::new(),
         unread: false,
         labels: Vec::new(),
+        pinned: false,
     }
 }
 

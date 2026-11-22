@@ -502,6 +502,7 @@ impl State {
                 .unwrap_or_default(),
         );
         self.logout_action.set_enabled(session.is_some());
+        interactions::set_me(session.as_ref().map(|s| s.account.did.clone()));
         self.session.replace(session);
         self.clear_thread();
         self.load_all();
@@ -525,6 +526,7 @@ impl State {
         // faux posts, cachés derrière l'écran de connexion.
         self.clear_thread();
         moderation::set_preferences(Vec::new());
+        interactions::set_me(None);
         self.load_all();
         self.update_my_profile();
         self.update_explore();
@@ -1088,6 +1090,100 @@ impl State {
         });
     }
 
+    /// Supprimer un de mes posts, après confirmation.
+    fn confirm_delete(self: &Rc<Self>, key: &str) {
+        let (Some(window), Some(post)) = (
+            self.window.upgrade(),
+            interactions::find(key).map(|entry| entry.post()),
+        ) else {
+            return;
+        };
+        let Some(uri) = post.uri.clone() else { return };
+        let dialog = adw::AlertDialog::new(
+            Some(&gettext("Supprimer ce post ?")),
+            Some(&gettext(
+                "Il sera retiré de Bluesky, avec ses j'aime et ses reposts. \
+                 Cette action est définitive.",
+            )),
+        );
+        dialog.add_responses(&[
+            ("cancel", &gettext("Annuler")),
+            ("delete", &gettext("Supprimer")),
+        ]);
+        dialog.set_response_appearance("delete", adw::ResponseAppearance::Destructive);
+        dialog.set_default_response(Some("cancel"));
+        dialog.set_close_response("cancel");
+        let weak = Rc::downgrade(self);
+        dialog.connect_response(Some("delete"), move |_, _| {
+            let Some(state) = weak.upgrade() else { return };
+            let Some(session) = state.session.borrow().clone() else {
+                return;
+            };
+            let task = runtime().spawn(api::delete(session, uri.clone()));
+            let (weak, uri) = (Rc::downgrade(&state), uri.clone());
+            glib::spawn_future_local(async move {
+                let result = task
+                    .await
+                    .unwrap_or_else(|_| Err(api::ApiError::new(gettext("Requête interrompue."))));
+                let Some(state) = weak.upgrade() else { return };
+                match result {
+                    Ok(()) => {
+                        state
+                            .toasts
+                            .add_toast(adw::Toast::new(&gettext("Post supprimé.")));
+                        if state.shown_uri.borrow().as_deref() == Some(uri.as_str()) {
+                            state.clear_thread();
+                        }
+                        state.load_all();
+                        state.update_my_profile();
+                    }
+                    Err(error) if error.expired => state.session_expired(&error.message),
+                    Err(error) => state.toasts.add_toast(adw::Toast::new(&error.message)),
+                }
+            });
+        });
+        dialog.present(Some(&window));
+    }
+
+    /// Épingler un de mes posts en haut de mon profil, ou l'en retirer.
+    fn toggle_pin(self: &Rc<Self>, key: &str) {
+        let Some(post) = interactions::find(key).map(|entry| entry.post()) else {
+            return;
+        };
+        let (Some(session), Some(uri), Some(cid)) = (
+            self.session.borrow().clone(),
+            post.uri.clone(),
+            post.cid.clone(),
+        ) else {
+            return;
+        };
+        let pin = !post.pinned;
+        let task = runtime().spawn(crate::edit_profile::set_pinned(
+            session,
+            pin.then_some((uri, cid)),
+        ));
+        let weak = Rc::downgrade(self);
+        glib::spawn_future_local(async move {
+            let result = task
+                .await
+                .unwrap_or_else(|_| Err(api::ApiError::new(gettext("Requête interrompue."))));
+            let Some(state) = weak.upgrade() else { return };
+            match result {
+                Ok(()) => {
+                    state.toasts.add_toast(adw::Toast::new(&if pin {
+                        gettext("Post épinglé sur votre profil.")
+                    } else {
+                        gettext("Post retiré du haut de votre profil.")
+                    }));
+                    state.load_all();
+                    state.update_my_profile();
+                }
+                Err(error) if error.expired => state.session_expired(&error.message),
+                Err(error) => state.toasts.add_toast(adw::Toast::new(&error.message)),
+            }
+        });
+    }
+
     /// Signaler le post `key` (clé des interactions).
     fn report_post(self: &Rc<Self>, key: &str) {
         let post = interactions::find(key).map(|entry| entry.post());
@@ -1596,6 +1692,8 @@ fn install_actions(window: &adw::ApplicationWindow, state: &Rc<State>) {
         ("block-author", State::confirm_block),
         ("report-post", State::report_post),
         ("report-author", State::report_author),
+        ("delete-post", State::confirm_delete),
+        ("pin-post", State::toggle_pin),
     ] {
         let action = gio::SimpleAction::new(name, Some(glib::VariantTy::STRING));
         let weak = Rc::downgrade(state);

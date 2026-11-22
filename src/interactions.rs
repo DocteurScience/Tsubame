@@ -81,6 +81,22 @@ fn toggles(post: &Post) -> (Toggle, Toggle, Toggle) {
 
 thread_local! {
     static REGISTRY: RefCell<HashMap<String, Weak<Interactions>>> = RefCell::default();
+    /// DID du compte connecté, pour reconnaître ses propres posts.
+    static ME: RefCell<Option<String>> = RefCell::default();
+}
+
+pub fn set_me(did: Option<String>) {
+    ME.with_borrow_mut(|me| *me = did);
+}
+
+/// Post du compte connecté (d'après le dépôt de son adresse).
+pub fn is_mine(post: &Post) -> bool {
+    let repo = post
+        .uri
+        .as_deref()
+        .and_then(crate::api::parse_record_uri)
+        .map(|(repo, _, _)| repo);
+    ME.with_borrow(|me| repo.is_some() && me.as_deref() == repo)
 }
 
 /// État du post, partagé avec les autres cartes qui l'affichent. Des données
@@ -223,6 +239,18 @@ mod tests {
         post.likes = likes;
         post.like_uri = like_uri.map(str::to_owned);
         post
+    }
+
+    #[test]
+    fn my_posts_are_recognized_by_their_repository() {
+        let mine = post("at://did:plc:moi/app.bsky.feed.post/1", 0, None);
+        let other = post("at://did:plc:autre/app.bsky.feed.post/1", 0, None);
+        set_me(None);
+        assert!(!is_mine(&mine));
+        set_me(Some("did:plc:moi".into()));
+        assert!(is_mine(&mine));
+        assert!(!is_mine(&other));
+        set_me(None);
     }
 
     #[test]
