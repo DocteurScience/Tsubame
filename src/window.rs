@@ -32,6 +32,7 @@ use crate::messages::MessagesPage;
 use crate::moderation;
 use crate::preferences;
 use crate::profile::{self, ProfilePage};
+use crate::report;
 use crate::runtime::runtime;
 use crate::thread::ThreadView;
 
@@ -1087,6 +1088,57 @@ impl State {
         });
     }
 
+    /// Signaler le post `key` (clé des interactions).
+    fn report_post(self: &Rc<Self>, key: &str) {
+        let post = interactions::find(key).map(|entry| entry.post());
+        let subject = match post {
+            Some(crate::data::Post {
+                uri: Some(uri),
+                cid: Some(cid),
+                ..
+            }) => report::Subject::Post { uri, cid },
+            // Faux post : rien n'est envoyé, mais la boîte s'ouvre.
+            _ if self.session.borrow().is_none() => report::Subject::Post {
+                uri: String::new(),
+                cid: String::new(),
+            },
+            _ => {
+                self.toasts.add_toast(adw::Toast::new(&gettext(
+                    "Ce post ne peut pas être signalé.",
+                )));
+                return;
+            }
+        };
+        self.report(subject);
+    }
+
+    fn report_author(self: &Rc<Self>, handle: &str) {
+        self.report(report::Subject::Account(handle.to_owned()));
+    }
+
+    fn report(self: &Rc<Self>, subject: report::Subject) {
+        let Some(window) = self.window.upgrade() else {
+            return;
+        };
+        let demo = self.session.borrow().is_none();
+        let weak = Rc::downgrade(self);
+        report::present(
+            &window,
+            self.session.borrow().clone(),
+            subject,
+            move |result| {
+                let Some(state) = weak.upgrade() else { return };
+                let message = match result {
+                    Ok(()) if demo => gettext("Mode démonstration : rien n'est envoyé."),
+                    Ok(()) => gettext("Signalement envoyé. Merci."),
+                    Err(error) if error.expired => return state.session_expired(&error.message),
+                    Err(error) => error.message,
+                };
+                state.toasts.add_toast(adw::Toast::new(&message));
+            },
+        );
+    }
+
     /// Bloquer un compte, après confirmation.
     fn confirm_block(self: &Rc<Self>, handle: &str) {
         let Some(window) = self.window.upgrade() else {
@@ -1542,6 +1594,8 @@ fn install_actions(window: &adw::ApplicationWindow, state: &Rc<State>) {
         ("copy-link", State::copy_link as fn(&Rc<State>, &str)),
         ("mute-author", State::mute_author),
         ("block-author", State::confirm_block),
+        ("report-post", State::report_post),
+        ("report-author", State::report_author),
     ] {
         let action = gio::SimpleAction::new(name, Some(glib::VariantTy::STRING));
         let weak = Rc::downgrade(state);

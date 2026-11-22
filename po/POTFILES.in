@@ -18,5 +18,6 @@ src/moderation.rs
 src/post_list.rs
 src/preferences.rs
 src/profile.rs
+src/report.rs
 src/thread.rs
 src/window.rs

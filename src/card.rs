@@ -268,6 +268,10 @@ fn more_menu(post: &Post, key: &str) -> gtk::MenuButton {
     let sharing = gio::Menu::new();
     sharing.append_item(&item(gettext("Copier le lien"), "win.copy-link", key));
     menu.append_section(None, &sharing);
+    let reporting = gio::Menu::new();
+    {
+        reporting.append_item(&item(gettext("Signaler le post…"), "win.report-post", key));
+    }
     if !post.handle.is_empty() {
         let author = gio::Menu::new();
         author.append_item(&item(
@@ -281,7 +285,13 @@ fn more_menu(post: &Post, key: &str) -> gtk::MenuButton {
             &post.handle,
         ));
         menu.append_section(None, &author);
+        reporting.append_item(&item(
+            gettext("Signaler @{}…").replace("{}", &post.handle),
+            "win.report-author",
+            &post.handle,
+        ));
     }
+    menu.append_section(None, &reporting);
     let button = gtk::MenuButton::builder()
         .icon_name("view-more-symbolic")
         .menu_model(&menu)

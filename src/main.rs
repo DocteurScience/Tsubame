@@ -22,6 +22,7 @@ mod photo;
 mod post_list;
 mod preferences;
 mod profile;
+mod report;
 mod richtext;
 mod runtime;
 mod settings;
