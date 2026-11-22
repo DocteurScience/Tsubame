@@ -1531,29 +1531,43 @@ impl State {
             state.load(Target::Home(ColumnKind::Notifications), false);
             state.load(Target::CompactNotifications, false);
             state.set_unread(count);
-            state.notify_desktop(count);
+            if !state.should_notify_desktop() {
+                return;
+            }
+            // La plus récente, pour le texte de la notification du bureau.
+            let Some(session) = state.session.borrow().clone() else {
+                return;
+            };
+            let task = runtime().spawn(api::load(session, api::Source::Notifications, None));
+            let posts = task
+                .await
+                .ok()
+                .and_then(Result::ok)
+                .map(|page| page.posts)
+                .unwrap_or_default();
+            state.notify_desktop(&posts, count);
         });
     }
 
-    fn notify_desktop(&self, count: u32) {
+    /// Fenêtre en arrière-plan et réglage activé.
+    fn should_notify_desktop(&self) -> bool {
+        self.window.upgrade().is_some_and(|w| !w.is_active())
+            && self.settings.boolean("desktop-notifications")
+    }
+
+    fn notify_desktop(&self, posts: &[Post], count: u32) {
         let Some(window) = self.window.upgrade() else {
             return;
         };
-        if window.is_active() || !self.settings.boolean("desktop-notifications") {
+        if !self.should_notify_desktop() {
             return;
         }
         let Some(app) = window.application() else {
             return;
         };
-        let notification = gio::Notification::new(&gettext("Nouvelles notifications"));
-        notification.set_body(Some(
-            &gettextrs::ngettext(
-                "Vous avez {} notification non lue.",
-                "Vous avez {} notifications non lues.",
-                count,
-            )
-            .replace("{}", &count.to_string()),
-        ));
+        let (title, body) = crate::desktop::message(posts, count);
+        let notification = gio::Notification::new(&title);
+        notification.set_body(Some(&body));
         notification.set_default_action("app.show-notifications");
         app.send_notification(Some(UNREAD_NOTIFICATION), &notification);
     }

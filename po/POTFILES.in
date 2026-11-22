@@ -9,6 +9,7 @@ src/chat.rs
 src/column.rs
 src/compose.rs
 src/data.rs
+src/desktop.rs
 src/drafts.rs
 src/edit_profile.rs
 src/explore.rs
