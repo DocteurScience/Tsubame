@@ -341,8 +341,7 @@ fn chat_failed(error: impl std::fmt::Display) -> ApiError {
     let text = error.to_string();
     if text.contains("scope") || text.contains("Bad token method") {
         return ApiError::new(gettext(
-            "La messagerie n'est pas autorisée pour cette session. Déconnectez-vous puis \
-             reconnectez-vous pour l'autoriser.",
+            "La messagerie n'est pas autorisée pour cette session. Déconnectez-vous puis reconnectez-vous pour l'autoriser.",
         ));
     }
     request_failed(text)

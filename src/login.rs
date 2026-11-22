@@ -89,8 +89,7 @@ impl LoginPage {
         entries.append(&entry);
         let hint = gtk::Label::builder()
             .label(gettext(
-                "Par exemple : vous.bsky.social. Votre navigateur s'ouvrira pour confirmer \
-                 la connexion ; Tsubame ne voit jamais votre mot de passe.",
+                "Par exemple : vous.bsky.social. Votre navigateur s'ouvrira pour confirmer la connexion ; Tsubame ne voit jamais votre mot de passe.",
             ))
             .wrap(true)
             .xalign(0.0)

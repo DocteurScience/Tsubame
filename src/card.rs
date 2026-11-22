@@ -657,16 +657,21 @@ fn people_links(entry: &Rc<Interactions>) -> gtk::Box {
         else {
             return;
         };
-        let (one, many, tooltip) = match which {
-            Interaction::Like => ("{} j'aime", "{} j'aime", gettext("Voir qui a aimé")),
-            _ => ("{} repost", "{} reposts", gettext("Voir qui a reposté")),
+        // Chaînes littérales, pour xgettext ; le nombre en gras.
+        let (template, tooltip) = match which {
+            Interaction::Like => (
+                ngettext("{} j'aime", "{} j'aime", toggle.count),
+                gettext("Voir qui a aimé"),
+            ),
+            _ => (
+                ngettext("{} repost", "{} reposts", toggle.count),
+                gettext("Voir qui a reposté"),
+            ),
         };
-        let words = ngettext(one, many, toggle.count);
-        label.set_label(&format!(
-            "<b>{}</b> {}",
-            toggle.count,
-            gtk::glib::markup_escape_text(words.trim_start_matches("{} "))
-        ));
+        label.set_label(
+            &gtk::glib::markup_escape_text(&template)
+                .replace("{}", &format!("<b>{}</b>", toggle.count)),
+        );
         button.set_tooltip_text(Some(&tooltip));
         button.set_visible(toggle.count > 0);
     };

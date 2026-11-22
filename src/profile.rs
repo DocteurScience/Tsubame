@@ -518,23 +518,28 @@ impl ProfilePage {
         let Some(profile) = self.profile.borrow().clone() else {
             return;
         };
-        let part = |count: u64, one: &str, many: &str| {
-            let words = ngettext(one, many, count.min(u64::from(u32::MAX)) as u32);
-            format!(
-                "<b>{}</b> {}",
-                format_count(count),
-                glib::markup_escape_text(words.trim_start_matches("{} "))
-            )
+        // Les chaînes restent littérales pour que xgettext les trouve ; le
+        // nombre est mis en gras là où la traduction le place.
+        let n = |count: u64| count.min(u64::from(u32::MAX)) as u32;
+        let part = |template: String, count: u64| {
+            glib::markup_escape_text(&template)
+                .replace("{}", &format!("<b>{}</b>", format_count(count)))
         };
         for (button, text, tooltip) in [
             (
                 &self.followers,
-                part(profile.followers, "{} abonné", "{} abonnés"),
+                part(
+                    ngettext("{} abonné", "{} abonnés", n(profile.followers)),
+                    profile.followers,
+                ),
                 gettext("Voir les abonnés"),
             ),
             (
                 &self.follows,
-                part(profile.follows, "{} abonnement", "{} abonnements"),
+                part(
+                    ngettext("{} abonnement", "{} abonnements", n(profile.follows)),
+                    profile.follows,
+                ),
                 gettext("Voir les abonnements"),
             ),
         ] {
@@ -543,8 +548,10 @@ impl ProfilePage {
             }
             button.set_tooltip_text(Some(&tooltip));
         }
-        self.post_count
-            .set_label(&part(profile.posts, "{} post", "{} posts"));
+        self.post_count.set_label(&part(
+            ngettext("{} post", "{} posts", n(profile.posts)),
+            profile.posts,
+        ));
         self.more.set_menu_model(Some(&profile_menu(&profile)));
         self.follow.set_sensitive(profile.blocking.is_none());
         if profile.following.is_some() {
@@ -778,8 +785,7 @@ impl ProfilePage {
         let dialog = adw::AlertDialog::new(
             Some(&gettext("Bloquer @{} ?").replace("{}", &profile.handle)),
             Some(&gettext(
-                "Ses posts et son profil vous seront cachés, et ce compte ne pourra plus \
-                 interagir avec vous. Le blocage est public.",
+                "Ses posts et son profil vous seront cachés, et ce compte ne pourra plus interagir avec vous. Le blocage est public.",
             )),
         );
         dialog.add_responses(&[

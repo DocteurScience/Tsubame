@@ -1129,8 +1129,7 @@ impl State {
         let dialog = adw::AlertDialog::new(
             Some(&gettext("Supprimer ce post ?")),
             Some(&gettext(
-                "Il sera retiré de Bluesky, avec ses j'aime et ses reposts. \
-                 Cette action est définitive.",
+                "Il sera retiré de Bluesky, avec ses j'aime et ses reposts. Cette action est définitive.",
             )),
         );
         dialog.add_responses(&[
@@ -1270,8 +1269,7 @@ impl State {
         let dialog = adw::AlertDialog::new(
             Some(&gettext("Bloquer @{} ?").replace("{}", handle)),
             Some(&gettext(
-                "Ses posts et son profil vous seront cachés, et ce compte ne pourra plus \
-                 interagir avec vous. Le blocage est public.",
+                "Ses posts et son profil vous seront cachés, et ce compte ne pourra plus interagir avec vous. Le blocage est public.",
             )),
         );
         dialog.add_responses(&[

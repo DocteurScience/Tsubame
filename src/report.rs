@@ -164,8 +164,7 @@ pub fn present(
     let reasons_group = adw::PreferencesGroup::builder()
         .title(gettext("Motif"))
         .description(gettext(
-            "Le signalement est envoyé au service de modération de Bluesky. \
-             La personne signalée n'en est pas informée.",
+            "Le signalement est envoyé au service de modération de Bluesky. La personne signalée n'en est pas informée.",
         ))
         .build();
     let chosen: Rc<RefCell<Option<&'static str>>> = Rc::default();

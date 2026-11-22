@@ -64,8 +64,7 @@ impl LoginError {
             LoginError::AccountNotFound => gettext("Aucun compte trouvé pour cet identifiant."),
             LoginError::Expired => gettext("Votre session a expiré. Reconnectez-vous."),
             LoginError::Unreachable => gettext(
-                "Impossible de trouver ce compte. Vérifiez l'identifiant et votre connexion à \
-                 Internet.",
+                "Impossible de trouver ce compte. Vérifiez l'identifiant et votre connexion à Internet.",
             ),
             LoginError::Denied => gettext("La connexion a été refusée dans le navigateur."),
             LoginError::Keyring(detail) => {

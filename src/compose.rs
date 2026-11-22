@@ -1003,8 +1003,7 @@ pub fn present(
                                 .replacen("{}", &(total + 1).to_string(), 1)
                         } else if published.gates_failed {
                             gettext(
-                                "Post publié, mais ses réglages de réponse et de citation \
-                                 n'ont pas été enregistrés.",
+                                "Post publié, mais ses réglages de réponse et de citation n'ont pas été enregistrés.",
                             )
                         } else if total > 0 {
                             gettext("Fil publié.")
