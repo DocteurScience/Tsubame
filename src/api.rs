@@ -1012,6 +1012,50 @@ pub async fn list_members(session: Arc<Session>, uri: String) -> Result<Vec<Acto
         .collect())
 }
 
+/// Abonnés (`followers` vrai) ou abonnements d'un compte, par pages de 50.
+pub async fn connections(
+    session: Arc<Session>,
+    actor: String,
+    followers: bool,
+    cursor: Option<String>,
+) -> Result<(Vec<Actor>, Option<String>), ApiError> {
+    use atrium_api::app::bsky::graph::{get_followers, get_follows};
+    let api = session.api().await?;
+    let actor: atrium_api::types::string::AtIdentifier =
+        actor.parse().map_err(|_| invalid_actor())?;
+    let graph = &api.api.app.bsky.graph;
+    let (views, cursor) = if followers {
+        let output = graph
+            .get_followers(
+                get_followers::ParametersData {
+                    actor,
+                    cursor,
+                    limit: 50.try_into().ok(),
+                    sort: None,
+                }
+                .into(),
+            )
+            .await
+            .map_err(request_failed)?;
+        (output.data.followers, output.data.cursor)
+    } else {
+        let output = graph
+            .get_follows(
+                get_follows::ParametersData {
+                    actor,
+                    cursor,
+                    limit: 50.try_into().ok(),
+                    sort: None,
+                }
+                .into(),
+            )
+            .await
+            .map_err(request_failed)?;
+        (output.data.follows, output.data.cursor)
+    };
+    Ok((views.iter().map(actor_from_view).collect(), cursor))
+}
+
 fn invalid_post() -> ApiError {
     ApiError::new(gettext("Ce post ne peut pas être modifié."))
 }

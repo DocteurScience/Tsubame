@@ -93,7 +93,10 @@ pub struct ProfilePage {
     name: gtk::Label,
     handle: gtk::Label,
     bio: gtk::Label,
-    stats: gtk::Label,
+    /// Compteurs : abonnés et abonnements (boutons vers leur liste), posts.
+    followers: gtk::Button,
+    follows: gtk::Button,
+    post_count: gtk::Label,
     follow: gtk::Button,
     /// Menu ⋮ : lien, masquer, bloquer, signaler.
     more: gtk::MenuButton,
@@ -157,8 +160,22 @@ impl ProfilePage {
         let name = label(&["title-1"]);
         let handle = label(&["dim-label"]);
         let bio = label(&[]);
-        let stats = label(&[]);
-        stats.set_use_markup(true);
+        let counter = || {
+            let label = gtk::Label::builder().use_markup(true).build();
+            gtk::Button::builder()
+                .child(&label)
+                .css_classes(["flat", "profile-count"])
+                .build()
+        };
+        let (followers, follows) = (counter(), counter());
+        let post_count = gtk::Label::builder()
+            .use_markup(true)
+            .margin_start(8)
+            .build();
+        let stats = gtk::Box::new(gtk::Orientation::Horizontal, 4);
+        stats.append(&followers);
+        stats.append(&follows);
+        stats.append(&post_count);
 
         // Onglets : boutons liés, à remplacer par AdwToggleGroup avec
         // libadwaita 1.7.
@@ -271,7 +288,9 @@ impl ProfilePage {
             name,
             handle,
             bio,
-            stats,
+            followers,
+            follows,
+            post_count,
             follow,
             more,
             likes_tab,
@@ -324,6 +343,27 @@ impl ProfilePage {
                 page.toggle_follow();
             }
         });
+
+        for (button, followers) in [(&page.followers, true), (&page.follows, false)] {
+            let weak = Rc::downgrade(&page);
+            button.connect_clicked(move |_| {
+                let Some(page) = weak.upgrade() else { return };
+                let Some(profile) = page.profile.borrow().clone() else {
+                    return;
+                };
+                let actor = if profile.did.is_empty() {
+                    profile.handle.clone()
+                } else {
+                    profile.did.clone()
+                };
+                (page.host.push)(crate::feed_page::connections_page(
+                    &actor,
+                    &profile.name,
+                    followers,
+                    &page.host,
+                ));
+            });
+        }
 
         let actions = gio::SimpleActionGroup::new();
         for (name, handler) in [
@@ -444,12 +484,25 @@ impl ProfilePage {
                 glib::markup_escape_text(words.trim_start_matches("{} "))
             )
         };
-        self.stats.set_label(&format!(
-            "{}   {}   {}",
-            part(profile.followers, "{} abonné", "{} abonnés"),
-            part(profile.follows, "{} abonnement", "{} abonnements"),
-            part(profile.posts, "{} post", "{} posts"),
-        ));
+        for (button, text, tooltip) in [
+            (
+                &self.followers,
+                part(profile.followers, "{} abonné", "{} abonnés"),
+                gettext("Voir les abonnés"),
+            ),
+            (
+                &self.follows,
+                part(profile.follows, "{} abonnement", "{} abonnements"),
+                gettext("Voir les abonnements"),
+            ),
+        ] {
+            if let Some(label) = button.child().and_downcast::<gtk::Label>() {
+                label.set_label(&text);
+            }
+            button.set_tooltip_text(Some(&tooltip));
+        }
+        self.post_count
+            .set_label(&part(profile.posts, "{} post", "{} posts"));
         self.more.set_menu_model(Some(&profile_menu(&profile)));
         self.follow.set_sensitive(profile.blocking.is_none());
         if profile.following.is_some() {

@@ -1,5 +1,5 @@
 //! Pages simples de posts et de comptes : Signets, fil d'une liste,
-//! membres d'une liste, et la page Listes.
+//! membres d'une liste, abonnés et abonnements, et la page Listes.
 
 use std::rc::Rc;
 
@@ -352,4 +352,137 @@ impl ListsPage {
         };
         (self.host.push)(page);
     }
+}
+
+/// Abonnés (`followers` vrai) ou abonnements du compte `actor`, avec la
+/// suite au défilement.
+pub fn connections_page(
+    actor: &str,
+    name: &str,
+    followers: bool,
+    host: &Host,
+) -> adw::NavigationPage {
+    let title = if followers {
+        gettext("Abonnés")
+    } else {
+        gettext("Abonnements")
+    };
+    let rows = boxed_list(&title);
+    let scroll = scrolled(&rows);
+    let stack = gtk::Stack::new();
+    stack.add_named(&scroll, Some("list"));
+    stack.add_named(&status(&gettext("Chargement…")), Some("loading"));
+    let error = status("");
+    stack.add_named(&error, Some("error"));
+    let root = adw::ToolbarView::builder().content(&stack).build();
+    root.add_top_bar(
+        &adw::HeaderBar::builder()
+            .title_widget(&adw::WindowTitle::new(&title, name))
+            .build(),
+    );
+    let page = adw::NavigationPage::builder()
+        .title(&title)
+        .child(&root)
+        .build();
+
+    let Some(session) = host.session.clone() else {
+        let toasts = host.toasts.clone();
+        for actor in data::demo_actors() {
+            rows.append(&actor_row(&actor, None, &toasts));
+        }
+        return page;
+    };
+    stack.set_visible_child_name("loading");
+
+    // Page suivante : `None` avant la première, `Some(None)` à la fin.
+    struct Loader {
+        session: std::sync::Arc<crate::auth::Session>,
+        actor: String,
+        followers: bool,
+        rows: gtk::ListBox,
+        stack: gtk::Stack,
+        error: adw::StatusPage,
+        toasts: adw::ToastOverlay,
+        expired: Rc<dyn Fn(String)>,
+        cursor: std::cell::RefCell<Option<Option<String>>>,
+        loading: std::cell::Cell<bool>,
+    }
+    impl Loader {
+        fn load(self: &Rc<Self>) {
+            let cursor = match self.cursor.borrow().clone() {
+                Some(None) => return,
+                Some(Some(cursor)) => Some(cursor),
+                None => None,
+            };
+            if self.loading.replace(true) {
+                return;
+            }
+            let task = runtime().spawn(api::connections(
+                self.session.clone(),
+                self.actor.clone(),
+                self.followers,
+                cursor,
+            ));
+            let weak = Rc::downgrade(self);
+            glib::spawn_future_local(async move {
+                let result = task
+                    .await
+                    .unwrap_or_else(|_| Err(ApiError::new(gettext("Chargement interrompu."))));
+                let Some(this) = weak.upgrade() else { return };
+                this.loading.set(false);
+                let first = this.cursor.borrow().is_none();
+                match result {
+                    Ok((actors, cursor)) => {
+                        for actor in &actors {
+                            this.rows.append(&actor_row(
+                                actor,
+                                Some(this.session.clone()),
+                                &this.toasts,
+                            ));
+                        }
+                        this.cursor
+                            .replace(Some(cursor.filter(|_| !actors.is_empty())));
+                        if first && actors.is_empty() {
+                            this.error.set_title(&if this.followers {
+                                gettext("Aucun abonné pour l'instant.")
+                            } else {
+                                gettext("Aucun abonnement pour l'instant.")
+                            });
+                            this.stack.set_visible_child_name("error");
+                        } else {
+                            this.stack.set_visible_child_name("list");
+                        }
+                    }
+                    Err(error) if error.expired => (this.expired)(error.message),
+                    Err(error) if first => {
+                        this.error.set_title(&error.message);
+                        this.stack.set_visible_child_name("error");
+                    }
+                    Err(error) => this.toasts.add_toast(adw::Toast::new(&error.message)),
+                }
+            });
+        }
+    }
+    let loader = Rc::new(Loader {
+        session,
+        actor: actor.to_owned(),
+        followers,
+        rows,
+        stack,
+        error,
+        toasts: host.toasts.clone(),
+        expired: host.expired.clone(),
+        cursor: Default::default(),
+        loading: Default::default(),
+    });
+    let weak = Rc::downgrade(&loader);
+    scroll.connect_edge_reached(move |_, edge| {
+        if edge == gtk::PositionType::Bottom
+            && let Some(loader) = weak.upgrade()
+        {
+            loader.load();
+        }
+    });
+    loader.load();
+    keep_alive(page, loader)
 }

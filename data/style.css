@@ -203,3 +203,13 @@ columnsview > .column headerbar {
   background-color: alpha(@card_bg_color, 0.6);
   padding: 12px;
 }
+
+/* Compteurs du profil cliquables. */
+.profile-count {
+  padding: 2px 6px;
+  min-height: 0;
+}
+
+.profile-count label {
+  font-weight: normal;
+}
