@@ -200,6 +200,8 @@ struct State {
     /// Colonnes ouvertes et leur ordre, position du volet : retrouvés au
     /// lancement suivant.
     settings: gio::Settings,
+    /// Vérification périodique des notifications, pendant la connexion.
+    poll: RefCell<Option<glib::SourceId>>,
     window: glib::WeakRef<adw::ApplicationWindow>,
     compact: adw::Breakpoint,
     /// Indices des colonnes affichées par `ColumnsView`.
@@ -508,6 +510,7 @@ impl State {
         self.load_all();
         self.load_pinned_feeds();
         self.load_moderation();
+        self.start_polling();
         self.columns_changed();
         self.update_my_profile();
         self.update_explore();
@@ -527,6 +530,7 @@ impl State {
         self.clear_thread();
         moderation::set_preferences(Vec::new());
         interactions::set_me(None);
+        self.stop_polling();
         self.load_all();
         self.update_my_profile();
         self.update_explore();
@@ -1486,6 +1490,74 @@ impl State {
         self.rebuild_sidebar();
     }
 
+    /// Vérifie toutes les minutes s'il y a de nouvelles notifications.
+    fn start_polling(self: &Rc<Self>) {
+        self.stop_polling();
+        if self.session.borrow().is_none() {
+            return;
+        }
+        let weak = Rc::downgrade(self);
+        let id = glib::timeout_add_seconds_local(POLL_SECONDS, move || {
+            let Some(state) = weak.upgrade() else {
+                return glib::ControlFlow::Break;
+            };
+            state.poll_unread();
+            glib::ControlFlow::Continue
+        });
+        self.poll.replace(Some(id));
+    }
+
+    fn stop_polling(&self) {
+        if let Some(id) = self.poll.take() {
+            id.remove();
+        }
+    }
+
+    /// Plus de notifications non vues qu'affiché : recharger les colonnes de
+    /// notifications et, si la fenêtre n'est pas au premier plan, prévenir
+    /// par une notification du bureau.
+    fn poll_unread(self: &Rc<Self>) {
+        let Some(session) = self.session.borrow().clone() else {
+            return;
+        };
+        let task = runtime().spawn(api::unread_count(session));
+        let weak = Rc::downgrade(self);
+        glib::spawn_future_local(async move {
+            let Ok(Ok(count)) = task.await else { return };
+            let Some(state) = weak.upgrade() else { return };
+            if count <= state.unread.get() {
+                return;
+            }
+            state.load(Target::Home(ColumnKind::Notifications), false);
+            state.load(Target::CompactNotifications, false);
+            state.set_unread(count);
+            state.notify_desktop(count);
+        });
+    }
+
+    fn notify_desktop(&self, count: u32) {
+        let Some(window) = self.window.upgrade() else {
+            return;
+        };
+        if window.is_active() || !self.settings.boolean("desktop-notifications") {
+            return;
+        }
+        let Some(app) = window.application() else {
+            return;
+        };
+        let notification = gio::Notification::new(&gettext("Nouvelles notifications"));
+        notification.set_body(Some(
+            &gettextrs::ngettext(
+                "Vous avez {} notification non lue.",
+                "Vous avez {} notifications non lues.",
+                count,
+            )
+            .replace("{}", &count.to_string()),
+        ));
+        notification.set_default_action("app.show-notifications");
+        app.send_notification(Some(UNREAD_NOTIFICATION), &notification);
+    }
+
     /// Recalcule le nombre de notifications non vues d'après les colonnes
     /// chargées.
     fn refresh_unread(self: &Rc<Self>) {
@@ -1520,6 +1592,9 @@ impl State {
             Column::mark_all_read,
         );
         self.set_unread(0);
+        if let Some(app) = self.window.upgrade().and_then(|w| w.application()) {
+            app.withdraw_notification(UNREAD_NOTIFICATION);
+        }
         if let Some(session) = self.session.borrow().clone() {
             runtime().spawn(async move {
                 if let Err(error) = api::mark_notifications_seen(session).await {
@@ -1831,6 +1906,11 @@ fn install_actions(window: &adw::ApplicationWindow, state: &Rc<State>) {
     }
 }
 
+/// Intervalle de vérification des notifications, en secondes.
+const POLL_SECONDS: u32 = 60;
+/// Identifiant de la notification du bureau, remplacée à chaque envoi.
+const UNREAD_NOTIFICATION: &str = "unread";
+
 pub fn build(app: &adw::Application) -> adw::ApplicationWindow {
     let columns_menu = gio::Menu::new();
     let add_menu = gio::Menu::new();
@@ -2070,6 +2150,7 @@ pub fn build(app: &adw::Application) -> adw::ApplicationWindow {
         unread: Cell::new(0),
         notifications_page: notifications.clone(),
         logout_action: gio::SimpleAction::new("logout", None),
+        poll: RefCell::default(),
     });
     state.connect_column(&state.compact_notifications, Target::CompactNotifications);
     install_actions(&window, &state);
@@ -2182,6 +2263,24 @@ pub fn build(app: &adw::Application) -> adw::ApplicationWindow {
 
     // Les gestionnaires ne gardent qu'une référence faible à l'état ; la
     // fenêtre garde la seule référence forte, libérée avec elle.
+    // Clic sur la notification du bureau : la fenêtre, colonne Notifications.
+    let show_notifications = gio::SimpleAction::new("show-notifications", None);
+    let weak = Rc::downgrade(&state);
+    show_notifications.connect_activate(move |_, _| {
+        let Some(state) = weak.upgrade() else { return };
+        if let Some(window) = state.window.upgrade() {
+            window.present();
+        }
+        if state
+            .columns
+            .borrow()
+            .iter()
+            .any(|c| c.kind == ColumnKind::Notifications)
+        {
+            state.show_column(ColumnKind::Notifications);
+        }
+    });
+    app.add_action(&show_notifications);
     window.connect_destroy(move |_| {
         let _ = &state;
     });

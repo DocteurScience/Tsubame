@@ -9,3 +9,4 @@ Terminal=false
 Type=Application
 Categories=GTK;GNOME;Network;Chat;InstantMessaging;
 StartupNotify=true
+X-GNOME-UsesNotifications=true

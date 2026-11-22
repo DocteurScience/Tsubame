@@ -153,6 +153,29 @@ pub fn present(
     page.add(&labelers);
     dialog.add(&page);
 
+    // Notifications du bureau, réglage de cet ordinateur (GSettings).
+    let notifications = adw::PreferencesPage::builder()
+        .title(gettext("Notifications"))
+        .icon_name("preferences-system-notifications-symbolic")
+        .build();
+    let group = adw::PreferencesGroup::builder()
+        .description(gettext(
+            "Tsubame vérifie les notifications toutes les minutes tant qu'il est ouvert.",
+        ))
+        .build();
+    let desktop = adw::SwitchRow::builder()
+        .title(gettext("Notifications du bureau"))
+        .subtitle(gettext(
+            "Prévenir des nouvelles notifications quand la fenêtre n'est pas au premier plan",
+        ))
+        .build();
+    crate::settings::settings()
+        .bind("desktop-notifications", &desktop, "active")
+        .build();
+    group.add(&desktop);
+    notifications.add(&group);
+    dialog.add(&notifications);
+
     let this = Rc::new(Dialog {
         dialog: dialog.clone(),
         session,

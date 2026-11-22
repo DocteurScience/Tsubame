@@ -704,6 +704,23 @@ pub fn grouped_notifications(
     cards
 }
 
+/// Nombre de notifications pas encore vues (`getUnreadCount`).
+pub async fn unread_count(session: Arc<Session>) -> Result<u32, ApiError> {
+    let api = session.api().await?;
+    let output = Box::pin(
+        api.api.app.bsky.notification.get_unread_count(
+            atrium_api::app::bsky::notification::get_unread_count::ParametersData {
+                priority: None,
+                seen_at: None,
+            }
+            .into(),
+        ),
+    )
+    .await
+    .map_err(request_failed)?;
+    Ok(output.data.count.clamp(0, i64::from(u32::MAX)) as u32)
+}
+
 /// Marque les notifications comme vues (`updateSeen`).
 pub async fn mark_notifications_seen(session: Arc<Session>) -> Result<(), ApiError> {
     let api = session.api().await?;

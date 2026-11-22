@@ -16,5 +16,10 @@
       <summary>Position du volet de lecture</summary>
       <description>Où s’affiche la discussion sur grand écran : à droite des colonnes, en dessous, ou nulle part (elle s’ouvre alors en page).</description>
     </key>
+    <key name="desktop-notifications" type="b">
+      <default>true</default>
+      <summary>Notifications du bureau</summary>
+      <description>Prévenir des nouvelles notifications Bluesky quand la fenêtre de Tsubame n’est pas au premier plan.</description>
+    </key>
   </schema>
 </schemalist>
