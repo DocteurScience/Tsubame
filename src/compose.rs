@@ -249,8 +249,42 @@ pub fn present(
     add_image.update_property(&[gtk::accessible::Property::Label(&gettext(
         "Ajouter une image",
     ))]);
+    // Qui peut répondre, et citations : pour un nouveau post seulement (une
+    // réponse suit les réglages du début de la discussion).
+    let reply_rule = Rc::new(Cell::new(api::ReplyRule::Everyone));
+    let no_quotes = Rc::new(Cell::new(false));
+    let gate_menu = gio::Menu::new();
+    let rules = gio::Menu::new();
+    for rule in api::ReplyRule::ALL {
+        rules.append(
+            Some(&rule.title()),
+            Some(&format!("compose.replies::{}", rule.id())),
+        );
+    }
+    gate_menu.append_section(Some(&gettext("Qui peut répondre")), &rules);
+    let quotes_section = gio::Menu::new();
+    quotes_section.append(
+        Some(&gettext("Autoriser les citations")),
+        Some("compose.quotes"),
+    );
+    gate_menu.append_section(None, &quotes_section);
+    let gate_content = adw::ButtonContent::builder()
+        .icon_name("mail-reply-sender-symbolic")
+        .label(api::ReplyRule::Everyone.title())
+        .build();
+    let gate_button = gtk::MenuButton::builder()
+        .child(&gate_content)
+        .menu_model(&gate_menu)
+        .tooltip_text(gettext("Qui peut répondre et citer"))
+        .css_classes(["flat"])
+        .visible(!replying)
+        .build();
+    gate_button.update_property(&[gtk::accessible::Property::Label(&gettext(
+        "Qui peut répondre et citer",
+    ))]);
     bottom.append(&add_image);
     bottom.append(&language_button);
+    bottom.append(&gate_button);
     bottom.append(&counter);
 
     let view = adw::ToolbarView::builder()
@@ -287,6 +321,35 @@ pub fn present(
         });
     }
     actions.add_action(&language_action);
+    let replies_action = gio::SimpleAction::new_stateful(
+        "replies",
+        Some(glib::VariantTy::STRING),
+        &api::ReplyRule::Everyone.id().to_variant(),
+    );
+    {
+        let (reply_rule, gate_content) = (reply_rule.clone(), gate_content.clone());
+        replies_action.connect_change_state(move |action, value| {
+            if let Some(rule) = value
+                .and_then(|v| v.str())
+                .and_then(api::ReplyRule::from_id)
+            {
+                reply_rule.set(rule);
+                gate_content.set_label(&rule.title());
+                action.set_state(&rule.id().to_variant());
+            }
+        });
+    }
+    actions.add_action(&replies_action);
+    let quotes_action = gio::SimpleAction::new_stateful("quotes", None, &true.to_variant());
+    {
+        let no_quotes = no_quotes.clone();
+        quotes_action.connect_activate(move |action, _| {
+            let allowed = !action.state().and_then(|s| s.get::<bool>()).unwrap_or(true);
+            action.set_state(&allowed.to_variant());
+            no_quotes.set(!allowed);
+        });
+    }
+    actions.add_action(&quotes_action);
     dialog.insert_action_group("compose", Some(&actions));
 
     // Compteur et validité, à chaque frappe. Un texte en cours empêche de
@@ -504,6 +567,8 @@ pub fn present(
                 reply: reply.clone(),
                 images: Vec::new(),
                 quote: quote_ref.clone(),
+                reply_rule: reply_rule.get(),
+                no_quotes: no_quotes.get(),
             };
             let task = runtime().spawn(async move {
                 // Images réduites et réencodées hors de la boucle GTK.
@@ -542,8 +607,13 @@ pub fn present(
                 });
                 busy.set(false);
                 match result {
-                    Ok(_) => {
-                        toasts.add_toast(adw::Toast::new(&if parent_uri.is_some() {
+                    Ok(published) => {
+                        toasts.add_toast(adw::Toast::new(&if published.gates_failed {
+                            gettext(
+                                "Post publié, mais ses réglages de réponse et de citation \
+                                 n'ont pas été enregistrés.",
+                            )
+                        } else if parent_uri.is_some() {
                             gettext("Réponse publiée.")
                         } else {
                             gettext("Post publié.")

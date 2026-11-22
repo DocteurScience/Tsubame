@@ -1230,6 +1230,106 @@ pub async fn delete(session: Arc<Session>, record_uri: String) -> Result<(), Api
         .map_err(request_failed)
 }
 
+/// Qui peut répondre à un nouveau post (`app.bsky.feed.threadgate`).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum ReplyRule {
+    #[default]
+    Everyone,
+    Following,
+    Followers,
+    Mentioned,
+    Nobody,
+}
+
+impl ReplyRule {
+    pub const ALL: [ReplyRule; 5] = [
+        ReplyRule::Everyone,
+        ReplyRule::Following,
+        ReplyRule::Followers,
+        ReplyRule::Mentioned,
+        ReplyRule::Nobody,
+    ];
+
+    pub fn id(self) -> &'static str {
+        match self {
+            ReplyRule::Everyone => "everyone",
+            ReplyRule::Following => "following",
+            ReplyRule::Followers => "followers",
+            ReplyRule::Mentioned => "mentioned",
+            ReplyRule::Nobody => "nobody",
+        }
+    }
+
+    pub fn from_id(id: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|rule| rule.id() == id)
+    }
+
+    /// Libellé court, pour le menu et le bouton.
+    pub fn title(self) -> String {
+        match self {
+            ReplyRule::Everyone => gettext("Tout le monde"),
+            ReplyRule::Following => gettext("Comptes que vous suivez"),
+            ReplyRule::Followers => gettext("Vos abonnés"),
+            ReplyRule::Mentioned => gettext("Comptes mentionnés"),
+            ReplyRule::Nobody => gettext("Personne"),
+        }
+    }
+}
+
+/// Enregistrements qui accompagnent un nouveau post, avec la même clé :
+/// qui peut répondre, et l'interdiction de le citer.
+pub fn gate_records(
+    post_uri: &str,
+    rule: ReplyRule,
+    no_quotes: bool,
+    created_at: &str,
+) -> Vec<(&'static str, serde_json::Value)> {
+    use serde_json::json;
+    let mut records = Vec::new();
+    let allow = match rule {
+        ReplyRule::Everyone => None,
+        ReplyRule::Following => Some(vec![
+            json!({"$type": "app.bsky.feed.threadgate#followingRule"}),
+        ]),
+        ReplyRule::Followers => Some(vec![
+            json!({"$type": "app.bsky.feed.threadgate#followerRule"}),
+        ]),
+        ReplyRule::Mentioned => Some(vec![
+            json!({"$type": "app.bsky.feed.threadgate#mentionRule"}),
+        ]),
+        ReplyRule::Nobody => Some(Vec::new()),
+    };
+    if let Some(allow) = allow {
+        records.push((
+            "app.bsky.feed.threadgate",
+            json!({
+                "$type": "app.bsky.feed.threadgate",
+                "post": post_uri,
+                "allow": allow,
+                "createdAt": created_at,
+            }),
+        ));
+    }
+    if no_quotes {
+        records.push((
+            "app.bsky.feed.postgate",
+            json!({
+                "$type": "app.bsky.feed.postgate",
+                "post": post_uri,
+                "embeddingRules": [{"$type": "app.bsky.feed.postgate#disableRule"}],
+                "createdAt": created_at,
+            }),
+        ));
+    }
+    records
+}
+
+/// Publication réussie. `gates_failed` : les réglages de réponse ou de citation
+/// n'ont pas pu être enregistrés, alors que le post l'a été.
+pub struct Published {
+    pub gates_failed: bool,
+}
+
 /// Post à publier.
 #[derive(Debug, Clone)]
 pub struct NewPost {
@@ -1242,6 +1342,10 @@ pub struct NewPost {
     pub images: Vec<NewImage>,
     /// Post cité.
     pub quote: Option<StrongRef>,
+    /// Qui peut répondre (sans effet sur une réponse).
+    pub reply_rule: ReplyRule,
+    /// Interdire de citer ce post.
+    pub no_quotes: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -1331,8 +1435,8 @@ pub fn post_record(
     record
 }
 
-/// Publie un post ; renvoie sa référence.
-pub async fn publish(session: Arc<Session>, post: NewPost) -> Result<StrongRef, ApiError> {
+/// Publie un post, puis ses réglages de réponse et de citation.
+pub async fn publish(session: Arc<Session>, post: NewPost) -> Result<Published, ApiError> {
     use atrium_api::com::atproto::repo::create_record;
     use atrium_api::types::string::{Datetime, Did, Handle, Nsid};
 
@@ -1400,13 +1504,54 @@ pub async fn publish(session: Arc<Session>, post: NewPost) -> Result<StrongRef, 
         )
         .await
         .map_err(request_failed)?;
-    Ok(StrongRef {
+    let published = StrongRef {
         uri: output.data.uri,
         cid: serde_json::to_value(&output.data.cid)
             .ok()
             .and_then(|cid| cid.as_str().map(str::to_owned))
             .unwrap_or_default(),
-    })
+    };
+    // Une réponse suit les réglages du début de la discussion.
+    let rule = if post.reply.is_some() {
+        ReplyRule::Everyone
+    } else {
+        post.reply_rule
+    };
+    let rkey = parse_record_uri(&published.uri).map(|(_, _, rkey)| rkey.to_owned());
+    let mut gates_failed = false;
+    for (collection, record) in
+        gate_records(&published.uri, rule, post.no_quotes, created_at.as_str())
+    {
+        let (Some(rkey), Ok(record)) = (rkey.clone(), serde_json::from_value(record)) else {
+            gates_failed = true;
+            continue;
+        };
+        let result = Box::pin(
+            api.api.com.atproto.repo.create_record(
+                create_record::InputData {
+                    collection: Nsid::new(collection.to_owned()).map_err(|_| invalid_post())?,
+                    record,
+                    repo: Did::new(session.account.did.clone())
+                        .map_err(|_| invalid_post())?
+                        .into(),
+                    rkey: atrium_api::types::string::RecordKey::new(rkey).ok(),
+                    swap_commit: None,
+                    validate: None,
+                }
+                .into(),
+            ),
+        )
+        .await;
+        if let Err(error) = result {
+            glib_debug(&format!("{collection} : {error}"));
+            gates_failed = true;
+        }
+    }
+    Ok(Published { gates_failed })
+}
+
+fn glib_debug(message: &str) {
+    gtk::glib::g_debug!("tsubame", "{}", message);
 }
 
 pub(crate) fn month(month: u32) -> String {
@@ -1841,6 +1986,8 @@ mod tests {
             langs: vec!["fr".into()],
             reply: Some((root, parent)),
             quote: None,
+            reply_rule: ReplyRule::Everyone,
+            no_quotes: false,
             images: Vec::new(),
         };
         let dids = HashMap::from([(
@@ -1882,6 +2029,8 @@ mod tests {
             langs: vec!["fr".into()],
             reply: None,
             quote: None,
+            reply_rule: ReplyRule::Everyone,
+            no_quotes: false,
             images: vec![image("Lever de soleil sur le Vercors"), image("")],
         };
         let blob = serde_json::json!({
@@ -1907,6 +2056,43 @@ mod tests {
     }
 
     #[test]
+    fn reply_and_quote_rules_become_gates() {
+        let uri = "at://did:plc:moi/app.bsky.feed.post/3k";
+        let at = "2026-11-20T15:00:00.000Z";
+        assert!(gate_records(uri, ReplyRule::Everyone, false, at).is_empty());
+        let gates = gate_records(uri, ReplyRule::Nobody, true, at);
+        assert_eq!(gates.len(), 2);
+        assert_eq!(gates[0].0, "app.bsky.feed.threadgate");
+        assert_eq!(gates[0].1["allow"], serde_json::json!([]));
+        assert_eq!(gates[0].1["post"], uri);
+        assert_eq!(gates[1].0, "app.bsky.feed.postgate");
+        assert_eq!(
+            gates[1].1["embeddingRules"][0]["$type"],
+            "app.bsky.feed.postgate#disableRule"
+        );
+        let gates = gate_records(uri, ReplyRule::Followers, false, at);
+        assert_eq!(
+            gates[0].1["allow"][0]["$type"],
+            "app.bsky.feed.threadgate#followerRule"
+        );
+        for rule in ReplyRule::ALL {
+            assert_eq!(ReplyRule::from_id(rule.id()), Some(rule));
+            for (collection, record) in gate_records(uri, rule, true, at) {
+                match collection {
+                    "app.bsky.feed.threadgate" => {
+                        let _: atrium_api::app::bsky::feed::threadgate::Record =
+                            serde_json::from_value(record).unwrap();
+                    }
+                    _ => {
+                        let _: atrium_api::app::bsky::feed::postgate::Record =
+                            serde_json::from_value(record).unwrap();
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
     fn quotes_are_embedded_alone_or_with_images() {
         let quoted = StrongRef {
             uri: "at://did:plc:lucie/app.bsky.feed.post/1".into(),
@@ -1917,6 +2103,8 @@ mod tests {
             langs: vec!["fr".into()],
             reply: None,
             quote: Some(quoted),
+            reply_rule: ReplyRule::Everyone,
+            no_quotes: false,
             images: Vec::new(),
         };
         let record = post_record(&post, &HashMap::new(), "2026-11-20T15:00:00.000Z", &[]);
@@ -1990,6 +2178,8 @@ mod tests {
             langs: Vec::new(),
             reply: None,
             quote: None,
+            reply_rule: ReplyRule::Everyone,
+            no_quotes: false,
             images: Vec::new(),
         };
         let record = post_record(&post, &HashMap::new(), "2026-11-20T15:00:00.000Z", &[]);
