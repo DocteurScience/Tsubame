@@ -1,9 +1,9 @@
 //! Boîte de rédaction : nouveau post ou réponse (maquette
 //! `docs/mockups/source/Compose.dc.html`).
 //!
-//! Pour l'instant : texte, langue, compteur de caractères, réponse. Les
-//! liens, mots-dièse et mentions deviennent des facettes à la publication.
-//! À venir : images, vidéo, étiquettes, réglages de réponse, brouillons.
+//! Texte, langue, compteur de caractères, images, réponse, citation,
+//! réglages de réponse, brouillons. Les liens, mots-dièse et mentions
+//! deviennent des facettes à la publication.
 
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
@@ -16,6 +16,7 @@ use gtk::{gdk, gio, glib};
 use crate::api::{self, NewImage, NewPost};
 use crate::auth::Session;
 use crate::data::{Post, StrongRef};
+use crate::drafts::{self, Draft};
 use crate::photo;
 use crate::richtext::{MAX_GRAPHEMES, grapheme_count};
 use crate::runtime::runtime;
@@ -95,6 +96,39 @@ pub fn present(
         .build();
     header.pack_start(&cancel);
     header.pack_end(&publish);
+
+    // Brouillons (nouveau post seulement) : bouton visible tant que le
+    // texte est vide.
+    let can_draft = reply_to.is_none() && quote.is_none();
+    let saved_drafts = Rc::new(RefCell::new(if can_draft {
+        drafts::load()
+    } else {
+        Vec::new()
+    }));
+    let draft_id: Rc<RefCell<Option<String>>> = Rc::default();
+    let drafts_list = gtk::ListBox::builder()
+        .selection_mode(gtk::SelectionMode::None)
+        .width_request(320)
+        .css_classes(["boxed-list"])
+        .build();
+    drafts_list.update_property(&[gtk::accessible::Property::Label(&gettext("Brouillons"))]);
+    let drafts_popover = gtk::Popover::builder()
+        .child(
+            &gtk::ScrolledWindow::builder()
+                .hscrollbar_policy(gtk::PolicyType::Never)
+                .propagate_natural_height(true)
+                .propagate_natural_width(true)
+                .max_content_height(360)
+                .child(&drafts_list)
+                .build(),
+        )
+        .build();
+    let drafts_button = gtk::MenuButton::builder()
+        .label(gettext("Brouillons"))
+        .popover(&drafts_popover)
+        .visible(false)
+        .build();
+    header.pack_start(&drafts_button);
 
     let content = gtk::Box::builder()
         .orientation(gtk::Orientation::Vertical)
@@ -366,6 +400,8 @@ pub fn present(
             attachments,
             add_image,
             images_area,
+            drafts_button,
+            saved_drafts,
         ) = (
             publish.clone(),
             counter.clone(),
@@ -376,6 +412,8 @@ pub fn present(
             attachments.clone(),
             add_image.clone(),
             images_area.clone(),
+            drafts_button.clone(),
+            saved_drafts.clone(),
         );
         Rc::new(move || {
             let buffer = text.buffer();
@@ -397,6 +435,8 @@ pub fn present(
                 counter.add_css_class("dim-label");
             }
             placeholder.set_visible(value.is_empty());
+            drafts_button
+                .set_visible(value.is_empty() && can_draft && !saved_drafts.borrow().is_empty());
             publish.set_sensitive(result.is_ok() && !busy.get());
             dialog.set_can_close(value.trim().is_empty() && images == 0);
         })
@@ -405,6 +445,69 @@ pub fn present(
         let update = update.clone();
         text.buffer().connect_changed(move |_| update());
     }
+
+    // Brouillons : la liste, et le choix d'un brouillon qui remplit la boîte.
+    {
+        let (drafts_list, saved_drafts, text, draft_id, language_action, drafts_button) = (
+            drafts_list.clone(),
+            saved_drafts.clone(),
+            text.clone(),
+            draft_id.clone(),
+            language_action.clone(),
+            drafts_button.clone(),
+        );
+        drafts_list.connect_row_activated(move |_, row| {
+            let draft = saved_drafts.borrow().get(row.index() as usize).cloned();
+            let Some(draft) = draft else { return };
+            drafts_button.popdown();
+            draft_id.replace(Some(draft.id.clone()));
+            language_action.change_state(&draft.lang.to_variant());
+            text.buffer().set_text(&draft.text);
+            text.grab_focus();
+        });
+    }
+    for draft in saved_drafts.borrow().iter() {
+        let first_line = draft.text.lines().next().unwrap_or_default();
+        let saved = api::parse_datetime(&draft.saved)
+            .map(|t| api::relative_time(t, chrono::Utc::now()))
+            .unwrap_or_default();
+        let row = adw::ActionRow::builder()
+            .title(first_line)
+            .title_lines(2)
+            .subtitle(&saved)
+            .use_markup(false)
+            .activatable(true)
+            .build();
+        let delete = gtk::Button::builder()
+            .icon_name("user-trash-symbolic")
+            .tooltip_text(gettext("Supprimer le brouillon"))
+            .valign(gtk::Align::Center)
+            .css_classes(["flat"])
+            .build();
+        delete.update_property(&[gtk::accessible::Property::Label(&gettext(
+            "Supprimer le brouillon",
+        ))]);
+        let (id, saved_drafts, update, list, weak_row) = (
+            draft.id.clone(),
+            saved_drafts.clone(),
+            update.clone(),
+            drafts_list.downgrade(),
+            row.downgrade(),
+        );
+        delete.connect_clicked(move |_| {
+            if let Err(error) = drafts::remove(&id) {
+                glib::g_debug!("tsubame", "brouillon : {error}");
+            }
+            saved_drafts.borrow_mut().retain(|d| d.id != id);
+            if let (Some(list), Some(row)) = (list.upgrade(), weak_row.upgrade()) {
+                list.remove(&row);
+            }
+            update();
+        });
+        row.add_suffix(&delete);
+        drafts_list.append(&row);
+    }
+
     // État de départ : une citation peut se publier sans texte.
     update();
 
@@ -475,26 +578,83 @@ pub fn present(
     }
 
     // Fermer avec un texte en cours : demander confirmation.
-    dialog.connect_close_attempt(|dialog| {
-        let confirm = adw::AlertDialog::new(
-            Some(&gettext("Abandonner ce post ?")),
-            Some(&gettext("Le texte saisi sera perdu.")),
+    // Fermer avec un texte en cours : demander confirmation, et proposer
+    // de garder un brouillon pour un nouveau post.
+    {
+        let (text, language, draft_id, attachments, error) = (
+            text.clone(),
+            language.clone(),
+            draft_id.clone(),
+            attachments.clone(),
+            error.clone(),
         );
-        confirm.add_responses(&[
-            ("continue", &gettext("Continuer la rédaction")),
-            ("discard", &gettext("Abandonner")),
-        ]);
-        confirm.set_response_appearance("discard", adw::ResponseAppearance::Destructive);
-        confirm.set_default_response(Some("continue"));
-        confirm.set_close_response("continue");
-        let weak = dialog.downgrade();
-        confirm.connect_response(Some("discard"), move |_, _| {
-            if let Some(dialog) = weak.upgrade() {
-                dialog.force_close();
+        dialog.connect_close_attempt(move |dialog| {
+            let has_images = !attachments.borrow().is_empty();
+            let body = if can_draft && has_images {
+                gettext("Le brouillon garde le texte, mais pas les images.")
+            } else if can_draft {
+                gettext("Vous pouvez garder le texte en brouillon.")
+            } else {
+                gettext("Le texte saisi sera perdu.")
+            };
+            let confirm = adw::AlertDialog::new(
+                Some(&if can_draft {
+                    gettext("Garder ce post en brouillon ?")
+                } else {
+                    gettext("Abandonner ce post ?")
+                }),
+                Some(&body),
+            );
+            confirm.add_responses(&[
+                ("continue", &gettext("Continuer la rédaction")),
+                ("discard", &gettext("Abandonner")),
+            ]);
+            if can_draft {
+                confirm.add_response("save", &gettext("Garder en brouillon"));
+                confirm.set_response_appearance("save", adw::ResponseAppearance::Suggested);
+                confirm.set_default_response(Some("save"));
+            } else {
+                confirm.set_default_response(Some("continue"));
             }
+            confirm.set_response_appearance("discard", adw::ResponseAppearance::Destructive);
+            confirm.set_close_response("continue");
+            let weak = dialog.downgrade();
+            confirm.connect_response(Some("discard"), move |_, _| {
+                if let Some(dialog) = weak.upgrade() {
+                    dialog.force_close();
+                }
+            });
+            let weak = dialog.downgrade();
+            let (text, language, draft_id, error) = (
+                text.clone(),
+                language.clone(),
+                draft_id.clone(),
+                error.clone(),
+            );
+            confirm.connect_response(Some("save"), move |_, _| {
+                let Some(dialog) = weak.upgrade() else { return };
+                let buffer = text.buffer();
+                let now = chrono::Utc::now().to_rfc3339();
+                let draft = Draft {
+                    id: draft_id.borrow().clone().unwrap_or_else(|| now.clone()),
+                    text: buffer
+                        .text(&buffer.start_iter(), &buffer.end_iter(), false)
+                        .to_string(),
+                    lang: language.get().to_owned(),
+                    saved: now,
+                };
+                match drafts::put(draft) {
+                    Ok(()) => dialog.force_close(),
+                    Err(failure) => {
+                        glib::g_debug!("tsubame", "brouillon : {failure}");
+                        error.set_label(&gettext("Le brouillon n'a pas pu être enregistré."));
+                        error.set_visible(true);
+                    }
+                }
+            });
+            confirm.present(Some(dialog));
         });
-        confirm.present(Some(dialog));
-    });
+    }
     {
         let dialog = dialog.clone();
         cancel.connect_clicked(move |_| {
@@ -524,7 +684,7 @@ pub fn present(
         (root, parent)
     });
     let do_publish = {
-        let (dialog, text, publish, error, toasts, busy, language, attachments) = (
+        let (dialog, text, publish, error, toasts, busy, language, attachments, draft_id) = (
             dialog.clone(),
             text.clone(),
             publish.clone(),
@@ -533,6 +693,7 @@ pub fn present(
             busy.clone(),
             language.clone(),
             attachments.clone(),
+            draft_id.clone(),
         );
         move || {
             let buffer = text.buffer();
@@ -599,6 +760,7 @@ pub fn present(
                 on_published.clone(),
                 parent_ref.as_ref().map(|p| p.uri.clone()),
             );
+            let draft_id = draft_id.clone();
             glib::spawn_future_local(async move {
                 let result = task.await.unwrap_or_else(|_| {
                     Err(api::ApiError::new(gettext(
@@ -618,6 +780,11 @@ pub fn present(
                         } else {
                             gettext("Post publié.")
                         }));
+                        if let Some(id) = draft_id.borrow().as_deref()
+                            && let Err(error) = drafts::remove(id)
+                        {
+                            glib::g_debug!("tsubame", "brouillon : {error}");
+                        }
                         dialog.force_close();
                         on_published(parent_uri);
                     }

@@ -10,6 +10,7 @@ mod column;
 mod columns;
 mod compose;
 mod data;
+mod drafts;
 mod edit_profile;
 mod explore;
 mod feed_page;
