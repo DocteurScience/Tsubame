@@ -3,6 +3,7 @@
 
 use adw::prelude::*;
 use gettextrs::{gettext, ngettext};
+use gtk::gio;
 
 use crate::data::{Media, Post, Reply};
 use crate::images;
@@ -192,7 +193,44 @@ fn stats(post: &Post) -> gtk::Box {
     row.append(&interaction_button(&entry, Interaction::Repost, false));
     row.append(&interaction_button(&entry, Interaction::Like, false));
     row.append(&interaction_button(&entry, Interaction::Bookmark, false));
+    row.append(&more_menu(post, &entry.key));
     row
+}
+
+/// Menu « Plus d'actions » d'une carte : copier le lien, masquer ou
+/// bloquer l'auteur.
+fn more_menu(post: &Post, key: &str) -> gtk::MenuButton {
+    let item = |label: String, action: &str, target: &str| {
+        let item = gio::MenuItem::new(Some(&label), None);
+        item.set_action_and_target_value(Some(action), Some(&target.to_variant()));
+        item
+    };
+    let menu = gio::Menu::new();
+    let sharing = gio::Menu::new();
+    sharing.append_item(&item(gettext("Copier le lien"), "win.copy-link", key));
+    menu.append_section(None, &sharing);
+    if !post.handle.is_empty() {
+        let author = gio::Menu::new();
+        author.append_item(&item(
+            gettext("Masquer @{}").replace("{}", &post.handle),
+            "win.mute-author",
+            &post.handle,
+        ));
+        author.append_item(&item(
+            gettext("Bloquer @{}").replace("{}", &post.handle),
+            "win.block-author",
+            &post.handle,
+        ));
+        menu.append_section(None, &author);
+    }
+    let button = gtk::MenuButton::builder()
+        .icon_name("view-more-symbolic")
+        .menu_model(&menu)
+        .tooltip_text(gettext("Plus d'actions"))
+        .css_classes(["flat", "post-stat"])
+        .build();
+    button.update_property(&[gtk::accessible::Property::Label(&gettext("Plus d'actions"))]);
+    button
 }
 
 /// Libellé accessible (et info-bulle) d'un bouton J'aime ou Reposter.

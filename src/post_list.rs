@@ -209,10 +209,17 @@ impl PostList {
                     self.list.remove_all();
                     self.posts.borrow_mut().clear();
                 }
-                for post in &page.posts {
+                // Les posts qui contiennent un mot masqué ne sont pas
+                // affichés ; les indices des rangées suivent ceux des posts.
+                let posts: Vec<Post> = page
+                    .posts
+                    .into_iter()
+                    .filter(|post| !crate::moderation::is_hidden(post))
+                    .collect();
+                for post in &posts {
                     self.list.append(&post_row(post));
                 }
-                self.posts.borrow_mut().extend(page.posts);
+                self.posts.borrow_mut().extend(posts);
                 self.cursor.replace(page.cursor);
                 let empty = self.posts.borrow().is_empty();
                 self.root

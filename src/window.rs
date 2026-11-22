@@ -29,6 +29,8 @@ use crate::feed_page::{FeedPage, ListsPage};
 use crate::interactions::{self, Change, Interaction};
 use crate::login::LoginPage;
 use crate::messages::MessagesPage;
+use crate::moderation;
+use crate::preferences;
 use crate::profile::{self, ProfilePage};
 use crate::runtime::runtime;
 use crate::thread::ThreadView;
@@ -503,6 +505,7 @@ impl State {
         self.clear_thread();
         self.load_all();
         self.load_pinned_feeds();
+        self.load_muted_words();
         self.columns_changed();
         self.update_my_profile();
         self.update_explore();
@@ -520,6 +523,7 @@ impl State {
         // Ne rien garder du compte à l'écran : les colonnes repassent aux
         // faux posts, cachés derrière l'écran de connexion.
         self.clear_thread();
+        moderation::set_muted_words(Vec::new());
         self.load_all();
         self.update_my_profile();
         self.update_explore();
@@ -1004,6 +1008,138 @@ impl State {
         });
     }
 
+    /// Préférences (modération). Changer les mots masqués refiltre les fils.
+    fn show_preferences(self: &Rc<Self>) {
+        let weak = Rc::downgrade(self);
+        preferences::present(&self.root_stack, self.session.borrow().clone(), move || {
+            if let Some(state) = weak.upgrade() {
+                state.load_all();
+            }
+        });
+    }
+
+    /// Mots masqués du compte, appliqués aux fils.
+    fn load_muted_words(self: &Rc<Self>) {
+        moderation::set_muted_words(Vec::new());
+        let Some(session) = self.session.borrow().clone() else {
+            return;
+        };
+        let task = runtime().spawn(moderation::preferences(session));
+        let weak = Rc::downgrade(self);
+        glib::spawn_future_local(async move {
+            if let Ok(Ok(preferences)) = task.await {
+                let words = moderation::muted_words(&preferences);
+                if !words.is_empty()
+                    && let Some(state) = weak.upgrade()
+                {
+                    moderation::set_muted_words(words);
+                    state.load_all();
+                }
+            }
+        });
+    }
+
+    /// Copie le lien web du post dans le presse-papiers.
+    fn copy_link(self: &Rc<Self>, key: &str) {
+        let link = interactions::find(key)
+            .map(|entry| entry.post())
+            .and_then(|post| {
+                let uri = post.uri?;
+                let rkey = uri.rsplit('/').next()?.to_owned();
+                Some(format!(
+                    "https://bsky.app/profile/{}/post/{rkey}",
+                    post.handle
+                ))
+            });
+        let message = match (link, self.window.upgrade()) {
+            (Some(link), Some(window)) => {
+                window.clipboard().set_text(&link);
+                gettext("Lien copié.")
+            }
+            _ => gettext("Ce post n'a pas de lien."),
+        };
+        self.toasts.add_toast(adw::Toast::new(&message));
+    }
+
+    /// Masque un compte : ses posts n'apparaissent plus dans les fils.
+    fn mute_author(self: &Rc<Self>, handle: &str) {
+        let Some(session) = self.session.borrow().clone() else {
+            self.toasts.add_toast(adw::Toast::new(&gettext(
+                "Mode démonstration : rien n'est enregistré.",
+            )));
+            return;
+        };
+        let task = runtime().spawn(moderation::mute(session, handle.to_owned(), true));
+        let handle = handle.to_owned();
+        let weak = Rc::downgrade(self);
+        glib::spawn_future_local(async move {
+            let result = task
+                .await
+                .unwrap_or_else(|_| Err(api::ApiError::new(gettext("Requête interrompue."))));
+            let Some(state) = weak.upgrade() else { return };
+            match result {
+                Ok(()) => {
+                    state.toasts.add_toast(adw::Toast::new(
+                        &gettext("@{} est masqué.").replace("{}", &handle),
+                    ));
+                    state.load_all();
+                }
+                Err(error) if error.expired => state.session_expired(&error.message),
+                Err(error) => state.toasts.add_toast(adw::Toast::new(&error.message)),
+            }
+        });
+    }
+
+    /// Bloquer un compte, après confirmation.
+    fn confirm_block(self: &Rc<Self>, handle: &str) {
+        let Some(window) = self.window.upgrade() else {
+            return;
+        };
+        let dialog = adw::AlertDialog::new(
+            Some(&gettext("Bloquer @{} ?").replace("{}", handle)),
+            Some(&gettext(
+                "Ses posts et son profil vous seront cachés, et ce compte ne pourra plus \
+                 interagir avec vous. Le blocage est public.",
+            )),
+        );
+        dialog.add_responses(&[
+            ("cancel", &gettext("Annuler")),
+            ("block", &gettext("Bloquer")),
+        ]);
+        dialog.set_response_appearance("block", adw::ResponseAppearance::Destructive);
+        dialog.set_default_response(Some("cancel"));
+        dialog.set_close_response("cancel");
+        let (weak, handle) = (Rc::downgrade(self), handle.to_owned());
+        dialog.connect_response(Some("block"), move |_, _| {
+            let Some(state) = weak.upgrade() else { return };
+            let Some(session) = state.session.borrow().clone() else {
+                state.toasts.add_toast(adw::Toast::new(&gettext(
+                    "Mode démonstration : rien n'est enregistré.",
+                )));
+                return;
+            };
+            let task = runtime().spawn(moderation::block(session, handle.clone()));
+            let (weak, handle) = (Rc::downgrade(&state), handle.clone());
+            glib::spawn_future_local(async move {
+                let result = task
+                    .await
+                    .unwrap_or_else(|_| Err(api::ApiError::new(gettext("Requête interrompue."))));
+                let Some(state) = weak.upgrade() else { return };
+                match result {
+                    Ok(_) => {
+                        state.toasts.add_toast(adw::Toast::new(
+                            &gettext("@{} est bloqué.").replace("{}", &handle),
+                        ));
+                        state.load_all();
+                    }
+                    Err(error) if error.expired => state.session_expired(&error.message),
+                    Err(error) => state.toasts.add_toast(adw::Toast::new(&error.message)),
+                }
+            });
+        });
+        dialog.present(Some(&window));
+    }
+
     /// Pages Signets et Listes, pour le compte connecté ou la démonstration.
     fn update_bookmarks_and_lists(self: &Rc<Self>) {
         // Signets de démonstration : deux faux posts.
@@ -1397,6 +1533,29 @@ fn install_actions(window: &adw::ApplicationWindow, state: &Rc<State>) {
     });
     window.add_action(&open_profile);
 
+    let preferences = gio::SimpleAction::new("preferences", None);
+    let weak = Rc::downgrade(state);
+    preferences.connect_activate(move |_, _| {
+        if let Some(state) = weak.upgrade() {
+            state.show_preferences();
+        }
+    });
+    window.add_action(&preferences);
+    for (name, handler) in [
+        ("copy-link", State::copy_link as fn(&Rc<State>, &str)),
+        ("mute-author", State::mute_author),
+        ("block-author", State::confirm_block),
+    ] {
+        let action = gio::SimpleAction::new(name, Some(glib::VariantTy::STRING));
+        let weak = Rc::downgrade(state);
+        action.connect_activate(move |_, param| {
+            if let (Some(state), Some(value)) = (weak.upgrade(), param.and_then(|p| p.str())) {
+                handler(&state, value);
+            }
+        });
+        window.add_action(&action);
+    }
+
     let search = gio::SimpleAction::new("search", None);
     let weak = Rc::downgrade(state);
     search.connect_activate(move |_, _| {
@@ -1605,6 +1764,7 @@ pub fn build(app: &adw::Application) -> adw::ApplicationWindow {
     sidebar_list.update_property(&[gtk::accessible::Property::Label(&gettext("Navigation"))]);
     let menu = gio::Menu::new();
     let account_section = gio::Menu::new();
+    account_section.append(Some(&gettext("Préférences")), Some("win.preferences"));
     account_section.append(Some(&gettext("Se déconnecter…")), Some("win.logout"));
     menu.append_section(None, &account_section);
     let about_section = gio::Menu::new();
@@ -1837,6 +1997,7 @@ pub fn build(app: &adw::Application) -> adw::ApplicationWindow {
     let app = app.clone();
     app.set_accels_for_action("win.refresh", &["F5", "<Control>r"]);
     app.set_accels_for_action("win.compose", &["<Control>n"]);
+    app.set_accels_for_action("win.preferences", &["<Control>comma"]);
     app.set_accels_for_action("win.search", &["<Control>k", "<Control>f"]);
     app.set_accels_for_action("win.next-column", &["<Control>Page_Down"]);
     app.set_accels_for_action("win.previous-column", &["<Control>Page_Up"]);
