@@ -191,6 +191,7 @@ fn stats(post: &Post) -> gtk::Box {
     row.append(&reply);
     row.append(&interaction_button(&entry, Interaction::Repost, false));
     row.append(&interaction_button(&entry, Interaction::Like, false));
+    row.append(&interaction_button(&entry, Interaction::Bookmark, false));
     row
 }
 
@@ -212,6 +213,8 @@ fn interaction_label(which: Interaction, toggle: &Toggle) -> String {
             "Annuler le repost, {} reposts",
             count,
         ),
+        (Interaction::Bookmark, false) => gettext("Ajouter aux signets"),
+        (Interaction::Bookmark, true) => gettext("Retirer des signets"),
     };
     fill(text, &[&count.to_string()])
 }
@@ -223,6 +226,8 @@ fn interaction_text(which: Interaction, toggle: &Toggle) -> String {
         (Interaction::Like, true) => gettext("Aimé · {}"),
         (Interaction::Repost, false) => gettext("Reposter · {}"),
         (Interaction::Repost, true) => gettext("Reposté · {}"),
+        (Interaction::Bookmark, false) => gettext("Signet"),
+        (Interaction::Bookmark, true) => gettext("Dans les signets"),
     };
     fill(text, &[&toggle.count.to_string()])
 }
@@ -233,6 +238,7 @@ fn interaction_button(entry: &Rc<Interactions>, which: Interaction, detailed: bo
     let (icon, action) = match which {
         Interaction::Like => ("emblem-favorite-symbolic", "win.toggle-like"),
         Interaction::Repost => ("media-playlist-repeat-symbolic", "win.toggle-repost"),
+        Interaction::Bookmark => ("user-bookmarks-symbolic", "win.toggle-bookmark"),
     };
     let content = adw::ButtonContent::builder().icon_name(icon).build();
     let button = gtk::Button::builder()
@@ -250,6 +256,9 @@ fn interaction_button(entry: &Rc<Interactions>, which: Interaction, detailed: bo
     let update = move |button: &gtk::Button, content: &adw::ButtonContent, toggle: &Toggle| {
         content.set_label(&if detailed {
             interaction_text(which, toggle)
+        } else if which == Interaction::Bookmark {
+            // Le signet est privé : pas de compteur.
+            String::new()
         } else {
             toggle.count.to_string()
         });
@@ -409,7 +418,7 @@ pub fn post_detail(post: &Post) -> gtk::Box {
         .selection_mode(gtk::SelectionMode::None)
         .column_spacing(6)
         .row_spacing(6)
-        .max_children_per_line(3)
+        .max_children_per_line(4)
         .margin_top(8)
         .build();
     let entry = interactions::register(post);
@@ -419,6 +428,7 @@ pub fn post_detail(post: &Post) -> gtk::Box {
     actions.append(&reply);
     actions.append(&interaction_button(&entry, Interaction::Repost, true));
     actions.append(&interaction_button(&entry, Interaction::Like, true));
+    actions.append(&interaction_button(&entry, Interaction::Bookmark, true));
     // Seuls les boutons prennent le focus, pas les cases du FlowBox.
     let mut child = actions.first_child();
     while let Some(widget) = child {

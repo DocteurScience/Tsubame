@@ -22,6 +22,8 @@ pub struct Post {
     pub like_uri: Option<String>,
     /// Mon repost de ce post, s'il existe.
     pub repost_uri: Option<String>,
+    /// Post dans mes signets.
+    pub bookmarked: bool,
     /// Premier post de la discussion, si ce post est une réponse.
     pub reply_root: Option<StrongRef>,
     /// Contexte affiché au-dessus du nom : notification (« a répondu à
@@ -44,6 +46,39 @@ pub struct Post {
     pub thread: Vec<Reply>,
     /// Notification pas encore vue.
     pub unread: bool,
+}
+
+/// Liste de comptes (curation ou modération).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct List {
+    pub uri: String,
+    pub name: String,
+    pub description: String,
+    pub avatar: Option<String>,
+    pub members: u64,
+    /// Liste de modération (comptes masqués ou bloqués), sans fil de posts.
+    pub moderation: bool,
+}
+
+pub fn demo_lists() -> Vec<List> {
+    vec![
+        List {
+            uri: "demo:gnome".into(),
+            name: "Communauté GNOME francophone".into(),
+            description: "Contributrices et contributeurs de GNOME en français.".into(),
+            avatar: None,
+            members: 24,
+            moderation: false,
+        },
+        List {
+            uri: "demo:indesirables".into(),
+            name: "Comptes indésirables".into(),
+            description: "Pourriels et faux comptes.".into(),
+            avatar: None,
+            members: 3,
+            moderation: true,
+        },
+    ]
 }
 
 /// Compte dans une liste de personnes (suggestions, résultats de recherche).
@@ -185,6 +220,7 @@ fn post(
         cid: None,
         like_uri: None,
         repost_uri: None,
+        bookmarked: false,
         reply_root: None,
         context: None,
         name: name.into(),

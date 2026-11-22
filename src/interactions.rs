@@ -43,6 +43,7 @@ pub struct Interactions {
     post: RefCell<Post>,
     like: RefCell<Toggle>,
     repost: RefCell<Toggle>,
+    bookmark: RefCell<Toggle>,
     watchers: RefCell<Vec<Watcher>>,
 }
 
@@ -54,7 +55,7 @@ pub fn key(post: &Post) -> String {
         .unwrap_or_else(|| format!("demo:{}:{}", post.handle, post.date))
 }
 
-fn toggles(post: &Post) -> (Toggle, Toggle) {
+fn toggles(post: &Post) -> (Toggle, Toggle, Toggle) {
     (
         Toggle {
             active: post.like_uri.is_some(),
@@ -66,6 +67,13 @@ fn toggles(post: &Post) -> (Toggle, Toggle) {
             active: post.repost_uri.is_some(),
             record: post.repost_uri.clone(),
             count: post.reposts,
+            busy: false,
+        },
+        // Un signet n'a ni enregistrement ni compteur affiché.
+        Toggle {
+            active: post.bookmarked,
+            record: None,
+            count: 0,
             busy: false,
         },
     )
@@ -82,12 +90,13 @@ pub fn register(post: &Post) -> Rc<Interactions> {
     let key = key(post);
     if let Some(existing) = find(&key) {
         existing.post.replace(post.clone());
-        let (like, repost) = toggles(post);
+        let (like, repost, bookmark) = toggles(post);
         existing.refresh(Interaction::Like, like);
         existing.refresh(Interaction::Repost, repost);
+        existing.refresh(Interaction::Bookmark, bookmark);
         return existing;
     }
-    let (like, repost) = toggles(post);
+    let (like, repost, bookmark) = toggles(post);
     let entry = Rc::new(Interactions {
         key: key.clone(),
         uri: post.uri.clone(),
@@ -95,6 +104,7 @@ pub fn register(post: &Post) -> Rc<Interactions> {
         post: RefCell::new(post.clone()),
         like: RefCell::new(like),
         repost: RefCell::new(repost),
+        bookmark: RefCell::new(bookmark),
         watchers: RefCell::default(),
     });
     REGISTRY.with_borrow_mut(|registry| {
@@ -115,6 +125,7 @@ impl Interactions {
         match which {
             Interaction::Like => &self.like,
             Interaction::Repost => &self.repost,
+            Interaction::Bookmark => &self.bookmark,
         }
     }
 

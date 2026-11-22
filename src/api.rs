@@ -17,7 +17,7 @@ use chrono::{DateTime, Datelike, FixedOffset, Local, Timelike, Utc};
 use gettextrs::{gettext, ngettext};
 
 use crate::auth::Session;
-use crate::data::{Actor, Media, Post, Profile, Reply, StrongRef, Topic};
+use crate::data::{Actor, List, Media, Post, Profile, Reply, StrongRef, Topic};
 
 /// Fil « Discover » de Bluesky.
 pub const DISCOVER_FEED: &str =
@@ -41,6 +41,10 @@ pub enum Source {
     Likes(String),
     /// Recherche de posts (`searchPosts`).
     Search(String),
+    /// Mes signets (`getBookmarks`).
+    Bookmarks,
+    /// Fil d'une liste de curation (`getListFeed`).
+    List(String),
 }
 
 /// Onglets d'un profil.
@@ -109,6 +113,64 @@ pub async fn load(
     let limit = PAGE_SIZE.try_into().ok();
     let (feed, cursor) = match source {
         Source::Notifications => return notifications(&api, cursor).await,
+        Source::Bookmarks => {
+            let output = api
+                .api
+                .app
+                .bsky
+                .bookmark
+                .get_bookmarks(
+                    atrium_api::app::bsky::bookmark::get_bookmarks::ParametersData {
+                        cursor,
+                        limit,
+                    }
+                    .into(),
+                )
+                .await
+                .map_err(request_failed)?;
+            let now = Utc::now();
+            return Ok(Page {
+                posts: output
+                    .data
+                    .bookmarks
+                    .iter()
+                    .filter_map(|bookmark| match &bookmark.item {
+                        Union::Refs(atrium_api::app::bsky::bookmark::defs::BookmarkViewItemRefs::AppBskyFeedDefsPostView(post)) => {
+                            Some(post_from_view(post, now))
+                        }
+                        _ => None,
+                    })
+                    .collect(),
+                cursor: output.data.cursor,
+            });
+        }
+        Source::List(uri) => {
+            let output = api
+                .api
+                .app
+                .bsky
+                .feed
+                .get_list_feed(
+                    atrium_api::app::bsky::feed::get_list_feed::ParametersData {
+                        cursor,
+                        limit,
+                        list: uri,
+                    }
+                    .into(),
+                )
+                .await
+                .map_err(request_failed)?;
+            let now = Utc::now();
+            return Ok(Page {
+                posts: output
+                    .data
+                    .feed
+                    .iter()
+                    .map(|item| post_from_feed(item, now))
+                    .collect(),
+                cursor: output.data.cursor,
+            });
+        }
         Source::Search(query) => {
             let output = api
                 .api
@@ -357,6 +419,7 @@ pub fn post_from_view(post: &PostView, now: DateTime<Utc>) -> Post {
             .and_then(|cid| cid.as_str().map(str::to_owned)),
         like_uri: viewer.and_then(|v| v.like.clone()),
         repost_uri: viewer.and_then(|v| v.repost.clone()),
+        bookmarked: viewer.and_then(|v| v.bookmarked).unwrap_or(false),
         reply_root: reply_root(post),
         context: None,
         name: display_name(&post.author),
@@ -533,6 +596,7 @@ pub fn post_from_notification(
             cid: None,
             like_uri: None,
             repost_uri: None,
+            bookmarked: false,
             reply_root: None,
             context: None,
             name: String::new(),
@@ -822,6 +886,8 @@ pub async fn follow(session: Arc<Session>, did: String) -> Result<String, ApiErr
 pub enum Interaction {
     Like,
     Repost,
+    /// Signet : privé, sans enregistrement dans le dépôt.
+    Bookmark,
 }
 
 impl Interaction {
@@ -829,8 +895,99 @@ impl Interaction {
         match self {
             Interaction::Like => "app.bsky.feed.like",
             Interaction::Repost => "app.bsky.feed.repost",
+            Interaction::Bookmark => "app.bsky.bookmark",
         }
     }
+}
+
+/// Ajoute un post aux signets.
+pub async fn bookmark(session: Arc<Session>, uri: String, cid: String) -> Result<(), ApiError> {
+    let api = session.api().await?;
+    api.api
+        .app
+        .bsky
+        .bookmark
+        .create_bookmark(
+            atrium_api::app::bsky::bookmark::create_bookmark::InputData {
+                cid: cid.parse().map_err(|_| invalid_post())?,
+                uri,
+            }
+            .into(),
+        )
+        .await
+        .map_err(request_failed)
+}
+
+/// Retire un post des signets.
+pub async fn unbookmark(session: Arc<Session>, uri: String) -> Result<(), ApiError> {
+    let api = session.api().await?;
+    api.api
+        .app
+        .bsky
+        .bookmark
+        .delete_bookmark(atrium_api::app::bsky::bookmark::delete_bookmark::InputData { uri }.into())
+        .await
+        .map_err(request_failed)
+}
+
+fn list_from_view(list: &atrium_api::app::bsky::graph::defs::ListView) -> List {
+    let purpose = serde_json::to_value(&list.purpose).unwrap_or_default();
+    List {
+        uri: list.uri.clone(),
+        name: list.name.clone(),
+        description: list.description.clone().unwrap_or_default(),
+        avatar: list.avatar.clone(),
+        members: list.list_item_count.unwrap_or(0) as u64,
+        moderation: purpose.as_str() == Some("app.bsky.graph.defs#modlist"),
+    }
+}
+
+/// Listes créées par un compte.
+pub async fn lists(session: Arc<Session>, actor: String) -> Result<Vec<List>, ApiError> {
+    let api = session.api().await?;
+    let output = api
+        .api
+        .app
+        .bsky
+        .graph
+        .get_lists(
+            atrium_api::app::bsky::graph::get_lists::ParametersData {
+                actor: actor.parse().map_err(|_| invalid_actor())?,
+                cursor: None,
+                limit: 100.try_into().ok(),
+                purposes: None,
+            }
+            .into(),
+        )
+        .await
+        .map_err(request_failed)?;
+    Ok(output.data.lists.iter().map(list_from_view).collect())
+}
+
+/// Membres d'une liste.
+pub async fn list_members(session: Arc<Session>, uri: String) -> Result<Vec<Actor>, ApiError> {
+    let api = session.api().await?;
+    let output = api
+        .api
+        .app
+        .bsky
+        .graph
+        .get_list(
+            atrium_api::app::bsky::graph::get_list::ParametersData {
+                cursor: None,
+                limit: 100.try_into().ok(),
+                list: uri,
+            }
+            .into(),
+        )
+        .await
+        .map_err(request_failed)?;
+    Ok(output
+        .data
+        .items
+        .iter()
+        .map(|item| actor_from_view(&item.subject))
+        .collect())
 }
 
 fn invalid_post() -> ApiError {
@@ -859,6 +1016,10 @@ pub async fn create(
     use atrium_api::types::TryIntoUnknown;
     use atrium_api::types::string::{Datetime, Did, Nsid};
 
+    // Un signet n'est pas un enregistrement : voir `bookmark`.
+    if interaction == Interaction::Bookmark {
+        return Err(invalid_post());
+    }
     let api = session.api().await?;
     let subject: strong_ref::Main = strong_ref::MainData {
         cid: cid.parse().map_err(|_| invalid_post())?,
@@ -866,6 +1027,7 @@ pub async fn create(
     }
     .into();
     let record = match interaction {
+        Interaction::Bookmark => unreachable!("traité plus haut"),
         Interaction::Like => atrium_api::app::bsky::feed::like::Record::from(
             atrium_api::app::bsky::feed::like::RecordData {
                 created_at: Datetime::now(),
@@ -1680,6 +1842,30 @@ mod tests {
             vec!["at://did:plc:a/app.bsky.feed.generator/linux"]
         );
         assert!(pinned_feed_uris(&serde_json::json!([])).is_empty());
+    }
+
+    #[test]
+    fn bookmark_state_and_lists_are_read() {
+        let mut item: serde_json::Value = serde_json::from_str(FEED_ITEM).unwrap();
+        item["post"]["viewer"] = serde_json::json!({"bookmarked": true});
+        let item: FeedViewPost = serde_json::from_value(item).unwrap();
+        assert!(post_from_feed(&item, now()).bookmarked);
+
+        let list: atrium_api::app::bsky::graph::defs::ListView =
+            serde_json::from_value(serde_json::json!({
+                "uri": "at://did:plc:moi/app.bsky.graph.list/1",
+                "cid": CID,
+                "creator": {"did": "did:plc:moi", "handle": "vous.bsky.social"},
+                "name": "Comptes indésirables",
+                "purpose": "app.bsky.graph.defs#modlist",
+                "listItemCount": 3,
+                "indexedAt": "2026-11-20T10:00:00.000Z"
+            }))
+            .unwrap();
+        let list = list_from_view(&list);
+        assert!(list.moderation);
+        assert_eq!(list.members, 3);
+        assert_eq!(list.description, "");
     }
 
     #[test]

@@ -11,6 +11,7 @@ mod columns;
 mod compose;
 mod data;
 mod explore;
+mod feed_page;
 mod i18n;
 mod images;
 mod interactions;

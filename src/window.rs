@@ -23,8 +23,9 @@ use crate::auth::{self, Session};
 use crate::column::{Column, ColumnKind, FeedId};
 use crate::columns::{ColumnsView, Layout};
 use crate::compose;
-use crate::data::Post;
+use crate::data::{self, Post};
 use crate::explore::ExplorePage;
+use crate::feed_page::{FeedPage, ListsPage};
 use crate::interactions::{self, Change, Interaction};
 use crate::login::LoginPage;
 use crate::messages::MessagesPage;
@@ -206,6 +207,10 @@ struct State {
     my_profile_bin: adw::Bin,
     my_profile: RefCell<Option<Rc<ProfilePage>>>,
     messages_bin: adw::Bin,
+    bookmarks_bin: adw::Bin,
+    lists_bin: adw::Bin,
+    /// Signets et Listes, gardés en vie avec leur page.
+    other_pages: RefCell<Vec<Rc<dyn std::any::Any>>>,
     messages: RefCell<Option<Rc<MessagesPage>>>,
     messages_page: adw::ViewStackPage,
     /// Messages non lus (pastilles de « Messages »).
@@ -502,6 +507,7 @@ impl State {
         self.update_my_profile();
         self.update_explore();
         self.update_messages();
+        self.update_bookmarks_and_lists();
         self.root_stack.set_visible_child_name("main");
         if let Some(column) = self.columns.borrow().get(self.current.get()) {
             column.focus();
@@ -518,6 +524,7 @@ impl State {
         self.update_my_profile();
         self.update_explore();
         self.update_messages();
+        self.update_bookmarks_and_lists();
         self.pinned.borrow_mut().clear();
         self.columns_changed();
         self.logout_action.set_enabled(false);
@@ -921,15 +928,21 @@ impl State {
         let session = self.session.borrow().clone();
         let me = session.as_ref().map(|s| s.account.did.clone());
         let weak = Rc::downgrade(self);
-        let open_post = Box::new(move |post: Post| {
+        let open_post = Rc::new(move |post: Post| {
             if let Some(state) = weak.upgrade() {
                 state.open_post_page(post);
             }
         });
         let weak = Rc::downgrade(self);
-        let expired = Box::new(move |message: String| {
+        let expired = Rc::new(move |message: String| {
             if let Some(state) = weak.upgrade() {
                 state.session_expired(&message);
+            }
+        });
+        let nav = self.nav.downgrade();
+        let push = Rc::new(move |page: adw::NavigationPage| {
+            if let Some(nav) = nav.upgrade() {
+                nav.push(&page);
             }
         });
         profile::Host {
@@ -938,6 +951,7 @@ impl State {
             toasts: self.toasts.clone(),
             open_post,
             expired,
+            push,
         }
     }
 
@@ -988,6 +1002,30 @@ impl State {
                     .map_err(|e| e.message.as_str()),
             ));
         });
+    }
+
+    /// Pages Signets et Listes, pour le compte connecté ou la démonstration.
+    fn update_bookmarks_and_lists(self: &Rc<Self>) {
+        // Signets de démonstration : deux faux posts.
+        let demo: Vec<Post> = data::posts(data::Feed::Following)
+            .into_iter()
+            .filter(|post| post.media.is_some() || post.handle.starts_with("pierre"))
+            .map(|post| Post {
+                bookmarked: true,
+                ..post
+            })
+            .collect();
+        let bookmarks = FeedPage::new(
+            &gettext("Signets"),
+            api::Source::Bookmarks,
+            demo,
+            self.profile_host(),
+        );
+        self.bookmarks_bin.set_child(Some(&bookmarks.root));
+        let lists = ListsPage::new(self.profile_host());
+        self.lists_bin.set_child(Some(&lists.root));
+        self.other_pages
+            .replace(vec![bookmarks as Rc<dyn std::any::Any>, lists]);
     }
 
     /// Page Messages, pour le compte connecté ou la démonstration.
@@ -1206,10 +1244,20 @@ impl State {
         let task = runtime().spawn({
             let change = change.clone();
             async move {
-                match change {
-                    Change::Do => api::create(session, which, uri, cid).await.map(Some),
-                    Change::Undo(Some(record)) => api::delete(session, record).await.map(|()| None),
-                    Change::Undo(None) => Ok(None),
+                match (which, change) {
+                    // Signet : appels dédiés, par l'adresse du post. Surtout
+                    // pas `delete`, qui supprimerait le post lui-même.
+                    (Interaction::Bookmark, Change::Do) => {
+                        api::bookmark(session, uri, cid).await.map(|()| None)
+                    }
+                    (Interaction::Bookmark, Change::Undo(_)) => {
+                        api::unbookmark(session, uri).await.map(|()| None)
+                    }
+                    (_, Change::Do) => api::create(session, which, uri, cid).await.map(Some),
+                    (_, Change::Undo(Some(record))) => {
+                        api::delete(session, record).await.map(|()| None)
+                    }
+                    (_, Change::Undo(None)) => Ok(None),
                 }
             }
         });
@@ -1239,6 +1287,12 @@ impl State {
                         }
                         (Interaction::Repost, Change::Undo(_)) => {
                             gettext("Le repost n'a pas été retiré.")
+                        }
+                        (Interaction::Bookmark, Change::Do) => {
+                            gettext("Le post n'a pas été ajouté aux signets.")
+                        }
+                        (Interaction::Bookmark, Change::Undo(_)) => {
+                            gettext("Le post n'a pas été retiré des signets.")
                         }
                     };
                     let toast = adw::Toast::new(&title);
@@ -1372,6 +1426,7 @@ fn install_actions(window: &adw::ApplicationWindow, state: &Rc<State>) {
     for (name, which) in [
         ("toggle-like", Interaction::Like),
         ("toggle-repost", Interaction::Repost),
+        ("toggle-bookmark", Interaction::Bookmark),
     ] {
         let action = gio::SimpleAction::new(name, Some(glib::VariantTy::STRING));
         let weak = Rc::downgrade(state);
@@ -1493,11 +1548,15 @@ pub fn build(app: &adw::Application) -> adw::ApplicationWindow {
     // l'entrée dans l'application.
     let my_profile_bin = adw::Bin::new();
     let messages_bin = adw::Bin::new();
+    let bookmarks_bin = adw::Bin::new();
+    let lists_bin = adw::Bin::new();
     let mut messages_stack_page = None;
     for page in &pages[1..] {
         let child: gtk::Widget = match page.name {
             "profile" => my_profile_bin.clone().upcast(),
             "messages" => messages_bin.clone().upcast(),
+            "bookmarks" => bookmarks_bin.clone().upcast(),
+            "lists" => lists_bin.clone().upcast(),
             _ => placeholder_page(page.icon, &page.title).upcast(),
         };
         let stack_page =
@@ -1643,6 +1702,9 @@ pub fn build(app: &adw::Application) -> adw::ApplicationWindow {
         my_profile_bin,
         my_profile: RefCell::default(),
         messages_bin,
+        bookmarks_bin,
+        lists_bin,
+        other_pages: RefCell::default(),
         messages: RefCell::default(),
         messages_page: messages_stack_page.expect("page Messages"),
         messages_unread: Cell::new(0),

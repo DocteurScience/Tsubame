@@ -10,6 +10,7 @@ src/column.rs
 src/compose.rs
 src/data.rs
 src/explore.rs
+src/feed_page.rs
 src/login.rs
 src/main.rs
 src/messages.rs

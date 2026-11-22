@@ -66,15 +66,18 @@ pub fn format_count(count: u64) -> String {
 }
 
 /// Ce que la fenêtre fournit à une page de profil.
+#[derive(Clone)]
 pub struct Host {
     pub session: Option<Arc<Session>>,
     /// Mon DID, pour reconnaître mon propre profil.
     pub me: Option<String>,
     pub toasts: adw::ToastOverlay,
     /// Ouvrir la discussion d'un post.
-    pub open_post: Box<dyn Fn(Post)>,
+    pub open_post: Rc<dyn Fn(Post)>,
     /// Session expirée : retour à l'écran de connexion.
-    pub expired: Box<dyn Fn(String)>,
+    pub expired: Rc<dyn Fn(String)>,
+    /// Empiler une page dans la navigation.
+    pub push: Rc<dyn Fn(adw::NavigationPage)>,
 }
 
 pub struct ProfilePage {
