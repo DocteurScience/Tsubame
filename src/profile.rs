@@ -8,7 +8,7 @@ use std::sync::Arc;
 
 use adw::prelude::*;
 use gettextrs::{gettext, ngettext};
-use gtk::glib;
+use gtk::{gio, glib};
 
 use crate::api::{self, ApiError, AuthorFilter, Page, Source};
 use crate::auth::Session;
@@ -95,6 +95,8 @@ pub struct ProfilePage {
     bio: gtk::Label,
     stats: gtk::Label,
     follow: gtk::Button,
+    /// Menu ⋮ : lien, masquer, bloquer, signaler.
+    more: gtk::MenuButton,
     likes_tab: gtk::ToggleButton,
     scroll: gtk::ScrolledWindow,
     posts: PostList,
@@ -121,6 +123,13 @@ impl ProfilePage {
     pub fn new(actor: &str, host: Host) -> Rc<Self> {
         let title = adw::WindowTitle::new("", "");
         let header = adw::HeaderBar::builder().title_widget(&title).build();
+        let more = gtk::MenuButton::builder()
+            .icon_name("view-more-symbolic")
+            .tooltip_text(gettext("Plus d'actions"))
+            .visible(false)
+            .build();
+        more.update_property(&[gtk::accessible::Property::Label(&gettext("Plus d'actions"))]);
+        header.pack_end(&more);
 
         // En-tête du profil.
         let banner = gtk::Picture::builder()
@@ -264,6 +273,7 @@ impl ProfilePage {
             bio,
             stats,
             follow,
+            more,
             likes_tab,
             scroll,
             posts,
@@ -314,6 +324,24 @@ impl ProfilePage {
                 page.toggle_follow();
             }
         });
+
+        let actions = gio::SimpleActionGroup::new();
+        for (name, handler) in [
+            ("copy-link", Self::copy_link as fn(&Rc<Self>)),
+            ("mute", Self::toggle_mute),
+            ("block", Self::toggle_block),
+            ("report", Self::report),
+        ] {
+            let action = gio::SimpleAction::new(name, None);
+            let weak = Rc::downgrade(&page);
+            action.connect_activate(move |_, _| {
+                if let Some(page) = weak.upgrade() {
+                    handler(&page);
+                }
+            });
+            actions.add_action(&action);
+        }
+        page.root.insert_action_group("profile", Some(&actions));
 
         page.load();
         page
@@ -379,6 +407,7 @@ impl ProfilePage {
         self.likes_tab.set_visible(is_me);
         self.follow
             .set_visible(!is_me && self.host.session.is_some() && !profile.did.is_empty());
+        self.more.set_visible(!is_me && !profile.handle.is_empty());
         if let Some(url) = &profile.avatar {
             let weak = self.avatar.downgrade();
             images::load(url, move |texture| {
@@ -421,6 +450,8 @@ impl ProfilePage {
             part(profile.follows, "{} abonnement", "{} abonnements"),
             part(profile.posts, "{} post", "{} posts"),
         ));
+        self.more.set_menu_model(Some(&profile_menu(&profile)));
+        self.follow.set_sensitive(profile.blocking.is_none());
         if profile.following.is_some() {
             self.follow.set_label(&gettext("Ne plus suivre"));
             self.follow.remove_css_class("suggested-action");
@@ -432,6 +463,20 @@ impl ProfilePage {
 
     fn load_posts(self: &Rc<Self>, more: bool) {
         let tab = self.tab.get();
+        if self
+            .profile
+            .borrow()
+            .as_ref()
+            .is_some_and(|p| p.blocking.is_some())
+        {
+            if !more {
+                self.posts.show_message(
+                    &gettext("Vous avez bloqué ce compte"),
+                    &gettext("Débloquez-le depuis le menu pour voir ses posts."),
+                );
+            }
+            return;
+        }
         let Some(session) = self.host.session.clone() else {
             if !more {
                 let posts = demo_posts(&self.actor, tab);
@@ -513,6 +558,158 @@ impl ProfilePage {
     }
 }
 
+/// Menu ⋮ d'un profil, d'après son état (masqué, bloqué).
+fn profile_menu(profile: &Profile) -> gio::Menu {
+    let menu = gio::Menu::new();
+    let sharing = gio::Menu::new();
+    sharing.append(Some(&gettext("Copier le lien")), Some("profile.copy-link"));
+    menu.append_section(None, &sharing);
+    let moderation = gio::Menu::new();
+    let mute = if profile.muted {
+        gettext("Ne plus masquer")
+    } else {
+        gettext("Masquer")
+    };
+    moderation.append(Some(&mute), Some("profile.mute"));
+    let block = if profile.blocking.is_some() {
+        gettext("Débloquer")
+    } else {
+        gettext("Bloquer…")
+    };
+    moderation.append(Some(&block), Some("profile.block"));
+    moderation.append(Some(&gettext("Signaler…")), Some("profile.report"));
+    menu.append_section(None, &moderation);
+    menu
+}
+
+impl ProfilePage {
+    fn copy_link(self: &Rc<Self>) {
+        let Some(handle) = self.profile.borrow().as_ref().map(|p| p.handle.clone()) else {
+            return;
+        };
+        self.root
+            .clipboard()
+            .set_text(&format!("https://bsky.app/profile/{handle}"));
+        self.host
+            .toasts
+            .add_toast(adw::Toast::new(&gettext("Lien copié.")));
+    }
+
+    fn report(self: &Rc<Self>) {
+        if let Some(handle) = self.profile.borrow().as_ref().map(|p| p.handle.clone()) {
+            let _ = self
+                .root
+                .activate_action("win.report-author", Some(&handle.to_variant()));
+        }
+    }
+
+    /// Requête de modération sur ce compte ; `apply` met le profil à jour
+    /// si elle réussit, puis l'en-tête et les posts suivent.
+    fn moderate<T: Send + 'static>(
+        self: &Rc<Self>,
+        request: impl std::future::Future<Output = Result<T, ApiError>> + Send + 'static,
+        done: String,
+        apply: impl FnOnce(&mut Profile, T) + 'static,
+    ) {
+        let task = runtime().spawn(request);
+        let weak = Rc::downgrade(self);
+        glib::spawn_future_local(async move {
+            let result = task
+                .await
+                .unwrap_or_else(|_| Err(ApiError::new(gettext("Requête interrompue."))));
+            let Some(page) = weak.upgrade() else { return };
+            match result {
+                Ok(value) => {
+                    if let Some(profile) = page.profile.borrow_mut().as_mut() {
+                        apply(profile, value);
+                    }
+                    page.update_counts();
+                    page.load_posts(false);
+                    page.host.toasts.add_toast(adw::Toast::new(&done));
+                }
+                Err(error) if error.expired => (page.host.expired)(error.message),
+                Err(error) => page.host.toasts.add_toast(adw::Toast::new(&error.message)),
+            }
+        });
+    }
+
+    /// Sans compte, rien n'est envoyé : on le dit.
+    fn session_or_demo(&self) -> Option<Arc<Session>> {
+        let session = self.host.session.clone();
+        if session.is_none() {
+            self.host.toasts.add_toast(adw::Toast::new(&gettext(
+                "Mode démonstration : rien n'est enregistré.",
+            )));
+        }
+        session
+    }
+
+    fn toggle_mute(self: &Rc<Self>) {
+        let Some(profile) = self.profile.borrow().clone() else {
+            return;
+        };
+        let Some(session) = self.session_or_demo() else {
+            return;
+        };
+        let mute = !profile.muted;
+        let done = if mute {
+            gettext("@{} est masqué.")
+        } else {
+            gettext("@{} n'est plus masqué.")
+        }
+        .replace("{}", &profile.handle);
+        self.moderate(
+            crate::moderation::mute(session, profile.did.clone(), mute),
+            done,
+            move |profile, ()| profile.muted = mute,
+        );
+    }
+
+    fn toggle_block(self: &Rc<Self>) {
+        let Some(profile) = self.profile.borrow().clone() else {
+            return;
+        };
+        if let Some(record) = profile.blocking.clone() {
+            let Some(session) = self.session_or_demo() else {
+                return;
+            };
+            self.moderate(
+                api::delete(session, record),
+                gettext("@{} est débloqué.").replace("{}", &profile.handle),
+                |profile, ()| profile.blocking = None,
+            );
+            return;
+        }
+        let dialog = adw::AlertDialog::new(
+            Some(&gettext("Bloquer @{} ?").replace("{}", &profile.handle)),
+            Some(&gettext(
+                "Ses posts et son profil vous seront cachés, et ce compte ne pourra plus \
+                 interagir avec vous. Le blocage est public.",
+            )),
+        );
+        dialog.add_responses(&[
+            ("cancel", &gettext("Annuler")),
+            ("block", &gettext("Bloquer")),
+        ]);
+        dialog.set_response_appearance("block", adw::ResponseAppearance::Destructive);
+        dialog.set_default_response(Some("cancel"));
+        dialog.set_close_response("cancel");
+        let weak = Rc::downgrade(self);
+        dialog.connect_response(Some("block"), move |_, _| {
+            let Some(page) = weak.upgrade() else { return };
+            let Some(session) = page.session_or_demo() else {
+                return;
+            };
+            page.moderate(
+                crate::moderation::block(session, profile.did.clone()),
+                gettext("@{} est bloqué.").replace("{}", &profile.handle),
+                |profile, record| profile.blocking = Some(record),
+            );
+        });
+        dialog.present(Some(&self.root));
+    }
+}
+
 /// Posts de démonstration d'un auteur, d'après son identifiant.
 fn demo_posts(handle: &str, tab: Tab) -> Vec<Post> {
     let mut posts: Vec<Post> = [
@@ -554,6 +751,8 @@ fn demo_profile(handle: &str) -> Profile {
         posts: posts.len() as u64,
         following: None,
         follows_me: false,
+        muted: false,
+        blocking: None,
     }
 }
 

@@ -17,6 +17,7 @@ const LIST: &str = "list";
 const EMPTY: &str = "empty";
 const ERROR: &str = "error";
 const UNAVAILABLE: &str = "unavailable";
+const MESSAGE: &str = "message";
 
 /// Chargement autorisé par `PostList::begin_load`.
 pub struct Load {
@@ -106,6 +107,11 @@ impl PostList {
                 .build(),
             Some(UNAVAILABLE),
         );
+        let message = adw::StatusPage::builder()
+            .icon_name("action-unavailable-symbolic")
+            .css_classes(["compact"])
+            .build();
+        root.add_named(&message, Some(MESSAGE));
         root.set_visible_child_name(LOADING);
 
         Self {
@@ -288,6 +294,20 @@ impl PostList {
         self.posts.borrow_mut().clear();
         self.cursor.replace(None);
         self.root.set_visible_child_name(UNAVAILABLE);
+    }
+
+    /// Pas de posts, avec un message (compte bloqué…).
+    pub fn show_message(&self, title: &str, description: &str) {
+        self.show_unavailable();
+        if let Some(page) = self
+            .root
+            .child_by_name(MESSAGE)
+            .and_downcast::<adw::StatusPage>()
+        {
+            page.set_title(title);
+            page.set_description(Some(description).filter(|d| !d.is_empty()));
+        }
+        self.root.set_visible_child_name(MESSAGE);
     }
 
     /// Donne le focus à la carte sélectionnée, ou à la première.

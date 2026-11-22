@@ -843,6 +843,8 @@ pub fn profile_from_view(
         posts: count(profile.posts_count),
         following: viewer.and_then(|v| v.following.clone()),
         follows_me: viewer.is_some_and(|v| v.followed_by.is_some()),
+        muted: viewer.and_then(|v| v.muted).unwrap_or(false),
+        blocking: viewer.and_then(|v| v.blocking.clone()),
     }
 }
 
@@ -1816,7 +1818,9 @@ mod tests {
                     "postsCount": 2906,
                     "viewer": {
                         "following": "at://did:plc:moi/app.bsky.graph.follow/1",
-                        "followedBy": "at://did:plc:lucie/app.bsky.graph.follow/2"
+                        "followedBy": "at://did:plc:lucie/app.bsky.graph.follow/2",
+                        "muted": true,
+                        "blocking": "at://did:plc:moi/app.bsky.graph.block/3"
                     }
                 }"#,
         )
@@ -1833,6 +1837,11 @@ mod tests {
             Some("at://did:plc:moi/app.bsky.graph.follow/1")
         );
         assert!(profile.follows_me);
+        assert!(profile.muted);
+        assert_eq!(
+            profile.blocking.as_deref(),
+            Some("at://did:plc:moi/app.bsky.graph.block/3")
+        );
         assert_eq!(profile.banner, None);
     }
 

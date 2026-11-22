@@ -167,6 +167,10 @@ pub struct Profile {
     pub following: Option<String>,
     /// Ce compte me suit.
     pub follows_me: bool,
+    /// Je masque ce compte.
+    pub muted: bool,
+    /// Mon blocage de ce compte (adresse de l'enregistrement), s'il existe.
+    pub blocking: Option<String>,
 }
 
 /// Référence à un post : son adresse et son contenu (CID).
