@@ -267,9 +267,6 @@ fn more_menu(post: &Post, key: &str) -> gtk::MenuButton {
     let menu = gio::Menu::new();
     let sharing = gio::Menu::new();
     sharing.append_item(&item(gettext("Copier le lien"), "win.copy-link", key));
-    if !post.handle.is_empty() {
-        sharing.append_item(&item(gettext("Citer le post…"), "win.quote", key));
-    }
     menu.append_section(None, &sharing);
     if crate::interactions::is_mine(post) {
         let mine = gio::Menu::new();
@@ -329,12 +326,14 @@ fn interaction_label(which: Interaction, toggle: &Toggle) -> String {
             "Ne plus aimer, {} j'aime",
             count,
         ),
-        (Interaction::Repost, false) => {
-            ngettext("Reposter, {} repost", "Reposter, {} reposts", count)
-        }
+        (Interaction::Repost, false) => ngettext(
+            "Reposter ou citer, {} repost",
+            "Reposter ou citer, {} reposts",
+            count,
+        ),
         (Interaction::Repost, true) => ngettext(
-            "Annuler le repost, {} repost",
-            "Annuler le repost, {} reposts",
+            "Annuler le repost ou citer, {} repost",
+            "Annuler le repost ou citer, {} reposts",
             count,
         ),
         (Interaction::Bookmark, false) => gettext("Ajouter aux signets"),
@@ -358,18 +357,49 @@ fn interaction_text(which: Interaction, toggle: &Toggle) -> String {
 
 /// Bouton J'aime ou Reposter, relié à l'état partagé du post : il suit les
 /// changements faits depuis une autre carte du même post.
-fn interaction_button(entry: &Rc<Interactions>, which: Interaction, detailed: bool) -> gtk::Button {
+/// Menu du bouton Reposter : reposter (ou annuler), citer.
+fn repost_menu(key: &str, active: bool) -> gio::Menu {
+    let menu = gio::Menu::new();
+    let item = |label: String, action: &str| {
+        let item = gio::MenuItem::new(Some(&label), None);
+        item.set_action_and_target_value(Some(action), Some(&key.to_variant()));
+        item
+    };
+    menu.append_item(&item(
+        if active {
+            gettext("Annuler le repost")
+        } else {
+            gettext("Reposter")
+        },
+        "win.toggle-repost",
+    ));
+    menu.append_item(&item(gettext("Citer…"), "win.quote"));
+    menu
+}
+
+/// Bouton J'aime, Reposter ou Signet. Reposter ouvre un menu (reposter,
+/// citer), comme sur Bluesky.
+fn interaction_button(entry: &Rc<Interactions>, which: Interaction, detailed: bool) -> gtk::Widget {
     let (icon, action) = match which {
         Interaction::Like => ("emblem-favorite-symbolic", "win.toggle-like"),
         Interaction::Repost => ("media-playlist-repeat-symbolic", "win.toggle-repost"),
         Interaction::Bookmark => ("user-bookmarks-symbolic", "win.toggle-bookmark"),
     };
     let content = adw::ButtonContent::builder().icon_name(icon).build();
-    let button = gtk::Button::builder()
-        .child(&content)
-        .action_name(action)
-        .action_target(&entry.key.to_variant())
-        .build();
+    let button: gtk::Widget = if which == Interaction::Repost {
+        gtk::MenuButton::builder()
+            .child(&content)
+            .menu_model(&repost_menu(&entry.key, entry.get(which).active))
+            .build()
+            .upcast()
+    } else {
+        gtk::Button::builder()
+            .child(&content)
+            .action_name(action)
+            .action_target(&entry.key.to_variant())
+            .build()
+            .upcast()
+    };
     if detailed {
         button.set_halign(gtk::Align::Start);
         button.add_css_class("post-action");
@@ -377,7 +407,11 @@ fn interaction_button(entry: &Rc<Interactions>, which: Interaction, detailed: bo
         button.add_css_class("flat");
         button.add_css_class("post-stat");
     }
-    let update = move |button: &gtk::Button, content: &adw::ButtonContent, toggle: &Toggle| {
+    let key = entry.key.clone();
+    let update = move |button: &gtk::Widget, content: &adw::ButtonContent, toggle: &Toggle| {
+        if let Some(menu_button) = button.downcast_ref::<gtk::MenuButton>() {
+            menu_button.set_menu_model(Some(&repost_menu(&key, toggle.active)));
+        }
         content.set_label(&if detailed {
             interaction_text(which, toggle)
         } else if which == Interaction::Bookmark {
