@@ -98,6 +98,8 @@ pub struct ProfilePage {
     follows: gtk::Button,
     post_count: gtk::Label,
     follow: gtk::Button,
+    /// « Modifier le profil », sur son propre profil.
+    edit: gtk::Button,
     /// Menu ⋮ : lien, masquer, bloquer, signaler.
     more: gtk::MenuButton,
     likes_tab: gtk::ToggleButton,
@@ -156,7 +158,16 @@ impl ProfilePage {
             .build();
         let top = gtk::Box::new(gtk::Orientation::Horizontal, 12);
         top.append(&avatar);
+        let edit = gtk::Button::builder()
+            .label(gettext("Modifier le profil"))
+            .valign(gtk::Align::Center)
+            .halign(gtk::Align::End)
+            .hexpand(true)
+            .visible(false)
+            .css_classes(["pill"])
+            .build();
         top.append(&follow);
+        top.append(&edit);
         let name = label(&["title-1"]);
         let handle = label(&["dim-label"]);
         let bio = label(&[]);
@@ -292,6 +303,7 @@ impl ProfilePage {
             follows,
             post_count,
             follow,
+            edit,
             more,
             likes_tab,
             scroll,
@@ -336,6 +348,31 @@ impl ProfilePage {
             if let Some(page) = weak.upgrade() {
                 (page.host.open_post)(post);
             }
+        });
+        let weak = Rc::downgrade(&page);
+        page.edit.connect_clicked(move |_| {
+            let Some(page) = weak.upgrade() else { return };
+            let Some(profile) = page.profile.borrow().clone() else {
+                return;
+            };
+            let weak = Rc::downgrade(&page);
+            crate::edit_profile::present(
+                &page.root,
+                page.host.session.clone(),
+                &profile,
+                move || {
+                    if let Some(page) = weak.upgrade() {
+                        page.host.toasts.add_toast(adw::Toast::new(
+                            &if page.host.session.is_some() {
+                                gettext("Profil enregistré.")
+                            } else {
+                                gettext("Mode démonstration : rien n'est enregistré.")
+                            },
+                        ));
+                        page.load();
+                    }
+                },
+            );
         });
         let weak = Rc::downgrade(&page);
         page.follow.connect_clicked(move |_| {
@@ -445,6 +482,7 @@ impl ProfilePage {
         self.bio.set_label(&profile.bio);
         self.bio.set_visible(!profile.bio.trim().is_empty());
         self.likes_tab.set_visible(is_me);
+        self.edit.set_visible(is_me);
         self.follow
             .set_visible(!is_me && self.host.session.is_some() && !profile.did.is_empty());
         self.more.set_visible(!is_me && !profile.handle.is_empty());
