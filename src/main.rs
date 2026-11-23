@@ -32,6 +32,7 @@ mod report;
 mod richtext;
 mod runtime;
 mod settings;
+mod starter_packs;
 mod thread;
 mod viewer;
 mod window;

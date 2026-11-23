@@ -157,7 +157,7 @@ impl Change {
     }
 }
 
-fn info_from_view(view: &atrium_api::app::bsky::feed::defs::GeneratorView) -> FeedInfo {
+pub(crate) fn info_from_view(view: &atrium_api::app::bsky::feed::defs::GeneratorView) -> FeedInfo {
     FeedInfo {
         uri: view.uri.clone(),
         name: view.display_name.clone(),
@@ -288,7 +288,7 @@ fn icon_button(icon: &str, label: &str) -> gtk::Button {
     button
 }
 
-fn feed_row(info: &FeedInfo) -> adw::ActionRow {
+pub(crate) fn feed_row(info: &FeedInfo) -> adw::ActionRow {
     let mut subtitle = gettext("par @{}").replace("{}", &info.creator);
     if info.likes > 0 {
         subtitle = format!(

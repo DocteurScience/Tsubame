@@ -21,6 +21,7 @@ Logiciels et Flathub).
 
 ### Lire
 
+- Starter packs dans Explorer : voir leurs comptes et leurs flux, tout suivre.
 - Liens, mentions et mots-dièse cliquables dans les posts ; page d'un mot-dièse.
 - Page « Flux » : épingler, réordonner, retirer ses flux ; découvrir et
   rechercher des flux, les ouvrir, les ajouter.

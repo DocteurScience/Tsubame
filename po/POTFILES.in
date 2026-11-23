@@ -25,6 +25,7 @@ src/post_list.rs
 src/preferences.rs
 src/profile.rs
 src/report.rs
+src/starter_packs.rs
 src/thread.rs
 src/viewer.rs
 src/window.rs

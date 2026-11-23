@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: tsubame\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-23 16:55+0000\n"
+"POT-Creation-Date: 2026-11-23 16:59+0000\n"
 "PO-Revision-Date: 2026-11-22\n"
 "Last-Translator: \n"
 "Language-Team: English\n"
@@ -19,11 +19,12 @@ msgid "Tsubame"
 msgstr "Tsubame"
 
 #: data/io.github.DocteurScience.Tsubame.desktop.in:4
-#: data/io.github.DocteurScience.Tsubame.metainfo.xml.in:7 src/main.rs:60
+#: data/io.github.DocteurScience.Tsubame.metainfo.xml.in:7 src/main.rs:61
 msgid "Client Bluesky pour GNOME"
 msgstr "Bluesky client for GNOME"
 
-#. Traducteurs : mots-clés séparés par des points-virgules, sans traduire « Tsubame ».
+#. Traducteurs : mots-clés séparés par des points-virgules, sans traduire «
+#. Tsubame ».
 #: data/io.github.DocteurScience.Tsubame.desktop.in:6
 msgid "Bluesky;réseau social;AT Protocol;microblog;"
 msgstr "Bluesky;social network;AT Protocol;microblog;"
@@ -33,8 +34,8 @@ msgid ""
 "Tsubame est un client Bluesky natif pour le bureau GNOME. Les posts "
 "s’affichent en cartes et la discussion s’ouvre dans un volet à côté du fil."
 msgstr ""
-"Tsubame is a native Bluesky client for the GNOME desktop. Posts are shown as "
-"cards and the conversation opens in a pane next to the feed."
+"Tsubame is a native Bluesky client for the GNOME desktop. Posts are shown as"
+" cards and the conversation opens in a pane next to the feed."
 
 #: data/io.github.DocteurScience.Tsubame.metainfo.xml.in:16
 msgid "DocteurScience"
@@ -102,230 +103,230 @@ msgstr "{} reposted"
 msgid "En réponse à {}"
 msgstr "Replying to {}"
 
-#: src/api.rs:683
+#: src/api.rs:686
 msgid "{name} et {n} autre ont aimé votre post"
 msgid_plural "{name} et {n} autres ont aimé votre post"
 msgstr[0] "{name} and {n} other liked your post"
 msgstr[1] "{name} and {n} others liked your post"
 
-#: src/api.rs:688
+#: src/api.rs:691
 msgid "{name} et {n} autre ont reposté votre post"
 msgid_plural "{name} et {n} autres ont reposté votre post"
 msgstr[0] "{name} and {n} other reposted your post"
 msgstr[1] "{name} and {n} others reposted your post"
 
-#: src/api.rs:693
+#: src/api.rs:696
 msgid "{name} et {n} autre ont aimé votre repost"
 msgid_plural "{name} et {n} autres ont aimé votre repost"
 msgstr[0] "{name} and {n} other liked your repost"
 msgstr[1] "{name} and {n} others liked your repost"
 
-#: src/api.rs:698
+#: src/api.rs:701
 msgid "{name} et {n} autre ont reposté votre repost"
 msgid_plural "{name} et {n} autres ont reposté votre repost"
 msgstr[0] "{name} and {n} other reposted your repost"
 msgstr[1] "{name} and {n} others reposted your repost"
 
-#: src/api.rs:703
+#: src/api.rs:706
 msgid "{name} et {n} autre vous suivent"
 msgid_plural "{name} et {n} autres vous suivent"
 msgstr[0] "{name} and {n} other followed you"
 msgstr[1] "{name} and {n} others followed you"
 
-#: src/api.rs:791
+#: src/api.rs:794
 msgid "a aimé votre post"
 msgstr "liked your post"
 
-#: src/api.rs:792
+#: src/api.rs:795
 msgid "a reposté votre post"
 msgstr "reposted your post"
 
-#: src/api.rs:793
+#: src/api.rs:796
 msgid "vous suit"
 msgstr "followed you"
 
-#: src/api.rs:794 src/data.rs:585
+#: src/api.rs:797 src/data.rs:587
 msgid "vous a mentionné"
 msgstr "mentioned you"
 
-#: src/api.rs:795 src/data.rs:584
+#: src/api.rs:798 src/data.rs:586
 msgid "a répondu à votre post"
 msgstr "replied to your post"
 
-#: src/api.rs:796 src/data.rs:586
+#: src/api.rs:799 src/data.rs:588
 msgid "a cité votre post"
 msgstr "quoted your post"
 
-#: src/api.rs:797
+#: src/api.rs:800
 msgid "a aimé votre repost"
 msgstr "liked your repost"
 
-#: src/api.rs:798
+#: src/api.rs:801
 msgid "a reposté votre repost"
 msgstr "reposted your repost"
 
-#: src/api.rs:799
+#: src/api.rs:802
 msgid "a rejoint Bluesky avec votre starter pack"
 msgstr "joined Bluesky with your starter pack"
 
-#: src/api.rs:1069 src/moderation.rs:365 src/report.rs:126
+#: src/api.rs:1072 src/moderation.rs:365 src/report.rs:126
 msgid "Ce compte n'existe pas."
 msgstr "This account does not exist."
 
-#: src/api.rs:1271
+#: src/api.rs:1274
 msgid "Abonnés"
 msgstr "Followers"
 
-#: src/api.rs:1272
+#: src/api.rs:1275
 msgid "Abonnements"
 msgstr "Following"
 
-#: src/api.rs:1273
+#: src/api.rs:1276
 msgctxt "comptes qui ont aimé un post"
 msgid "J'aime"
 msgstr "Likes"
 
-#: src/api.rs:1274
+#: src/api.rs:1277
 msgid "Reposts"
 msgstr "Reposts"
 
-#: src/api.rs:1280
+#: src/api.rs:1283
 msgid "Aucun abonné pour l'instant."
 msgstr "No followers yet."
 
-#: src/api.rs:1281
+#: src/api.rs:1284
 msgid "Aucun abonnement pour l'instant."
 msgstr "Not following anyone yet."
 
-#: src/api.rs:1282
+#: src/api.rs:1285
 msgid "Personne n'a encore aimé ce post."
 msgstr "No one has liked this post yet."
 
-#: src/api.rs:1283
+#: src/api.rs:1286
 msgid "Personne n'a encore reposté ce post."
 msgstr "No one has reposted this post yet."
 
-#: src/api.rs:1396
+#: src/api.rs:1399
 msgid "Ce post ne peut pas être modifié."
 msgstr "This post cannot be changed."
 
-#: src/api.rs:1538
+#: src/api.rs:1541
 msgid "Tout le monde"
 msgstr "Everyone"
 
-#: src/api.rs:1539
+#: src/api.rs:1542
 msgid "Comptes que vous suivez"
 msgstr "Accounts you follow"
 
-#: src/api.rs:1540
+#: src/api.rs:1543
 msgid "Vos abonnés"
 msgstr "Your followers"
 
-#: src/api.rs:1541
+#: src/api.rs:1544
 msgid "Comptes mentionnés"
 msgstr "Mentioned accounts"
 
-#: src/api.rs:1542
+#: src/api.rs:1545
 msgid "Personne"
 msgstr "No one"
 
-#: src/api.rs:1814 src/edit_profile.rs:198
+#: src/api.rs:1817 src/edit_profile.rs:198
 msgid "Une image n'a pas pu être envoyée : {}"
 msgstr "An image could not be uploaded: {}"
 
-#: src/api.rs:1928
+#: src/api.rs:1931
 msgid "La vidéo n'a pas pu être envoyée."
 msgstr "The video could not be uploaded."
 
-#: src/api.rs:1986
+#: src/api.rs:1989
 msgid "La vidéo a été refusée : {}"
 msgstr "The video was rejected: {}"
 
-#: src/api.rs:1987
+#: src/api.rs:1990
 msgid "La vidéo n'a pas pu être convertie."
 msgstr "The video could not be processed."
 
-#: src/api.rs:2006
+#: src/api.rs:2009
 msgid "La conversion de la vidéo prend trop de temps."
 msgstr "Processing the video is taking too long."
 
-#: src/api.rs:2021
+#: src/api.rs:2024
 msgid "janv."
 msgstr "Jan"
 
-#: src/api.rs:2022
+#: src/api.rs:2025
 msgid "févr."
 msgstr "Feb"
 
-#: src/api.rs:2023
+#: src/api.rs:2026
 msgid "mars"
 msgstr "Mar"
 
-#: src/api.rs:2024
+#: src/api.rs:2027
 msgid "avr."
 msgstr "Apr"
 
-#: src/api.rs:2025
+#: src/api.rs:2028
 msgid "mai"
 msgstr "May"
 
-#: src/api.rs:2026
+#: src/api.rs:2029
 msgid "juin"
 msgstr "Jun"
 
-#: src/api.rs:2027
+#: src/api.rs:2030
 msgid "juil."
 msgstr "Jul"
 
-#: src/api.rs:2028
+#: src/api.rs:2031
 msgid "août"
 msgstr "Aug"
 
-#: src/api.rs:2029
+#: src/api.rs:2032
 msgid "sept."
 msgstr "Sep"
 
-#: src/api.rs:2030
+#: src/api.rs:2033
 msgid "oct."
 msgstr "Oct"
 
-#: src/api.rs:2031
+#: src/api.rs:2034
 msgid "nov."
 msgstr "Nov"
 
-#: src/api.rs:2032
+#: src/api.rs:2035
 msgid "déc."
 msgstr "Dec"
 
-#: src/api.rs:2042
+#: src/api.rs:2045
 msgid "à l'instant"
 msgstr "now"
 
-#: src/api.rs:2044
+#: src/api.rs:2047
 msgid "{} min"
 msgstr "{} min"
 
-#: src/api.rs:2046
+#: src/api.rs:2049
 msgid "{} h"
 msgstr "{} h"
 
-#: src/api.rs:2049
+#: src/api.rs:2052
 msgid "{} j"
 msgid_plural "{} j"
 msgstr[0] "{} d"
 msgstr[1] "{} d"
 
-#: src/api.rs:2056
+#: src/api.rs:2059
 msgctxt "jour, mois abrégé et année"
 msgid "{day} {month} {year}"
 msgstr "{month} {day}, {year}"
 
-#: src/api.rs:2067
+#: src/api.rs:2070
 msgctxt "date et heure d'un post"
 msgid "{day} {month} {year}, {time}"
 msgstr "{month} {day}, {year}, {time}"
 
-#: src/api.rs:2079
+#: src/api.rs:2082
 msgctxt "jour et mois abrégé"
 msgid "{day} {month}"
 msgstr "{month} {day}"
@@ -358,8 +359,8 @@ msgstr "Your session has expired. Please sign in again."
 
 #: src/auth/mod.rs:68
 msgid ""
-"Impossible de trouver ce compte. Vérifiez l'identifiant et votre connexion à "
-"Internet."
+"Impossible de trouver ce compte. Vérifiez l'identifiant et votre connexion à"
+" Internet."
 msgstr ""
 "Could not find this account. Check the handle and your Internet connection."
 
@@ -800,7 +801,7 @@ msgstr "Keep as draft"
 msgid "Le brouillon n'a pas pu être enregistré."
 msgstr "The draft could not be saved."
 
-#: src/compose.rs:1217
+#: src/compose.rs:1217 src/starter_packs.rs:404
 msgid "Mode démonstration : rien n'est publié."
 msgstr "Demo mode: nothing is posted."
 
@@ -912,7 +913,8 @@ msgid ""
 msgstr "Describe what the video shows for people who cannot see it."
 
 #: src/compose.rs:1847
-msgid "Décrivez ce que montre l'image pour les personnes qui ne la voient pas."
+msgid ""
+"Décrivez ce que montre l'image pour les personnes qui ne la voient pas."
 msgstr "Describe what the image shows for people who cannot see it."
 
 #: src/desktop.rs:16
@@ -987,88 +989,101 @@ msgstr "Choose a banner"
 msgid "Choisir un avatar"
 msgstr "Choose an avatar"
 
-#: src/edit_profile.rs:576 src/explore.rs:165 src/feeds.rs:714
+#: src/edit_profile.rs:576 src/explore.rs:171 src/feeds.rs:714
 #: src/preferences.rs:339 src/preferences.rs:451 src/profile.rs:646
 #: src/profile.rs:730 src/report.rs:241 src/window.rs:1105 src/window.rs:1173
 #: src/window.rs:1215 src/window.rs:1316 src/window.rs:1687
 msgid "Requête interrompue."
 msgstr "Request interrupted."
 
-#: src/explore.rs:115
+#: src/explore.rs:121
 msgctxt "bouton : vous suivez ce compte"
 msgid "Abonné"
 msgstr "Following"
 
-#: src/explore.rs:117 src/profile.rs:570
+#: src/explore.rs:123 src/profile.rs:570
 msgid "Suivre"
 msgstr "Follow"
 
-#: src/explore.rs:120
+#: src/explore.rs:126
 msgid "Ne plus suivre {}"
 msgstr "Unfollow {}"
 
-#: src/explore.rs:122
+#: src/explore.rs:128
 msgid "Suivre {}"
 msgstr "Follow {}"
 
-#: src/explore.rs:174 src/profile.rs:665
+#: src/explore.rs:180 src/profile.rs:665
 msgid "L'abonnement n'a pas changé."
 msgstr "Following did not change."
 
-#: src/explore.rs:203
+#: src/explore.rs:209
 msgid "Rechercher des posts, des personnes…"
 msgstr "Search posts, people…"
 
-#: src/explore.rs:207
+#: src/explore.rs:213
 msgid "Rechercher"
 msgstr "Search"
 
 #. Sans recherche : sujets du moment, personnes à suivre.
-#: src/explore.rs:218 src/explore.rs:228
+#: src/explore.rs:224 src/explore.rs:235
 msgid "Sujets du moment"
 msgstr "Trending topics"
 
-#: src/explore.rs:219 src/explore.rs:230
+#: src/explore.rs:225 src/explore.rs:237
 msgid "Personnes à suivre"
 msgstr "People to follow"
 
-#: src/explore.rs:249 src/feeds.rs:531
+#: src/explore.rs:226 src/explore.rs:239 src/explore.rs:268
+msgid "Starter packs"
+msgstr "Starter packs"
+
+#: src/explore.rs:258 src/feeds.rs:531
 msgid "Résultats"
 msgstr "Results"
 
-#: src/explore.rs:251 src/profile.rs:33
+#: src/explore.rs:260 src/profile.rs:33
 msgid "Posts"
 msgstr "Posts"
 
-#: src/explore.rs:255
+#: src/explore.rs:264
 msgid "Personnes"
 msgstr "People"
 
-#: src/explore.rs:260
+#: src/explore.rs:274
+msgid "Starter packs trouvés"
+msgstr "Starter packs found"
+
+#: src/explore.rs:289
 msgid "Posts trouvés"
 msgstr "Posts found"
 
-#: src/explore.rs:261
+#: src/explore.rs:290
 msgid "Personnes trouvées"
 msgstr "People found"
 
-#: src/explore.rs:387 src/explore.rs:480 src/explore.rs:505 src/feed_page.rs:91
-#: src/feed_page.rs:211 src/feed_page.rs:310 src/feed_page.rs:419
-#: src/feeds.rs:430 src/feeds.rs:551 src/messages.rs:425 src/messages.rs:514
-#: src/preferences.rs:258 src/preferences.rs:387 src/profile.rs:471
-#: src/profile.rs:612
+#: src/explore.rs:447
+msgid "Aucun starter pack."
+msgstr "No starter packs."
+
+#: src/explore.rs:467 src/explore.rs:490 src/explore.rs:499 src/explore.rs:593
+#: src/explore.rs:618 src/feed_page.rs:91 src/feed_page.rs:211
+#: src/feed_page.rs:310 src/feed_page.rs:419 src/feeds.rs:430 src/feeds.rs:551
+#: src/messages.rs:425 src/messages.rs:514 src/preferences.rs:258
+#: src/preferences.rs:387 src/profile.rs:471 src/profile.rs:612
+#: src/starter_packs.rs:388
 msgid "Chargement interrompu."
 msgstr "Loading interrupted."
 
-#: src/explore.rs:418
+#: src/explore.rs:530
 msgid "Aucun sujet pour l'instant."
 msgstr "No topics yet."
 
-#: src/explore.rs:437
+#: src/explore.rs:549
 msgid "Aucune suggestion pour l'instant."
 msgstr "No suggestions yet."
 
-#: src/explore.rs:533
+#: src/explore.rs:646
 msgid "Personne ne correspond à cette recherche."
 msgstr "No one matches this search."
 
@@ -1126,7 +1141,7 @@ msgstr "Pinned feeds can open as columns on the home page."
 msgid "Flux populaires"
 msgstr "Popular feeds"
 
-#: src/feeds.rs:378 src/window.rs:76
+#: src/feeds.rs:378 src/starter_packs.rs:274 src/window.rs:76
 msgid "Flux"
 msgstr "Feeds"
 
@@ -1192,11 +1207,11 @@ msgstr "Handle"
 
 #: src/login.rs:92
 msgid ""
-"Par exemple : vous.bsky.social. Votre navigateur s'ouvrira pour confirmer la "
-"connexion ; Tsubame ne voit jamais votre mot de passe."
+"Par exemple : vous.bsky.social. Votre navigateur s'ouvrira pour confirmer la"
+" connexion ; Tsubame ne voit jamais votre mot de passe."
 msgstr ""
-"For example: you.bsky.social. Your browser will open to confirm the sign-in; "
-"Tsubame never sees your password."
+"For example: you.bsky.social. Your browser will open to confirm the sign-in;"
+" Tsubame never sees your password."
 
 #: src/login.rs:106
 msgid "Se connecter"
@@ -1240,7 +1255,7 @@ msgid "erreur inattendue"
 msgstr "unexpected error"
 
 #. Traducteurs : remplacez « translator-credits » par vos noms, un par ligne.
-#: src/main.rs:66
+#: src/main.rs:67
 msgid "translator-credits"
 msgstr ""
 
@@ -1291,7 +1306,8 @@ msgid "Aucune conversation"
 msgstr "No conversations"
 
 #: src/messages.rs:275
-msgid "Demande de message : cette personne ne fait pas partie de vos contacts."
+msgid ""
+"Demande de message : cette personne ne fait pas partie de vos contacts."
 msgstr "Message request: this person is not one of your contacts."
 
 #: src/messages.rs:277
@@ -1687,12 +1703,60 @@ msgid ""
 "Le signalement est envoyé au service de modération de Bluesky. La personne "
 "signalée n'en est pas informée."
 msgstr ""
-"The report is sent to the Bluesky moderation service. The reported person is "
-"not told."
+"The report is sent to the Bluesky moderation service. The reported person is"
+" not told."
 
 #: src/report.rs:199
 msgid "Précisions (facultatif)"
 msgstr "Details (optional)"
+
+#: src/starter_packs.rs:194
+msgid "Par {}"
+msgstr "By {}"
+
+#: src/starter_packs.rs:199
+msgid "{} compte"
+msgid_plural "{} comptes"
+msgstr[0] "{} account"
+msgstr[1] "{} accounts"
+
+#: src/starter_packs.rs:209
+msgid "{} flux"
+msgid_plural "{} flux"
+msgstr[0] "{} feed"
+msgstr[1] "{} feeds"
+
+#: src/starter_packs.rs:266
+msgid "Starter pack"
+msgstr "Starter pack"
+
+#: src/starter_packs.rs:270
+msgid "Tout suivre"
+msgstr "Follow all"
+
+#: src/starter_packs.rs:275
+msgid "Flux du starter pack"
+msgstr "Starter pack feeds"
+
+#: src/starter_packs.rs:276
+msgid "Comptes du starter pack"
+msgstr "Starter pack accounts"
+
+#: src/starter_packs.rs:289
+msgid "Comptes"
+msgstr "Accounts"
+
+#: src/starter_packs.rs:422
+msgid "{} compte suivi, puis une erreur s'est produite."
+msgid_plural "{} comptes suivis, puis une erreur s'est produite."
+msgstr[0] "Followed {} account, then an error occurred."
+msgstr[1] "Followed {} accounts, then an error occurred."
+
+#: src/starter_packs.rs:427
+msgid "{} compte suivi."
+msgid_plural "{} comptes suivis."
+msgstr[0] "Followed {} account."
+msgstr[1] "Followed {} accounts."
 
 #: src/thread.rs:33
 msgid "Disposition du volet de lecture"

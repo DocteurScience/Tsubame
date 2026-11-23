@@ -17,12 +17,14 @@ use crate::images;
 use crate::post_list::PostList;
 use crate::profile::Host;
 use crate::runtime::runtime;
+use crate::starter_packs::{self, StarterPack, StarterPackPage, pack_row};
 
 /// Onglets des résultats.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Results {
     Posts,
     People,
+    Packs,
 }
 
 pub struct ExplorePage {
@@ -36,6 +38,10 @@ pub struct ExplorePage {
     posts: PostList,
     people: gtk::ListBox,
     people_status: adw::StatusPage,
+    /// Starter packs suggérés (sans recherche) et trouvés.
+    packs: gtk::ListBox,
+    pack_results: gtk::ListBox,
+    known_packs: RefCell<Vec<StarterPack>>,
     query: RefCell<String>,
     /// Numéro de la dernière recherche de personnes : les réponses à une
     /// recherche dépassée sont ignorées.
@@ -217,6 +223,7 @@ impl ExplorePage {
         // Sans recherche : sujets du moment, personnes à suivre.
         let topics = boxed_list(&gettext("Sujets du moment"));
         let suggested = boxed_list(&gettext("Personnes à suivre"));
+        let packs = boxed_list(&gettext("Starter packs"));
         let discover = gtk::Box::builder()
             .orientation(gtk::Orientation::Vertical)
             .spacing(12)
@@ -229,6 +236,8 @@ impl ExplorePage {
         discover.append(&topics);
         discover.append(&heading(&gettext("Personnes à suivre")));
         discover.append(&suggested);
+        discover.append(&heading(&gettext("Starter packs")));
+        discover.append(&packs);
         let discover_scroll = gtk::ScrolledWindow::builder()
             .hscrollbar_policy(gtk::PolicyType::Never)
             .child(
@@ -255,8 +264,28 @@ impl ExplorePage {
             .label(gettext("Personnes"))
             .group(&posts_tab)
             .build();
+        let packs_tab = gtk::ToggleButton::builder()
+            .label(gettext("Starter packs"))
+            .group(&posts_tab)
+            .build();
         tabs.append(&posts_tab);
         tabs.append(&people_tab);
+        tabs.append(&packs_tab);
+        let pack_results = boxed_list(&gettext("Starter packs trouvés"));
+        let packs_scroll = gtk::ScrolledWindow::builder()
+            .hscrollbar_policy(gtk::PolicyType::Never)
+            .vexpand(true)
+            .child(
+                &adw::Clamp::builder()
+                    .maximum_size(crate::columns::COLUMN_MAX_WIDTH + 24)
+                    .margin_top(12)
+                    .margin_bottom(24)
+                    .margin_start(12)
+                    .margin_end(12)
+                    .child(&pack_results)
+                    .build(),
+            )
+            .build();
         let posts = PostList::new(&gettext("Posts trouvés"), "");
         let people = boxed_list(&gettext("Personnes trouvées"));
         let people_status = adw::StatusPage::builder()
@@ -286,6 +315,7 @@ impl ExplorePage {
         let results = gtk::Stack::new();
         results.add_named(&posts.root, Some("posts"));
         results.add_named(&people_scroll, Some("people"));
+        results.add_named(&packs_scroll, Some("packs"));
         let results_box = gtk::Box::new(gtk::Orientation::Vertical, 0);
         results_box.append(&tabs);
         results_box.append(&results);
@@ -310,6 +340,9 @@ impl ExplorePage {
             posts,
             people,
             people_status,
+            packs,
+            pack_results,
+            known_packs: RefCell::default(),
             query: RefCell::default(),
             people_generation: Cell::new(0),
         });
@@ -326,7 +359,11 @@ impl ExplorePage {
                 page.search(entry.text().trim());
             }
         });
-        for (tab, button) in [(Results::Posts, posts_tab), (Results::People, people_tab)] {
+        for (tab, button) in [
+            (Results::Posts, posts_tab),
+            (Results::People, people_tab),
+            (Results::Packs, packs_tab),
+        ] {
             let weak = Rc::downgrade(&page);
             button.connect_toggled(move |button| {
                 if button.is_active()
@@ -335,6 +372,7 @@ impl ExplorePage {
                     page.results.set_visible_child_name(match tab {
                         Results::Posts => "posts",
                         Results::People => "people",
+                        Results::Packs => "packs",
                     });
                 }
             });
@@ -368,9 +406,71 @@ impl ExplorePage {
                 page.search(&query);
             }
         });
+        for list in [&page.packs, &page.pack_results] {
+            let weak = Rc::downgrade(&page);
+            list.connect_row_activated(move |_, row| {
+                if let Some(page) = weak.upgrade() {
+                    page.open_pack(&row.widget_name());
+                }
+            });
+        }
 
         page.load_discover();
         page
+    }
+
+    fn open_pack(&self, uri: &str) {
+        let pack = self
+            .known_packs
+            .borrow()
+            .iter()
+            .find(|p| p.uri == uri)
+            .cloned();
+        if let Some(pack) = pack {
+            let page = StarterPackPage::new(&pack, self.host.clone());
+            (self.host.push)(page.navigation_page());
+        }
+    }
+
+    /// Remplit `list` de starter packs, ou d'un message.
+    fn show_packs(&self, list: &gtk::ListBox, packs: Result<Vec<StarterPack>, ApiError>) {
+        clear(list);
+        match packs {
+            Ok(packs) if !packs.is_empty() => {
+                for pack in &packs {
+                    let row = pack_row(pack);
+                    row.set_widget_name(&pack.uri);
+                    list.append(&row);
+                }
+                self.known_packs.borrow_mut().extend(packs);
+            }
+            Ok(_) => list.append(&message_row(&gettext("Aucun starter pack."))),
+            Err(error) => list.append(&message_row(&error.message)),
+        }
+    }
+
+    fn load_packs(self: &Rc<Self>) {
+        let query = self.query.borrow().clone();
+        let Some(session) = self.host.session.clone() else {
+            let found = starter_packs::demo_packs()
+                .into_iter()
+                .filter(|p| matches(&p.name, &query) || matches(&p.creator, &query))
+                .collect();
+            self.show_packs(&self.pack_results, Ok(found));
+            return;
+        };
+        let task = runtime().spawn(starter_packs::search(session, query.clone()));
+        let weak = Rc::downgrade(self);
+        glib::spawn_future_local(async move {
+            let result = task
+                .await
+                .unwrap_or_else(|_| Err(ApiError::new(gettext("Chargement interrompu."))));
+            let Some(page) = weak.upgrade() else { return };
+            if *page.query.borrow() != query {
+                return;
+            }
+            page.show_packs(&page.pack_results, result);
+        });
     }
 
     /// Sujets du moment et personnes à suivre.
@@ -378,8 +478,20 @@ impl ExplorePage {
         let Some(session) = self.host.session.clone() else {
             self.show_topics(Ok(data::demo_topics()));
             self.show_suggested(Ok(data::demo_actors()));
+            self.show_packs(&self.packs, Ok(starter_packs::demo_packs()));
             return;
         };
+        // Starter packs à part : leur échec n'empêche pas le reste.
+        let packs = runtime().spawn(starter_packs::suggested(session.clone()));
+        let weak = Rc::downgrade(self);
+        glib::spawn_future_local(async move {
+            let result = packs
+                .await
+                .unwrap_or_else(|_| Err(ApiError::new(gettext("Chargement interrompu."))));
+            if let Some(page) = weak.upgrade() {
+                page.show_packs(&page.packs, result);
+            }
+        });
         let topics = runtime().spawn(api::trending(session.clone()));
         let people = runtime().spawn(api::suggestions(session));
         let weak = Rc::downgrade(self);
@@ -455,6 +567,7 @@ impl ExplorePage {
         self.stack.set_visible_child_name("results");
         self.load_posts(false);
         self.load_people();
+        self.load_packs();
     }
 
     fn load_posts(self: &Rc<Self>, more: bool) {
