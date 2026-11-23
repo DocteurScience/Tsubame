@@ -51,7 +51,11 @@ Le build se fait hors ligne : les crates viennent de `build-aux/cargo-sources.js
 python3 build-aux/cargo-sources.py
 ```
 
-GitHub Actions construit le paquet à chaque push (workflow `Flatpak`) et le met à disposition comme artefact `tsubame-flatpak`.
+GitHub Actions construit le paquet (workflow `Flatpak`) sur `main`, sur les tags `v*` et à la demande, et le met à disposition comme artefact `tsubame-flatpak`. Pour l'installer :
+
+```bash
+flatpak install --user tsubame.flatpak
+```
 
 ## Snap
 
@@ -71,7 +75,7 @@ La session Bluesky est gardée dans le trousseau, auquel un Snap n'accède qu'ap
 sudo snap connect tsubame:password-manager-service
 ```
 
-GitHub Actions construit aussi le Snap à chaque push (workflow `Snap`, artefact `tsubame-snap`).
+GitHub Actions construit aussi le Snap (workflow `Snap`, artefact `tsubame-snap`), dans les mêmes cas que le Flatpak.
 
 ## Client OAuth d'une version distribuée
 
