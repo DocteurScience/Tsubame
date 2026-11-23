@@ -174,8 +174,13 @@ impl ProfilePage {
         let name = label(&["title-1"]);
         let handle = label(&["dim-label"]);
         let bio = label(&[]);
+        // Étiquettes raccourcies au besoin, pour que la rangée tienne en
+        // palier mobile avec des polices larges.
         let counter = || {
-            let label = gtk::Label::builder().use_markup(true).build();
+            let label = gtk::Label::builder()
+                .use_markup(true)
+                .ellipsize(gtk::pango::EllipsizeMode::End)
+                .build();
             gtk::Button::builder()
                 .child(&label)
                 .css_classes(["flat", "profile-count"])
@@ -184,6 +189,7 @@ impl ProfilePage {
         let (followers, follows) = (counter(), counter());
         let post_count = gtk::Label::builder()
             .use_markup(true)
+            .ellipsize(gtk::pango::EllipsizeMode::End)
             .margin_start(8)
             .build();
         let stats = gtk::Box::new(gtk::Orientation::Horizontal, 4);
