@@ -91,7 +91,41 @@ columnsview > .column headerbar {
 }
 
 /* Palier compact : cibles tactiles d'au moins 44 px (voir CLAUDE.md). */
-.compact .post-stat,
+/* GTK compte min-width sans le rembourrage : les boutons des cartes ont
+   donc 4 px de côté et 36 px de contenu, 44 px en tout, pour que cinq
+   boutons tiennent dans une carte de 360 px de large. */
+.compact .post-stat {
+  padding-left: 4px;
+  padding-right: 4px;
+  min-height: 44px;
+  min-width: 36px;
+}
+
+/* Bouton ⋮ des cartes : GtkMenuButton porte la classe, son bouton interne
+   le rembourrage. */
+.compact menubutton.post-stat > button {
+  padding-left: 4px;
+  padding-right: 4px;
+  min-width: 36px;
+  min-height: 44px;
+}
+
+/* Autres cibles tactiles du palier mobile : onglets liés (filtres,
+   messagerie, profil), barre du bas de la rédaction, compteurs du profil,
+   avatar des cartes, ajout d'un post au fil. */
+.compact .linked > button,
+.compact .compose-bar button,
+.compact .profile-count,
+.compact .avatar-button,
+.compact .compose-add-thread {
+  min-height: 44px;
+}
+
+.compact .compose-bar button,
+.compact .avatar-button {
+  min-width: 44px;
+}
+
 .compact .post-detail button,
 .compact headerbar button:not(.minimize):not(.maximize):not(.close),
 .compact .pill {

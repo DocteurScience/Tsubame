@@ -392,7 +392,7 @@ pub fn present(
                 .build(),
         )
         .halign(gtk::Align::Start)
-        .css_classes(["flat"])
+        .css_classes(["flat", "compose-add-thread"])
         .build();
     thread_box.append(&add_to_thread);
     content.insert_child_after(&thread_box, Some(&images_area));
@@ -412,7 +412,10 @@ pub fn present(
     for (code, name) in LANGUAGES {
         language_menu.append(Some(name), Some(&format!("compose.language::{code}")));
     }
+    // Les étiquettes du bas se raccourcissent (« Fran… ») en palier mobile,
+    // pour laisser la place au compteur.
     let language_content = adw::ButtonContent::builder()
+        .can_shrink(true)
         .icon_name("preferences-desktop-locale-symbolic")
         .label(language_name(language.get()))
         .build();
@@ -430,6 +433,7 @@ pub fn present(
         .build();
     let bottom = gtk::Box::builder()
         .orientation(gtk::Orientation::Horizontal)
+        .css_classes(["compose-bar"])
         .spacing(6)
         .margin_start(6)
         .margin_end(12)
@@ -464,6 +468,7 @@ pub fn present(
     );
     gate_menu.append_section(None, &quotes_section);
     let gate_content = adw::ButtonContent::builder()
+        .can_shrink(true)
         .icon_name("mail-reply-sender-symbolic")
         .label(api::ReplyRule::Everyone.title())
         .build();
