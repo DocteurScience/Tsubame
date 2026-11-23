@@ -168,7 +168,26 @@ def check_sizes(screen, width=360):
             problems.append(f"« {name[:40]} » {e.width}×{e.height} px")
 
     walk(app(), f)
+    if any("dépasse" in p for p in problems):
+        problems.append("conteneurs trop larges : " + ", ".join(widest(width)))
     report(screen + " (mobile)", problems)
+
+
+def widest(width, limit=6):
+    """Conteneurs qui dépassent `width`, les plus profonds d'abord : la
+    piste de ce qui impose la largeur."""
+    found = []
+
+    def f(o, depth):
+        try:
+            e = o.queryComponent().getExtents(pyatspi.WINDOW_COORDS)
+        except NotImplementedError:
+            return
+        if e.x + e.width > width + 2:
+            found.append((depth, f"{o.getRoleName()}«{(o.name or '')[:20]}» {e.width}px"))
+
+    walk(app(), f)
+    return [name for _, name in sorted(found, reverse=True)[:limit]]
 
 
 def report(screen, problems):

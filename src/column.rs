@@ -152,6 +152,7 @@ pub struct Column {
     header: adw::HeaderBar,
     title: adw::WindowTitle,
     switcher: gtk::MenuButton,
+    switcher_label: gtk::Label,
     close: gtk::Button,
     options: gtk::MenuButton,
     moves: gio::Menu,
@@ -177,8 +178,14 @@ impl Column {
         // Titre simple, ou menu des colonnes ouvertes quand une seule colonne
         // est visible (comme « Following ▾ » dans la maquette Mobile).
         let title = adw::WindowTitle::new(&kind.title(), "");
-        let switcher = gtk::MenuButton::builder()
+        // Le titre se raccourcit (« Follo… ») plutôt que d'élargir l'en-tête
+        // au-delà de 360 px avec des polices plus larges.
+        let switcher_label = gtk::Label::builder()
             .label(kind.title())
+            .ellipsize(gtk::pango::EllipsizeMode::End)
+            .build();
+        let switcher = gtk::MenuButton::builder()
+            .child(&switcher_label)
             .menu_model(columns_menu)
             .always_show_arrow(true)
             .tooltip_text(gettext("Changer de colonne"))
@@ -288,6 +295,7 @@ impl Column {
             header,
             title,
             switcher,
+            switcher_label,
             close,
             options,
             moves,
@@ -417,7 +425,7 @@ impl Column {
     pub fn refresh_title(&self) {
         let title = self.kind.title();
         self.title.set_title(&title);
-        self.switcher.set_label(&title);
+        self.switcher_label.set_label(&title);
         self.list
             .update_property(&[gtk::accessible::Property::Label(&title)]);
     }
