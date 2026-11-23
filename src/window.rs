@@ -243,6 +243,9 @@ struct State {
     /// trop tard.
     shown_uri: RefCell<Option<String>>,
     logout_action: gio::SimpleAction,
+    /// Section « comptes » du menu principal, et les comptes qu'elle liste.
+    accounts_menu: gio::Menu,
+    known_accounts: RefCell<Vec<auth::Account>>,
 }
 
 impl State {
@@ -511,6 +514,11 @@ impl State {
                 .unwrap_or_default(),
         );
         self.logout_action.set_enabled(session.is_some());
+        if let Some(session) = &session {
+            let _ = self
+                .settings
+                .set_string("current-account", &session.account.did);
+        }
         interactions::set_me(session.as_ref().map(|s| s.account.did.clone()));
         self.session.replace(session);
         self.clear_thread();
@@ -527,6 +535,66 @@ impl State {
         if let Some(column) = self.columns.borrow().get(self.current.get()) {
             column.focus();
         }
+        self.refresh_accounts();
+    }
+
+    /// Section « comptes » du menu principal : passer à un autre compte
+    /// gardé dans le trousseau, en ajouter un.
+    fn refresh_accounts(self: &Rc<Self>) {
+        let task = runtime().spawn(auth::stored_accounts());
+        let weak = Rc::downgrade(self);
+        glib::spawn_future_local(async move {
+            let accounts = task.await.ok().and_then(Result::ok).unwrap_or_default();
+            let Some(state) = weak.upgrade() else { return };
+            let current = state
+                .session
+                .borrow()
+                .as_ref()
+                .map(|s| s.account.did.clone());
+            state.accounts_menu.remove_all();
+            for account in accounts.iter().filter(|a| Some(&a.did) != current.as_ref()) {
+                let item = gio::MenuItem::new(
+                    Some(&gettext("Passer à @{}").replace("{}", &account.handle)),
+                    None,
+                );
+                item.set_action_and_target_value(
+                    Some("win.switch-account"),
+                    Some(&account.did.to_variant()),
+                );
+                state.accounts_menu.append_item(&item);
+            }
+            state.accounts_menu.append(
+                Some(&gettext("Ajouter un compte…")),
+                Some("win.add-account"),
+            );
+            state.known_accounts.replace(accounts);
+        });
+    }
+
+    /// Passe au compte `did`, gardé dans le trousseau.
+    fn switch_account(self: &Rc<Self>, did: &str) {
+        let account = self
+            .known_accounts
+            .borrow()
+            .iter()
+            .find(|a| a.did == did)
+            .cloned();
+        if let Some(account) = account {
+            self.stop_polling();
+            self.enter(Some(auth::session_for(account)));
+        }
+    }
+
+    /// Écran de connexion pour un compte de plus ; « Retour » revient à
+    /// l'application telle qu'elle était.
+    fn add_account(self: &Rc<Self>) {
+        let weak = Rc::downgrade(self);
+        self.login.show_add_account(move || {
+            if let Some(state) = weak.upgrade() {
+                state.root_stack.set_visible_child_name("main");
+            }
+        });
+        self.root_stack.set_visible_child_name("login");
     }
 
     /// Revient à l'écran de connexion.
@@ -579,6 +647,7 @@ impl State {
         dialog.connect_response(Some("logout"), move |_, _| {
             let Some(state) = weak.upgrade() else { return };
             let account = account.clone();
+            let leaving = account.did.clone();
             let task = runtime().spawn(async move { auth::logout(&account).await });
             let weak = Rc::downgrade(&state);
             glib::spawn_future_local(async move {
@@ -589,7 +658,20 @@ impl State {
                     Ok(Err(error)) => Some(error.message()),
                     Err(_) => Some(gettext("La déconnexion a échoué.")),
                 };
-                state.leave(message.as_deref());
+                // Un autre compte reste connecté : on passe à lui.
+                let others = runtime().spawn(auth::stored_accounts());
+                let next = others
+                    .await
+                    .ok()
+                    .and_then(Result::ok)
+                    .and_then(|accounts| accounts.into_iter().find(|a| a.did != leaving));
+                match (message, next) {
+                    (None, Some(next)) => {
+                        state.stop_polling();
+                        state.enter(Some(auth::session_for(next)));
+                    }
+                    (message, _) => state.leave(message.as_deref()),
+                }
             });
         });
         dialog.present(Some(window));
@@ -600,7 +682,8 @@ impl State {
     fn restore_session(self: &Rc<Self>) {
         self.login.show_checking();
         self.root_stack.set_visible_child_name("login");
-        let task = runtime().spawn(auth::stored_session());
+        let preferred = self.settings.string("current-account").to_string();
+        let task = runtime().spawn(auth::stored_session(preferred));
         let weak = Rc::downgrade(self);
         glib::spawn_future_local(async move {
             let result = task.await;
@@ -1881,6 +1964,22 @@ fn install_actions(window: &adw::ApplicationWindow, state: &Rc<State>) {
         }
     });
     window.add_action(&open_tag);
+    let switch = gio::SimpleAction::new("switch-account", Some(glib::VariantTy::STRING));
+    let weak = Rc::downgrade(state);
+    switch.connect_activate(move |_, param| {
+        if let (Some(state), Some(did)) = (weak.upgrade(), param.and_then(|p| p.str())) {
+            state.switch_account(did);
+        }
+    });
+    window.add_action(&switch);
+    let add_account = gio::SimpleAction::new("add-account", None);
+    let weak = Rc::downgrade(state);
+    add_account.connect_activate(move |_, _| {
+        if let Some(state) = weak.upgrade() {
+            state.add_account();
+        }
+    });
+    window.add_action(&add_account);
     let message = gio::SimpleAction::new("message", Some(glib::VariantTy::STRING));
     let weak = Rc::downgrade(state);
     message.connect_activate(move |_, param| {
@@ -2153,6 +2252,8 @@ pub fn build(app: &adw::Application) -> adw::ApplicationWindow {
         .build();
     sidebar_list.update_property(&[gtk::accessible::Property::Label(&gettext("Navigation"))]);
     let menu = gio::Menu::new();
+    let accounts_menu = gio::Menu::new();
+    menu.append_section(None, &accounts_menu);
     let account_section = gio::Menu::new();
     account_section.append(Some(&gettext("Préférences")), Some("win.preferences"));
     account_section.append(Some(&gettext("Se déconnecter…")), Some("win.logout"));
@@ -2269,6 +2370,8 @@ pub fn build(app: &adw::Application) -> adw::ApplicationWindow {
         unread: Cell::new(0),
         notifications_page: notifications.clone(),
         logout_action: gio::SimpleAction::new("logout", None),
+        accounts_menu,
+        known_accounts: RefCell::default(),
         poll: RefCell::default(),
     });
     state.connect_column(&state.compact_notifications, Target::CompactNotifications);

@@ -25,6 +25,9 @@ pub struct LoginPage {
     url: RefCell<Option<String>>,
     task: RefCell<Option<tokio::task::AbortHandle>>,
     on_logged_in: RefCell<Option<LoggedIn>>,
+    /// « Retour », quand on ajoute un compte depuis l'application.
+    back: gtk::Button,
+    on_back: RefCell<Option<Box<dyn Fn()>>>,
 }
 
 fn centered(child: &impl IsA<gtk::Widget>) -> gtk::ScrolledWindow {
@@ -135,6 +138,13 @@ impl LoginPage {
             .visible(cfg!(debug_assertions))
             .build();
         form.append(&demo);
+        let back = gtk::Button::builder()
+            .label(gettext("Retour"))
+            .halign(gtk::Align::Center)
+            .visible(false)
+            .css_classes(["flat"])
+            .build();
+        form.append(&back);
 
         // Attente du navigateur.
         let waiting_label = gtk::Label::builder()
@@ -194,6 +204,17 @@ impl LoginPage {
             url: RefCell::default(),
             task: RefCell::default(),
             on_logged_in: RefCell::default(),
+            back,
+            on_back: RefCell::default(),
+        });
+        let weak = Rc::downgrade(&page);
+        page.back.connect_clicked(move |_| {
+            with(&weak, |p| {
+                p.cancel_task();
+                if let Some(back) = p.on_back.borrow().as_ref() {
+                    back();
+                }
+            })
         });
 
         let weak = Rc::downgrade(&page);
@@ -232,9 +253,19 @@ impl LoginPage {
         self.stack.set_visible_child_name("checking");
     }
 
+    /// Formulaire pour ajouter un compte : « Retour » appelle `back`.
+    pub fn show_add_account(&self, back: impl Fn() + 'static) {
+        self.entry.set_text("");
+        self.show_form(None);
+        self.on_back.replace(Some(Box::new(back)));
+        self.back.set_visible(true);
+    }
+
     /// Montre le formulaire, avec un message éventuel (session expirée…).
     pub fn show_form(&self, message: Option<&str>) {
         self.cancel_task();
+        self.back.set_visible(false);
+        self.on_back.replace(None);
         self.error.set_label(message.unwrap_or_default());
         self.error.set_visible(message.is_some());
         self.stack.set_visible_child_name("form");

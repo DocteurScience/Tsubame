@@ -12,6 +12,10 @@ Logiciels et Flathub).
 
 ## Non publié
 
+### Compte
+
+- Plusieurs comptes : en ajouter un, passer de l'un à l'autre depuis le menu principal.
+
 ### Modération
 
 - Mots masqués pour une durée, ou dans les mots-clics seulement.
