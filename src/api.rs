@@ -1627,6 +1627,9 @@ pub struct NewVideo {
     pub alt: String,
     /// Largeur et hauteur, si le lecteur a pu les lire.
     pub size: Option<(u32, u32)>,
+    /// Présentation suggérée : « gif » pour un GIF animé (en boucle, sans
+    /// commandes).
+    pub presentation: Option<&'static str>,
     /// Blob de la vidéo, une fois traitée par le service vidéo.
     pub blob: Option<serde_json::Value>,
 }
@@ -1706,6 +1709,9 @@ pub fn post_record(
         }
         if let Some((width, height)) = video.size {
             embed["aspectRatio"] = json!({"width": width, "height": height});
+        }
+        if let Some(presentation) = video.presentation {
+            embed["presentation"] = json!(presentation);
         }
         record["embed"] = embed;
     } else if !blobs.is_empty() {
@@ -2532,6 +2538,7 @@ mod tests {
             video: Some(NewVideo {
                 alt: "Un train".into(),
                 size: Some((1920, 1080)),
+                presentation: Some("gif"),
                 blob: Some(serde_json::json!({
                     "$type": "blob", "ref": {"$link": CID}, "mimeType": "video/mp4", "size": 1
                 })),
@@ -2544,6 +2551,7 @@ mod tests {
         assert_eq!(record["embed"]["$type"], "app.bsky.embed.video");
         assert_eq!(record["embed"]["alt"], "Un train");
         assert_eq!(record["embed"]["aspectRatio"]["width"], 1920);
+        assert_eq!(record["embed"]["presentation"], "gif");
         let _: atrium_api::app::bsky::feed::post::Record = serde_json::from_value(record).unwrap();
     }
 

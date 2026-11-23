@@ -1382,8 +1382,8 @@ const MAX_VIDEO_BYTES: usize = 100 * 1024 * 1024;
 struct Attachment {
     bytes: glib::Bytes,
     paintable: gdk::Paintable,
-    /// Pour une vidéo : son type MIME et son lecteur.
-    video: Option<(String, gtk::MediaFile)>,
+    /// Pour une vidéo ou un GIF animé : son type MIME.
+    video: Option<String>,
     alt: RefCell<String>,
     tile: gtk::Overlay,
     alt_button: gtk::Button,
@@ -1407,7 +1407,9 @@ impl Attachment {
         } else {
             (
                 gettext("Ajouter un texte alternatif"),
-                if self.video.is_some() {
+                if self.video.as_deref() == Some("image/gif") {
+                    gettext("GIF sans texte alternatif")
+                } else if self.video.is_some() {
                     gettext("Vidéo sans texte alternatif")
                 } else {
                     gettext("Image sans texte alternatif")
@@ -1461,13 +1463,18 @@ fn images_of(attachments: &Rc<RefCell<Vec<Rc<Attachment>>>>) -> Vec<RawImage> {
 /// La vidéo jointe, avec sa taille si le lecteur l'a lue.
 fn video_of(attachments: &Rc<RefCell<Vec<Rc<Attachment>>>>) -> Option<api::NewVideo> {
     attachments.borrow().iter().find_map(|a| {
-        let (mime, media) = a.video.as_ref()?;
-        let (width, height) = (media.intrinsic_width(), media.intrinsic_height());
+        let mime = a.video.as_ref()?;
+        let (width, height) = (
+            a.paintable.intrinsic_width(),
+            a.paintable.intrinsic_height(),
+        );
         Some(api::NewVideo {
             bytes: a.bytes.to_vec(),
             mime: mime.clone(),
             alt: a.alt.borrow().trim().to_owned(),
             size: (width > 0 && height > 0).then_some((width as u32, height as u32)),
+            // Un GIF se montre en boucle, sans commandes.
+            presentation: (mime == "image/gif").then_some("gif"),
             blob: None,
         })
     })
@@ -1524,12 +1531,14 @@ fn load_images(
             let mime = gio::content_type_get_mime_type(&content_type)
                 .map(|m| m.to_string())
                 .unwrap_or_default();
-            // Une vidéo se publie seule ; des images, jusqu'à quatre.
-            let refusal = if mime.starts_with("video/") && !attachments.borrow().is_empty() {
+            // Une vidéo (ou un GIF animé, converti en vidéo par Bluesky) se
+            // publie seule ; des images, jusqu'à quatre.
+            let as_video = mime.starts_with("video/") || mime == "image/gif";
+            let refusal = if as_video && !attachments.borrow().is_empty() {
                 Some(gettext("Une vidéo se publie seule, sans images."))
-            } else if mime.starts_with("video/") && bytes.len() > MAX_VIDEO_BYTES {
+            } else if as_video && bytes.len() > MAX_VIDEO_BYTES {
                 Some(gettext("Cette vidéo dépasse 100 Mo."))
-            } else if !mime.starts_with("video/") && has_video(&attachments) {
+            } else if !as_video && has_video(&attachments) {
                 Some(gettext("Une vidéo se publie seule, sans images."))
             } else {
                 None
@@ -1540,20 +1549,21 @@ fn load_images(
                 continue;
             }
             if mime.starts_with("video/") {
-                let media = gtk::MediaFile::for_file(&file);
-                let paintable = media.clone().upcast();
-                attach(
+                let paintable = gtk::MediaFile::for_file(&file).upcast();
+                attach(&attachments, &tiles, &update, bytes, paintable, Some(mime));
+                continue;
+            }
+            // Un GIF se montre par sa première image.
+            let video = as_video.then_some(mime);
+            match gdk::Texture::from_bytes(&bytes) {
+                Ok(texture) => attach(
                     &attachments,
                     &tiles,
                     &update,
                     bytes,
-                    paintable,
-                    Some((mime, media)),
-                );
-                continue;
-            }
-            match gdk::Texture::from_bytes(&bytes) {
-                Ok(texture) => attach(&attachments, &tiles, &update, bytes, texture.upcast(), None),
+                    texture.upcast(),
+                    video,
+                ),
                 Err(_) => {
                     error.set_label(&gettext("Ce fichier n'est pas une image lisible."));
                     error.set_visible(true);
@@ -1578,6 +1588,7 @@ fn choose_images(
         "image/png",
         "image/jpeg",
         "image/webp",
+        "image/gif",
         "video/mp4",
         "video/quicktime",
         "video/webm",
@@ -1675,7 +1686,7 @@ fn attach(
     update: &Rc<dyn Fn()>,
     bytes: glib::Bytes,
     paintable: gdk::Paintable,
-    video: Option<(String, gtk::MediaFile)>,
+    video: Option<String>,
 ) {
     let picture = gtk::Picture::builder()
         .paintable(&paintable)
@@ -1705,17 +1716,29 @@ fn attach(
         .accessible_role(gtk::AccessibleRole::Group)
         .css_classes(["compose-tile"])
         .build();
-    if let Some((_, media)) = &video {
-        // Marque « vidéo » au centre de la vignette.
+    if let Some(mime) = &video {
+        // Marque « vidéo » ou « GIF » au centre de la vignette.
         let badge = gtk::Box::builder()
             .halign(gtk::Align::Center)
             .valign(gtk::Align::Center)
             .css_classes(["osd", "compose-play"])
             .build();
-        badge.append(&crate::card::decorative_icon(
-            "media-playback-start-symbolic",
-        ));
+        if mime == "image/gif" {
+            badge.append(
+                &gtk::Label::builder()
+                    .label(gettext("GIF"))
+                    .accessible_role(gtk::AccessibleRole::Presentation)
+                    .css_classes(["compose-alt"])
+                    .build(),
+            );
+        } else {
+            badge.append(&crate::card::decorative_icon(
+                "media-playback-start-symbolic",
+            ));
+        }
         tile.add_overlay(&badge);
+    }
+    if let Some(media) = paintable.downcast_ref::<gtk::MediaFile>() {
         // GtkMediaFile ne dessine rien avant la lecture : on lit sans son
         // jusqu'à la première image, puis on s'arrête.
         media.set_muted(true);

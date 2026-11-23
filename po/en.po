@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: tsubame\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-23 16:48+0000\n"
+"POT-Creation-Date: 2026-11-23 16:50+0000\n"
 "PO-Revision-Date: 2026-11-22\n"
 "Last-Translator: \n"
 "Language-Team: English\n"
@@ -230,103 +230,103 @@ msgstr "Mentioned accounts"
 msgid "Personne"
 msgstr "No one"
 
-#: src/api.rs:1802 src/edit_profile.rs:198
+#: src/api.rs:1808 src/edit_profile.rs:198
 msgid "Une image n'a pas pu être envoyée : {}"
 msgstr "An image could not be uploaded: {}"
 
-#: src/api.rs:1916
+#: src/api.rs:1922
 msgid "La vidéo n'a pas pu être envoyée."
 msgstr "The video could not be uploaded."
 
-#: src/api.rs:1974
+#: src/api.rs:1980
 msgid "La vidéo a été refusée : {}"
 msgstr "The video was rejected: {}"
 
-#: src/api.rs:1975
+#: src/api.rs:1981
 msgid "La vidéo n'a pas pu être convertie."
 msgstr "The video could not be processed."
 
-#: src/api.rs:1994
+#: src/api.rs:2000
 msgid "La conversion de la vidéo prend trop de temps."
 msgstr "Processing the video is taking too long."
 
-#: src/api.rs:2009
+#: src/api.rs:2015
 msgid "janv."
 msgstr "Jan"
 
-#: src/api.rs:2010
+#: src/api.rs:2016
 msgid "févr."
 msgstr "Feb"
 
-#: src/api.rs:2011
+#: src/api.rs:2017
 msgid "mars"
 msgstr "Mar"
 
-#: src/api.rs:2012
+#: src/api.rs:2018
 msgid "avr."
 msgstr "Apr"
 
-#: src/api.rs:2013
+#: src/api.rs:2019
 msgid "mai"
 msgstr "May"
 
-#: src/api.rs:2014
+#: src/api.rs:2020
 msgid "juin"
 msgstr "Jun"
 
-#: src/api.rs:2015
+#: src/api.rs:2021
 msgid "juil."
 msgstr "Jul"
 
-#: src/api.rs:2016
+#: src/api.rs:2022
 msgid "août"
 msgstr "Aug"
 
-#: src/api.rs:2017
+#: src/api.rs:2023
 msgid "sept."
 msgstr "Sep"
 
-#: src/api.rs:2018
+#: src/api.rs:2024
 msgid "oct."
 msgstr "Oct"
 
-#: src/api.rs:2019
+#: src/api.rs:2025
 msgid "nov."
 msgstr "Nov"
 
-#: src/api.rs:2020
+#: src/api.rs:2026
 msgid "déc."
 msgstr "Dec"
 
-#: src/api.rs:2030
+#: src/api.rs:2036
 msgid "à l'instant"
 msgstr "now"
 
-#: src/api.rs:2032
+#: src/api.rs:2038
 msgid "{} min"
 msgstr "{} min"
 
-#: src/api.rs:2034
+#: src/api.rs:2040
 msgid "{} h"
 msgstr "{} h"
 
-#: src/api.rs:2037
+#: src/api.rs:2043
 msgid "{} j"
 msgid_plural "{} j"
 msgstr[0] "{} d"
 msgstr[1] "{} d"
 
-#: src/api.rs:2044
+#: src/api.rs:2050
 msgctxt "jour, mois abrégé et année"
 msgid "{day} {month} {year}"
 msgstr "{month} {day}, {year}"
 
-#: src/api.rs:2055
+#: src/api.rs:2061
 msgctxt "date et heure d'un post"
 msgid "{day} {month} {year}, {time}"
 msgstr "{month} {day}, {year}, {time}"
 
-#: src/api.rs:2067
+#: src/api.rs:2073
 msgctxt "jour et mois abrégé"
 msgid "{day} {month}"
 msgstr "{month} {day}"
@@ -384,7 +384,7 @@ msgstr "unknown account identity"
 msgid "Voir le profil de {}"
 msgstr "View the profile of {}"
 
-#: src/card.rs:97 src/card.rs:238 src/compose.rs:1413
+#: src/card.rs:97 src/card.rs:238 src/compose.rs:1415
 msgid "Image sans texte alternatif"
 msgstr "Image without alternative text"
 
@@ -689,7 +689,7 @@ msgid "Nouveau post"
 msgstr "New post"
 
 #. En-tête : Annuler, titre, Publier.
-#: src/compose.rs:257 src/compose.rs:1782 src/edit_profile.rs:234
+#: src/compose.rs:257 src/compose.rs:1805 src/edit_profile.rs:234
 #: src/login.rs:150 src/profile.rs:801 src/report.rs:150 src/window.rs:572
 #: src/window.rs:1143 src/window.rs:1283
 msgid "Annuler"
@@ -729,7 +729,7 @@ msgstr "Add a post to the thread"
 msgid "Langue du post"
 msgstr "Post language"
 
-#: src/compose.rs:490 src/compose.rs:494 src/compose.rs:1591
+#: src/compose.rs:490 src/compose.rs:494 src/compose.rs:1602
 msgid "Ajouter des images ou une vidéo"
 msgstr "Add images or a video"
 
@@ -852,59 +852,67 @@ msgid "Ajouter un texte alternatif"
 msgstr "Add alternative text"
 
 #: src/compose.rs:1411
+msgid "GIF sans texte alternatif"
+msgstr "GIF without alternative text"
+
+#: src/compose.rs:1413
 msgid "Vidéo sans texte alternatif"
 msgstr "Video without alternative text"
 
-#: src/compose.rs:1490
+#: src/compose.rs:1497
 msgid "Une image n'a pas pu être préparée : {}"
 msgstr "An image could not be prepared: {}"
 
-#: src/compose.rs:1518
+#: src/compose.rs:1525
 msgid "Ce fichier n'a pas pu être lu."
 msgstr "This file could not be read."
 
-#: src/compose.rs:1529 src/compose.rs:1533
+#: src/compose.rs:1538 src/compose.rs:1542
 msgid "Une vidéo se publie seule, sans images."
 msgstr "A video is posted on its own, without images."
 
-#: src/compose.rs:1531
+#: src/compose.rs:1540
 msgid "Cette vidéo dépasse 100 Mo."
 msgstr "This video is larger than 100 MB."
 
-#: src/compose.rs:1558 src/edit_profile.rs:491
+#: src/compose.rs:1568 src/edit_profile.rs:491
 msgid "Ce fichier n'est pas une image lisible."
 msgstr "This file is not a readable image."
 
-#: src/compose.rs:1576
+#: src/compose.rs:1586
 msgid "Images et vidéos"
 msgstr "Images and videos"
 
-#: src/compose.rs:1691 src/compose.rs:1695
+#: src/compose.rs:1702 src/compose.rs:1706
 msgid "Retirer l'image"
 msgstr "Remove image"
 
-#: src/compose.rs:1779 src/compose.rs:1818
+#: src/compose.rs:1729
+msgid "GIF"
+msgstr "GIF"
+
+#: src/compose.rs:1802 src/compose.rs:1841
 msgid "Texte alternatif"
 msgstr "Alternative text"
 
-#: src/compose.rs:1784 src/edit_profile.rs:236
+#: src/compose.rs:1807 src/edit_profile.rs:236
 msgid "Enregistrer"
 msgstr "Save"
 
-#: src/compose.rs:1802
+#: src/compose.rs:1825
 msgid "Vidéo à décrire"
 msgstr "Video to describe"
 
-#: src/compose.rs:1804
+#: src/compose.rs:1827
 msgid "Image à décrire"
 msgstr "Image to describe"
 
-#: src/compose.rs:1822
+#: src/compose.rs:1845
 msgid ""
 "Décrivez ce que montre la vidéo pour les personnes qui ne la voient pas."
 msgstr "Describe what the video shows for people who cannot see it."
 
-#: src/compose.rs:1824
+#: src/compose.rs:1847
 msgid ""
 "Décrivez ce que montre l'image pour les personnes qui ne la voient pas."
 msgstr "Describe what the image shows for people who cannot see it."
