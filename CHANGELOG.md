@@ -15,6 +15,7 @@ Logiciels et Flathub).
 ### Écrire
 
 - Émojis, coller une image (Ctrl+V) ou la déposer sur la boîte de rédaction.
+- Étiquette de contenu sur les images (nudité, contenu sexuel, violence).
 
 ### Lire
 

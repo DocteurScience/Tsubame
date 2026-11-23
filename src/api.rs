@@ -1609,6 +1609,9 @@ pub struct NewPost {
     pub reply_rule: ReplyRule,
     /// Interdire de citer ce post.
     pub no_quotes: bool,
+    /// Étiquette de contenu posée par l'auteur sur ses images (« nudity »,
+    /// « sexual », « porn », « graphic-media »).
+    pub self_label: Option<&'static str>,
     /// Lien joint, avec son aperçu (sans effet avec des images).
     pub link: Option<NewLink>,
 }
@@ -1664,6 +1667,12 @@ pub fn post_record(
         "text": post.text,
         "createdAt": created_at,
     });
+    if let Some(value) = post.self_label {
+        record["labels"] = json!({
+            "$type": "com.atproto.label.defs#selfLabels",
+            "values": [{"val": value}],
+        });
+    }
     if !post.langs.is_empty() {
         record["langs"] = json!(post.langs);
     }
@@ -2357,6 +2366,24 @@ mod tests {
     const CID: &str = "bafyreie5737gdxlw5i64vzichcalba3z2v5n6icifvx5xytvske7mr3hpm";
 
     #[test]
+    fn self_labels_go_in_the_record() {
+        let post = NewPost {
+            text: "Photo".into(),
+            langs: Vec::new(),
+            reply: None,
+            quote: None,
+            reply_rule: ReplyRule::Everyone,
+            no_quotes: false,
+            self_label: Some("graphic-media"),
+            link: None,
+            images: Vec::new(),
+        };
+        let record = post_record(&post, &HashMap::new(), "2026-11-20T15:00:00.000Z", &[]);
+        assert_eq!(record["labels"]["values"][0]["val"], "graphic-media");
+        let _: atrium_api::app::bsky::feed::post::Record = serde_json::from_value(record).unwrap();
+    }
+
+    #[test]
     fn new_posts_become_records() {
         let root = StrongRef {
             uri: "at://did:plc:lucie/app.bsky.feed.post/1".into(),
@@ -2374,6 +2401,7 @@ mod tests {
             quote: None,
             reply_rule: ReplyRule::Everyone,
             no_quotes: false,
+            self_label: None,
             link: None,
             images: Vec::new(),
         };
@@ -2418,6 +2446,7 @@ mod tests {
             quote: None,
             reply_rule: ReplyRule::Everyone,
             no_quotes: false,
+            self_label: None,
             link: None,
             images: vec![image("Lever de soleil sur le Vercors"), image("")],
         };
@@ -2489,6 +2518,7 @@ mod tests {
             quote: None,
             reply_rule: ReplyRule::Everyone,
             no_quotes: false,
+            self_label: None,
             images: Vec::new(),
             link: Some(NewLink {
                 uri: "https://example.org/billet".into(),
@@ -2529,6 +2559,7 @@ mod tests {
             quote: Some(quoted),
             reply_rule: ReplyRule::Everyone,
             no_quotes: false,
+            self_label: None,
             link: None,
             images: Vec::new(),
         };
@@ -2648,6 +2679,7 @@ mod tests {
             quote: None,
             reply_rule: ReplyRule::Everyone,
             no_quotes: false,
+            self_label: None,
             link: None,
             images: Vec::new(),
         };

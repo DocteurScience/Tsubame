@@ -133,6 +133,32 @@ fn show_link(
     update();
 }
 
+/// Étiquettes qu'on peut mettre soi-même sur ses images. La première,
+/// vide, n'en met aucune.
+const SELF_LABELS: [&str; 5] = ["", "sexual", "nudity", "porn", "graphic-media"];
+
+fn self_label_title(value: &str) -> String {
+    match value {
+        "sexual" => gettext("Contenu sexuel suggestif"),
+        "nudity" => gettext("Nudité non sexuelle"),
+        "porn" => gettext("Pornographie"),
+        "graphic-media" => gettext("Violence graphique"),
+        _ => gettext("Aucune étiquette"),
+    }
+}
+
+fn set_label_button(button: &gtk::MenuButton, chosen: Option<&str>) {
+    let title = self_label_title(chosen.unwrap_or_default());
+    let name = gettext("Étiquette de contenu : {}").replace("{}", &title);
+    button.set_tooltip_text(Some(&name));
+    button.update_property(&[gtk::accessible::Property::Label(&name)]);
+    if chosen.is_some() {
+        button.add_css_class("accent");
+    } else {
+        button.remove_css_class("accent");
+    }
+}
+
 /// Retient `view` comme dernière zone de texte focalisée.
 fn track_focus(view: &gtk::TextView, last: &Rc<RefCell<glib::WeakRef<gtk::TextView>>>) {
     let focus = gtk::EventControllerFocus::new();
@@ -510,6 +536,24 @@ pub fn present(
     bottom.append(&emoji);
     bottom.append(&language_button);
     bottom.append(&gate_button);
+    // Étiquette de contenu des images (nudité, contenu sexuel, violence) :
+    // visible seulement avec des images.
+    let self_label: Rc<RefCell<Option<&'static str>>> = Rc::default();
+    let label_menu = gio::Menu::new();
+    for value in SELF_LABELS {
+        label_menu.append(
+            Some(&self_label_title(value)),
+            Some(&format!("compose.self-label::{value}")),
+        );
+    }
+    let label_button = gtk::MenuButton::builder()
+        .icon_name("dialog-warning-symbolic")
+        .menu_model(&label_menu)
+        .css_classes(["flat"])
+        .visible(false)
+        .build();
+    set_label_button(&label_button, None);
+    bottom.append(&label_button);
     bottom.append(&counter);
 
     let view = adw::ToolbarView::builder()
@@ -575,6 +619,28 @@ pub fn present(
         });
     }
     actions.add_action(&quotes_action);
+    let label_action = gio::SimpleAction::new_stateful(
+        "self-label",
+        Some(glib::VariantTy::STRING),
+        &"".to_variant(),
+    );
+    {
+        let (self_label, label_button) = (self_label.clone(), label_button.clone());
+        label_action.connect_change_state(move |action, value| {
+            let Some(value) = value.and_then(|v| v.str()) else {
+                return;
+            };
+            let chosen = SELF_LABELS
+                .iter()
+                .find(|v| **v == value)
+                .copied()
+                .filter(|v| !v.is_empty());
+            self_label.replace(chosen);
+            set_label_button(&label_button, chosen);
+            action.set_state(&value.to_variant());
+        });
+    }
+    actions.add_action(&label_action);
     dialog.insert_action_group("compose", Some(&actions));
 
     // Compteur et validité, à chaque frappe. Un texte en cours empêche de
@@ -612,6 +678,7 @@ pub fn present(
             add_to_thread.clone(),
             link_box.clone(),
         );
+        let label_button = label_button.clone();
         Rc::new(move || {
             let buffer = text.buffer();
             let value = buffer.text(&buffer.start_iter(), &buffer.end_iter(), false);
@@ -620,6 +687,7 @@ pub fn present(
             // Les images passent avant la carte du lien.
             link_box.set_visible(images == 0 && link_box.first_child().is_some());
             add_image.set_sensitive(images < MAX_IMAGES && !busy.get());
+            label_button.set_visible(images > 0);
             // Une citation suffit, sans texte ni image.
             let result = validate(&value, images + quoting);
             let count = match result {
@@ -1232,6 +1300,7 @@ pub fn present(
                 link: link_state.preview.borrow().clone(),
                 reply_rule: reply_rule.get(),
                 no_quotes: no_quotes.get(),
+                self_label: *self_label.borrow(),
             };
             let task = runtime().spawn(async move {
                 // Images réduites et réencodées hors de la boucle GTK.
@@ -1268,6 +1337,7 @@ pub fn present(
                         quote: None,
                         reply_rule: api::ReplyRule::Everyone,
                         no_quotes: false,
+                        self_label: None,
                         link: None,
                     };
                     match Box::pin(api::publish(session.clone(), next)).await {
