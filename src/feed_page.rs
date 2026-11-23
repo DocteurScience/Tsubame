@@ -259,7 +259,7 @@ fn list_row(list: &List) -> adw::ActionRow {
         });
     }
     row.add_prefix(&avatar);
-    row.add_suffix(&gtk::Image::from_icon_name("go-next-symbolic"));
+    row.add_suffix(&crate::card::decorative_icon("go-next-symbolic"));
     row
 }
 

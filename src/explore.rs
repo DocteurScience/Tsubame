@@ -193,7 +193,7 @@ fn topic_row(rank: usize, topic: &Topic) -> adw::ActionRow {
             .css_classes(["dim-label", "heading", "numeric"])
             .build(),
     );
-    row.add_suffix(&gtk::Image::from_icon_name("go-next-symbolic"));
+    row.add_suffix(&crate::card::decorative_icon("go-next-symbolic"));
     row
 }
 

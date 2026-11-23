@@ -299,6 +299,7 @@ fn add_play_button(overlay: &gtk::Overlay, playlist: &str, description: &str, he
                     &gtk::Image::builder()
                         .icon_name("video-x-generic-symbolic")
                         .pixel_size(32)
+                        .accessible_role(gtk::AccessibleRole::Presentation)
                         .vexpand(true)
                         .valign(gtk::Align::End)
                         .build(),
@@ -347,6 +348,7 @@ fn add_warning(overlay: &gtk::Overlay, content: &gtk::Widget, warning: &str) {
         &gtk::Image::builder()
             .icon_name("dialog-warning-symbolic")
             .pixel_size(24)
+            .accessible_role(gtk::AccessibleRole::Presentation)
             .build(),
     );
     let title = gtk::Label::builder()
@@ -376,13 +378,35 @@ fn add_warning(overlay: &gtk::Overlay, content: &gtk::Widget, warning: &str) {
     });
 }
 
+/// Icône décorative : les lecteurs d'écran l'ignorent, le nom est ailleurs.
+pub fn decorative_icon(icon: &str) -> gtk::Image {
+    gtk::Image::builder()
+        .icon_name(icon)
+        .accessible_role(gtk::AccessibleRole::Presentation)
+        .build()
+}
+
+/// Icône et texte d'un bouton. Pas d'`AdwButtonContent` ici : il relie le
+/// bouton à son étiquette visible (`labelled-by`), qui passe avant le nom
+/// accessible : Orca lirait « 31 » au lieu de « Aimer, 31 j'aime ».
+fn icon_label(icon: &str, text: &str) -> (gtk::Box, gtk::Label) {
+    let content = gtk::Box::builder()
+        .spacing(6)
+        .halign(gtk::Align::Center)
+        .build();
+    content.append(&decorative_icon(icon));
+    let label = gtk::Label::builder()
+        .label(text)
+        .visible(!text.is_empty())
+        .build();
+    content.append(&label);
+    (content, label)
+}
+
 /// Bouton d'action à icône et compteur. Le nom accessible décrit l'action et
 /// le nombre, l'icône seule ne suffit pas.
 fn stat_button(icon: &str, count: u32, accessible: String) -> gtk::Button {
-    let content = adw::ButtonContent::builder()
-        .icon_name(icon)
-        .label(count.to_string())
-        .build();
+    let (content, _) = icon_label(icon, &count.to_string());
     let button = gtk::Button::builder()
         .child(&content)
         .tooltip_text(&accessible)
@@ -548,7 +572,7 @@ fn interaction_button(entry: &Rc<Interactions>, which: Interaction, detailed: bo
         Interaction::Repost => ("media-playlist-repeat-symbolic", "win.toggle-repost"),
         Interaction::Bookmark => ("user-bookmarks-symbolic", "win.toggle-bookmark"),
     };
-    let content = adw::ButtonContent::builder().icon_name(icon).build();
+    let (content, text) = icon_label(icon, "");
     let button: gtk::Widget = if which == Interaction::Repost {
         gtk::MenuButton::builder()
             .child(&content)
@@ -571,18 +595,20 @@ fn interaction_button(entry: &Rc<Interactions>, which: Interaction, detailed: bo
         button.add_css_class("post-stat");
     }
     let key = entry.key.clone();
-    let update = move |button: &gtk::Widget, content: &adw::ButtonContent, toggle: &Toggle| {
+    let update = move |button: &gtk::Widget, text: &gtk::Label, toggle: &Toggle| {
         if let Some(menu_button) = button.downcast_ref::<gtk::MenuButton>() {
             menu_button.set_menu_model(Some(&repost_menu(&key, toggle.active)));
         }
-        content.set_label(&if detailed {
+        let visible = if detailed {
             interaction_text(which, toggle)
         } else if which == Interaction::Bookmark {
             // Le signet est privé : pas de compteur.
             String::new()
         } else {
             toggle.count.to_string()
-        });
+        };
+        text.set_label(&visible);
+        text.set_visible(!visible.is_empty());
         let label = interaction_label(which, toggle);
         button.set_tooltip_text(Some(&label));
         button.update_property(&[gtk::accessible::Property::Label(&label)]);
@@ -597,14 +623,14 @@ fn interaction_button(entry: &Rc<Interactions>, which: Interaction, detailed: bo
             button.remove_css_class("active");
         }
     };
-    update(&button, &content, &entry.get(which));
+    update(&button, &text, &entry.get(which));
     let weak_button = button.downgrade();
-    let weak_content = content.downgrade();
+    let weak_text = text.downgrade();
     entry.connect(move |changed, toggle| {
         if changed == which
-            && let (Some(button), Some(content)) = (weak_button.upgrade(), weak_content.upgrade())
+            && let (Some(button), Some(text)) = (weak_button.upgrade(), weak_text.upgrade())
         {
-            update(&button, &content, toggle);
+            update(&button, &text, toggle);
         }
     });
     // La carte garde l'état du post en vie tant qu'elle est affichée.
@@ -646,13 +672,15 @@ fn card_frame(
         .spacing(4)
         .hexpand(true)
         .build();
-    // L'avatar ouvre aussi le profil.
+    // L'avatar ouvre aussi le profil, à la souris : au clavier, le nom
+    // suffit (un seul arrêt de tabulation par profil).
     if handle.is_empty() {
         card.append(&avatar);
     } else {
         let button = gtk::Button::builder()
             .child(&avatar)
             .valign(gtk::Align::Start)
+            .focusable(false)
             .css_classes(["flat", "circular", "avatar-button"])
             .build();
         link_to_profile(&button, name, handle);

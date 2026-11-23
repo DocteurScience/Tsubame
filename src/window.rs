@@ -108,7 +108,7 @@ enum SidebarItem {
 
 fn sidebar_row(icon: &str, title: &str, badge: Option<u32>) -> gtk::ListBoxRow {
     let content = gtk::Box::new(gtk::Orientation::Horizontal, 12);
-    content.append(&gtk::Image::from_icon_name(icon));
+    content.append(&crate::card::decorative_icon(icon));
     content.append(
         &gtk::Label::builder()
             .label(title)

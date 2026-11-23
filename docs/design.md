@@ -119,6 +119,12 @@ Fils (`src/api.rs`) :
 
 **Point ouvert : client OAuth de production.** Tsubame utilise pour l'instant le client de développement « localhost » du protocole AT, qui ne demande rien de publié mais n'est pas fait pour une version distribuée. Il faudra publier les métadonnées du client en https (par exemple sur GitHub Pages) et utiliser leur adresse comme `client_id`, avec une URI de redirection adaptée à une application native.
 
+## Accessibilité
+
+- `build-aux/a11y-audit.py` parcourt l'arbre AT-SPI de Tsubame ouvert (ce que lit Orca) et signale les éléments interactifs sans nom, ceux qu'on ne peut pas atteindre au clavier et les images sans nom. Dernier passage : écran de connexion, accueil (colonnes et discussion), boîte de rédaction, préférences, profil, sans problème.
+- `AdwButtonContent` relie son bouton à l'étiquette visible (`labelled-by`), qui passe avant le nom donné : un bouton « 31 » serait lu « 31 ». Les boutons dont le nom diffère du texte visible (compteurs des cartes) utilisent donc une icône et une étiquette simples (`card::icon_label`).
+- Les icônes décoratives (barre latérale, flèches de liste, avertissements, avatar de la boîte de rédaction) ont le rôle « présentation ». L'avatar d'une carte ouvre le profil à la souris ; au clavier, le nom suffit, pour un seul arrêt de tabulation.
+
 ## Traduction
 
 - Le français est la langue source : les chaînes sont écrites en français dans le code, avec `gettext` et `ngettext` (`gettext-rs`), domaine `tsubame`. Le modèle `po/tsubame.pot` se génère avec `ninja -C <build> tsubame-pot` (non versionné) ; `po/LINGUAS` liste les traductions, installées par Meson.

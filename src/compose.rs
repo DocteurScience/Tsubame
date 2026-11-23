@@ -307,8 +307,10 @@ pub fn present(
         .as_ref()
         .map(|s| s.account.handle.clone())
         .unwrap_or_default();
+    // Décoratif : le compte est déjà nommé dans la fenêtre.
     let avatar = adw::Avatar::builder()
         .size(40)
+        .accessible_role(gtk::AccessibleRole::Presentation)
         .text(&author)
         .show_initials(true)
         .valign(gtk::Align::Start)
