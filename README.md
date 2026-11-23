@@ -51,7 +51,7 @@ Le build se fait hors ligne : les crates viennent de `build-aux/cargo-sources.js
 python3 build-aux/cargo-sources.py
 ```
 
-GitHub Actions construit le paquet à chaque push (workflow `Flatpak`) et le met à disposition comme artefact `tsubame.flatpak`.
+GitHub Actions construit le paquet à chaque push (workflow `Flatpak`) et le met à disposition comme artefact `tsubame-flatpak`.
 
 ## Snap
 
@@ -72,6 +72,19 @@ sudo snap connect tsubame:password-manager-service
 ```
 
 GitHub Actions construit aussi le Snap à chaque push (workflow `Snap`, artefact `tsubame-snap`).
+
+## Client OAuth d'une version distribuée
+
+Par défaut, Tsubame se connecte avec le client de développement « localhost » du protocole AT, qui ne demande rien de publié mais n'est pas fait pour une version distribuée. Une version distribuée utilise un client publié :
+
+1. Publier `docs/oauth/client-metadata.json` en https, à l'adresse indiquée dans son champ `client_id` (par exemple GitHub Pages, dossier `docs/` de la branche principale). Si l'adresse change, mettre à jour `client_id` et `client_uri`.
+2. Construire avec cette adresse : option Meson `oauth-client-id` (ou variable `TSUBAME_OAUTH_CLIENT_ID` avec Cargo). Dans le manifeste Flatpak et dans `snap/snapcraft.yaml`, l'ajouter aux options de Meson :
+
+```bash
+meson setup _build -Doauth-client-id=https://docteurscience.github.io/Tsubame/oauth/client-metadata.json
+```
+
+Le client est natif et public (`token_endpoint_auth_method: none`) ; la réponse du navigateur revient sur `http://127.0.0.1:<port>/callback`.
 
 ## Licence
 

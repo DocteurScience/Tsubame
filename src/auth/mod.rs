@@ -25,8 +25,9 @@ use atrium_identity::did::{CommonDidResolver, CommonDidResolverConfig, DEFAULT_P
 use atrium_identity::handle::{AtprotoHandleResolver, AtprotoHandleResolverConfig, DnsTxtResolver};
 use atrium_oauth::store::state::MemoryStateStore;
 use atrium_oauth::{
-    AtprotoLocalhostClientMetadata, AuthorizeOptions, CallbackParams, DefaultHttpClient,
-    KnownScope, OAuthClient, OAuthClientConfig, OAuthResolverConfig, OAuthSession, Scope,
+    AtprotoClientMetadata, AtprotoLocalhostClientMetadata, AuthMethod, AuthorizeOptions,
+    CallbackParams, DefaultHttpClient, GrantType, KnownScope, OAuthClient, OAuthClientConfig,
+    OAuthResolverConfig, OAuthSession, Scope,
 };
 use gettextrs::gettext;
 
@@ -176,33 +177,82 @@ fn scopes() -> Vec<Scope> {
 /// Client OAuth pour une URI de redirection donnée. Avec le client
 /// « localhost », cette URI fait partie du `client_id` : une session doit
 /// être restaurée avec celle qui l'a ouverte.
+/// Client OAuth publié : adresse https de ses métadonnées
+/// (`docs/oauth/client-metadata.json`), fixée à la compilation
+/// (`TSUBAME_OAUTH_CLIENT_ID`, option Meson `oauth-client-id`). Sans elle,
+/// Tsubame utilise le client de développement « localhost » du protocole AT,
+/// qui ne demande rien de publié mais n'est pas fait pour une version
+/// distribuée.
+const CLIENT_ID: Option<&str> = option_env!("TSUBAME_OAUTH_CLIENT_ID");
+
+fn published_client_id() -> Option<&'static str> {
+    CLIENT_ID
+        .map(str::trim)
+        .filter(|id| id.starts_with("https://"))
+}
+
+/// Client OAuth avec ces métadonnées. Une macro et non une fonction
+/// générique : le trait des métadonnées n'est pas exporté par atrium-oauth.
+macro_rules! new_client {
+    ($client_metadata:expr, $handle:expr, $redirect_uri:expr $(,)?) => {{
+        let http_client = Arc::new(DefaultHttpClient::default());
+        let dns = hickory_resolver::TokioResolver::builder_tokio()
+            .and_then(|builder| builder.build())
+            .map_err(|e| LoginError::Failed(e.to_string()))?;
+        let config = OAuthClientConfig {
+            client_metadata: $client_metadata,
+            keys: None,
+            resolver: OAuthResolverConfig {
+                did_resolver: CommonDidResolver::new(CommonDidResolverConfig {
+                    plc_directory_url: DEFAULT_PLC_DIRECTORY_URL.to_owned(),
+                    http_client: Arc::clone(&http_client),
+                }),
+                handle_resolver: AtprotoHandleResolver::new(AtprotoHandleResolverConfig {
+                    dns_txt_resolver: HickoryDnsTxtResolver { resolver: dns },
+                    http_client: Arc::clone(&http_client),
+                }),
+                authorization_server_metadata: Default::default(),
+                protected_resource_metadata: Default::default(),
+            },
+            state_store: MemoryStateStore::default(),
+            session_store: KeyringSessionStore::new($handle, $redirect_uri),
+        };
+        OAuthClient::new(config).map_err(LoginError::from)
+    }};
+}
+
 fn client(handle: &str, redirect_uri: &str) -> Result<Client, LoginError> {
-    let http_client = Arc::new(DefaultHttpClient::default());
-    let dns = hickory_resolver::TokioResolver::builder_tokio()
-        .and_then(|builder| builder.build())
-        .map_err(|e| LoginError::Failed(e.to_string()))?;
-    let config = OAuthClientConfig {
-        client_metadata: AtprotoLocalhostClientMetadata {
-            redirect_uris: Some(vec![redirect_uri.to_owned()]),
-            scopes: Some(scopes()),
-        },
-        keys: None,
-        resolver: OAuthResolverConfig {
-            did_resolver: CommonDidResolver::new(CommonDidResolverConfig {
-                plc_directory_url: DEFAULT_PLC_DIRECTORY_URL.to_owned(),
-                http_client: Arc::clone(&http_client),
-            }),
-            handle_resolver: AtprotoHandleResolver::new(AtprotoHandleResolverConfig {
-                dns_txt_resolver: HickoryDnsTxtResolver { resolver: dns },
-                http_client: Arc::clone(&http_client),
-            }),
-            authorization_server_metadata: Default::default(),
-            protected_resource_metadata: Default::default(),
-        },
-        state_store: MemoryStateStore::default(),
-        session_store: KeyringSessionStore::new(handle, redirect_uri),
-    };
-    OAuthClient::new(config).map_err(LoginError::from)
+    let redirect_uris = vec![redirect_uri.to_owned()];
+    match published_client_id() {
+        Some(client_id) => {
+            // Page d'accueil : le dossier des métadonnées, même domaine.
+            let client_uri = client_id
+                .rsplit_once('/')
+                .map(|(folder, _)| format!("{folder}/"));
+            new_client!(
+                AtprotoClientMetadata {
+                    client_id: client_id.to_owned(),
+                    client_uri,
+                    redirect_uris,
+                    token_endpoint_auth_method: AuthMethod::None,
+                    grant_types: vec![GrantType::AuthorizationCode, GrantType::RefreshToken],
+                    scopes: scopes(),
+                    jwks_uri: None,
+                    token_endpoint_auth_signing_alg: None,
+                },
+                handle,
+                redirect_uri,
+            )
+        }
+        None => new_client!(
+            AtprotoLocalhostClientMetadata {
+                redirect_uris: Some(redirect_uris),
+                scopes: Some(scopes()),
+            },
+            handle,
+            redirect_uri,
+        ),
+    }
 }
 
 /// Connexion en attente de la réponse du navigateur.

@@ -37,7 +37,10 @@ tsubame_bin = custom_target(
   output: meson.project_name(),
   install: true,
   install_dir: bindir,
-  env: {'TSUBAME_LOCALEDIR': localedir},
+  env: {
+    'TSUBAME_LOCALEDIR': localedir,
+    'TSUBAME_OAUTH_CLIENT_ID': get_option('oauth-client-id'),
+  },
   command: [
     'sh', '-c',
     '"$1" build --manifest-path "$2" --target-dir "$3" $4 && cp "$3/$5/tsubame" "$6"',
