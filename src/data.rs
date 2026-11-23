@@ -284,6 +284,7 @@ pub struct Reply {
     pub handle: String,
     pub time: String,
     pub text: String,
+    pub facets: Vec<crate::richtext::Facet>,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -338,6 +339,7 @@ fn reply(
         handle: handle.into(),
         time: time.into(),
         text: text.into(),
+        facets: crate::richtext::detect(text),
     }
 }
 

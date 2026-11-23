@@ -593,6 +593,9 @@ fn reply_from_view(post: &PostView, now: DateTime<Utc>) -> Reply {
         handle: post.author.handle.as_str().to_owned(),
         time: indexed.map(|t| relative_time(t, now)).unwrap_or_default(),
         text: record_text(post),
+        facets: serde_json::to_value(&post.record)
+            .map(|record| crate::richtext::from_record(&record))
+            .unwrap_or_default(),
     }
 }
 

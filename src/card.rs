@@ -916,7 +916,7 @@ pub fn reply_card(reply: &Reply) -> gtk::Box {
     );
     card.set_tooltip_text(Some(&format!("@{}", reply.handle)));
     body.append(&meta(&reply.name, &reply.handle, &reply.time));
-    body.append(&label(&reply.text, &[]));
+    body.append(&rich_text(&reply.text, &reply.facets, &[]));
     card
 }
 
