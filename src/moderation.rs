@@ -373,6 +373,23 @@ pub fn set_labeler(preferences: &mut Vec<Value>, did: &str, subscribed: bool) {
     }
 }
 
+/// Langues des posts à afficher dans les fils (vide : toutes).
+pub fn set_content_languages(languages: Vec<String>) {
+    CONTENT_LANGUAGES.with_borrow_mut(|current| *current = languages);
+}
+
+/// Le post est-il dans une langue écartée ? Un post sans langue déclarée,
+/// ou un choix vide, ne l'est jamais. Seule la langue principale compte
+/// (« en-US » vaut « en »).
+pub fn outside_languages(post_langs: &[String], wanted: &[String]) -> bool {
+    let primary = |code: &str| code.split('-').next().unwrap_or(code).to_lowercase();
+    !wanted.is_empty()
+        && !post_langs.is_empty()
+        && !post_langs
+            .iter()
+            .any(|l| wanted.iter().any(|w| primary(w) == primary(l)))
+}
+
 /// Définitions des étiquettes des services suivis, pour les fils.
 pub fn set_definitions(definitions: Vec<LabelDefinition>) {
     DEFINITIONS.with_borrow_mut(|current| *current = definitions);
@@ -585,6 +602,8 @@ thread_local! {
     static MUTED: RefCell<Vec<MutedWord>> = RefCell::default();
     /// Étiquettes des services tiers suivis.
     static DEFINITIONS: RefCell<Vec<LabelDefinition>> = RefCell::default();
+    /// Langues des posts à afficher (vide : toutes).
+    static CONTENT_LANGUAGES: RefCell<Vec<String>> = RefCell::default();
 }
 
 /// Préférences à appliquer aux fils ; vide au départ et sans compte.
@@ -596,6 +615,7 @@ pub fn set_preferences(preferences: Vec<Value>) {
 /// Post à cacher : il contient un mot masqué, ou une étiquette le masque.
 pub fn is_hidden(post: &Post) -> bool {
     MUTED.with_borrow(|muted| post_is_muted(post, muted, chrono::Utc::now()))
+        || CONTENT_LANGUAGES.with_borrow(|wanted| outside_languages(&post.langs, wanted))
         || matches!(media_warning_visibility(post), Some((Visibility::Hide, _)))
 }
 
@@ -900,6 +920,18 @@ mod tests {
         );
         // Service inconnu : ignoré.
         assert_eq!(decide_with(&p, &[], &labels), None);
+    }
+
+    #[test]
+    fn posts_are_filtered_by_language() {
+        let langs = |l: &[&str]| l.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        assert!(!outside_languages(&langs(&["en"]), &[]));
+        assert!(!outside_languages(&[], &langs(&["fr"])));
+        assert!(!outside_languages(
+            &langs(&["en-US"]),
+            &langs(&["fr", "en"])
+        ));
+        assert!(outside_languages(&langs(&["ja"]), &langs(&["fr", "en"])));
     }
 
     #[test]

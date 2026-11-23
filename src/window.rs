@@ -1207,6 +1207,28 @@ impl State {
     }
 
     /// Épingler un de mes posts en haut de mon profil, ou l'en retirer.
+    /// Ouvre la traduction du texte du post dans le navigateur, vers la
+    /// langue de l'interface.
+    fn translate(self: &Rc<Self>, key: &str) {
+        let Some(post) = interactions::find(key).map(|entry| entry.post()) else {
+            return;
+        };
+        let uri = translation_uri(&post.text, &moderation::interface_language());
+        let window = self.toasts.root().and_downcast::<gtk::Window>();
+        let toasts = self.toasts.clone();
+        gtk::UriLauncher::new(&uri).launch(
+            window.as_ref(),
+            gio::Cancellable::NONE,
+            move |result| {
+                if result.is_err() {
+                    toasts.add_toast(adw::Toast::new(&gettext(
+                        "Le navigateur n'a pas pu être ouvert.",
+                    )));
+                }
+            },
+        );
+    }
+
     /// Partager un post dans une conversation.
     fn send_post(self: &Rc<Self>, key: &str) {
         let Some(post) = interactions::find(key).map(|entry| entry.post()) else {
@@ -1879,6 +1901,7 @@ fn install_actions(window: &adw::ApplicationWindow, state: &Rc<State>) {
     for (name, handler) in [
         ("copy-link", State::copy_link as fn(&Rc<State>, &str)),
         ("send-post", State::send_post),
+        ("translate", State::translate),
         ("mute-author", State::mute_author),
         ("block-author", State::confirm_block),
         ("report-post", State::report_post),
@@ -2262,6 +2285,26 @@ pub fn build(app: &adw::Application) -> adw::ApplicationWindow {
                 state.update_layout();
             }
         });
+    // Langues des posts affichés : filtre des fils, rechargés au changement.
+    moderation::set_content_languages(
+        state
+            .settings
+            .strv("content-languages")
+            .iter()
+            .map(|l| l.to_string())
+            .collect(),
+    );
+    let weak = Rc::downgrade(&state);
+    state
+        .settings
+        .connect_changed(Some("content-languages"), move |settings, key| {
+            moderation::set_content_languages(
+                settings.strv(key).iter().map(|l| l.to_string()).collect(),
+            );
+            if let Some(state) = weak.upgrade() {
+                state.load_all();
+            }
+        });
     let weak = Rc::downgrade(&state);
     columns_view.connect_visible_changed(move |visible| {
         if let Some(state) = weak.upgrade() {
@@ -2414,5 +2457,26 @@ mod tests {
         assert_eq!(drop_index(1, 1, true), None);
         assert_eq!(drop_index(1, 0, true), None); // après la précédente
         assert_eq!(drop_index(1, 2, false), None); // avant la suivante
+    }
+}
+
+/// Adresse de Google Traduction pour `text`, vers `target` (« fr »…), la
+/// langue d'origine étant détectée.
+pub fn translation_uri(text: &str, target: &str) -> String {
+    format!(
+        "https://translate.google.com/?sl=auto&tl={}&text={}&op=translate",
+        glib::Uri::escape_string(target, None, false),
+        glib::Uri::escape_string(text, None, false),
+    )
+}
+
+#[cfg(test)]
+mod translation_tests {
+    #[test]
+    fn translation_links_escape_the_text() {
+        assert_eq!(
+            super::translation_uri("Bonjour & à demain #GNOME", "en"),
+            "https://translate.google.com/?sl=auto&tl=en&text=Bonjour%20%26%20%C3%A0%20demain%20%23GNOME&op=translate"
+        );
     }
 }

@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: tsubame\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-23 17:47+0000\n"
+"POT-Creation-Date: 2026-11-23 17:51+0000\n"
 "PO-Revision-Date: 2026-11-22\n"
 "Last-Translator: \n"
 "Language-Team: English\n"
@@ -79,262 +79,262 @@ msgstr "Sign-in in the browser, session kept in the keyring"
 msgid "Bluesky n'a pas répondu : {}"
 msgstr "Bluesky did not respond: {}"
 
-#: src/api.rs:536
+#: src/api.rs:543
 msgid "Le post cité a été supprimé."
 msgstr "The quoted post was deleted."
 
-#: src/api.rs:539
+#: src/api.rs:546
 msgid "Le post cité n'est pas visible : un blocage l'empêche."
 msgstr "The quoted post is not visible: a block prevents it."
 
-#: src/api.rs:542
+#: src/api.rs:549
 msgid "Son auteur a retiré la citation de ce post."
 msgstr "Its author detached the quote from this post."
 
-#: src/api.rs:592
+#: src/api.rs:599
 msgid "Épinglé"
 msgstr "Pinned"
 
-#: src/api.rs:593
+#: src/api.rs:600
 msgid "{} a reposté"
 msgstr "{} reposted"
 
-#: src/api.rs:594 src/compose.rs:315
+#: src/api.rs:601 src/compose.rs:321
 msgid "En réponse à {}"
 msgstr "Replying to {}"
 
-#: src/api.rs:698
+#: src/api.rs:705
 msgid "{name} et {n} autre ont aimé votre post"
 msgid_plural "{name} et {n} autres ont aimé votre post"
 msgstr[0] "{name} and {n} other liked your post"
 msgstr[1] "{name} and {n} others liked your post"
 
-#: src/api.rs:703
+#: src/api.rs:710
 msgid "{name} et {n} autre ont reposté votre post"
 msgid_plural "{name} et {n} autres ont reposté votre post"
 msgstr[0] "{name} and {n} other reposted your post"
 msgstr[1] "{name} and {n} others reposted your post"
 
-#: src/api.rs:708
+#: src/api.rs:715
 msgid "{name} et {n} autre ont aimé votre repost"
 msgid_plural "{name} et {n} autres ont aimé votre repost"
 msgstr[0] "{name} and {n} other liked your repost"
 msgstr[1] "{name} and {n} others liked your repost"
 
-#: src/api.rs:713
+#: src/api.rs:720
 msgid "{name} et {n} autre ont reposté votre repost"
 msgid_plural "{name} et {n} autres ont reposté votre repost"
 msgstr[0] "{name} and {n} other reposted your repost"
 msgstr[1] "{name} and {n} others reposted your repost"
 
-#: src/api.rs:718
+#: src/api.rs:725
 msgid "{name} et {n} autre vous suivent"
 msgid_plural "{name} et {n} autres vous suivent"
 msgstr[0] "{name} and {n} other followed you"
 msgstr[1] "{name} and {n} others followed you"
 
-#: src/api.rs:806
+#: src/api.rs:813
 msgid "a aimé votre post"
 msgstr "liked your post"
 
-#: src/api.rs:807
+#: src/api.rs:814
 msgid "a reposté votre post"
 msgstr "reposted your post"
 
-#: src/api.rs:808
+#: src/api.rs:815
 msgid "vous suit"
 msgstr "followed you"
 
-#: src/api.rs:809 src/data.rs:604
+#: src/api.rs:816 src/data.rs:608
 msgid "vous a mentionné"
 msgstr "mentioned you"
 
-#: src/api.rs:810 src/data.rs:603
+#: src/api.rs:817 src/data.rs:607
 msgid "a répondu à votre post"
 msgstr "replied to your post"
 
-#: src/api.rs:811 src/data.rs:605
+#: src/api.rs:818 src/data.rs:609
 msgid "a cité votre post"
 msgstr "quoted your post"
 
-#: src/api.rs:812
+#: src/api.rs:819
 msgid "a aimé votre repost"
 msgstr "liked your repost"
 
-#: src/api.rs:813
+#: src/api.rs:820
 msgid "a reposté votre repost"
 msgstr "reposted your repost"
 
-#: src/api.rs:814
+#: src/api.rs:821
 msgid "a rejoint Bluesky avec votre starter pack"
 msgstr "joined Bluesky with your starter pack"
 
-#: src/api.rs:1084 src/feeds.rs:229 src/moderation.rs:707 src/report.rs:155
+#: src/api.rs:1092 src/feeds.rs:229 src/moderation.rs:727 src/report.rs:155
 msgid "Ce compte n'existe pas."
 msgstr "This account does not exist."
 
-#: src/api.rs:1345
+#: src/api.rs:1353
 msgid "Abonnés"
 msgstr "Followers"
 
-#: src/api.rs:1346
+#: src/api.rs:1354
 msgid "Abonnements"
 msgstr "Following"
 
-#: src/api.rs:1347
+#: src/api.rs:1355
 msgctxt "comptes qui ont aimé un post"
 msgid "J'aime"
 msgstr "Likes"
 
-#: src/api.rs:1348
+#: src/api.rs:1356
 msgid "Reposts"
 msgstr "Reposts"
 
-#: src/api.rs:1349
+#: src/api.rs:1357
 msgid "Abonnés que vous connaissez"
 msgstr "Followers you know"
 
-#: src/api.rs:1355
+#: src/api.rs:1363
 msgid "Aucun abonné pour l'instant."
 msgstr "No followers yet."
 
-#: src/api.rs:1356
+#: src/api.rs:1364
 msgid "Aucun abonnement pour l'instant."
 msgstr "Not following anyone yet."
 
-#: src/api.rs:1357
+#: src/api.rs:1365
 msgid "Personne n'a encore aimé ce post."
 msgstr "No one has liked this post yet."
 
-#: src/api.rs:1358
+#: src/api.rs:1366
 msgid "Personne n'a encore reposté ce post."
 msgstr "No one has reposted this post yet."
 
-#: src/api.rs:1359
+#: src/api.rs:1367
 msgid "Aucun compte que vous suivez ne suit ce compte."
 msgstr "No account you follow follows this account."
 
-#: src/api.rs:1492
+#: src/api.rs:1500
 msgid "Ce post ne peut pas être modifié."
 msgstr "This post cannot be changed."
 
-#: src/api.rs:1634
+#: src/api.rs:1642
 msgid "Tout le monde"
 msgstr "Everyone"
 
-#: src/api.rs:1635
+#: src/api.rs:1643
 msgid "Comptes que vous suivez"
 msgstr "Accounts you follow"
 
-#: src/api.rs:1636
+#: src/api.rs:1644
 msgid "Vos abonnés"
 msgstr "Your followers"
 
-#: src/api.rs:1637
+#: src/api.rs:1645
 msgid "Comptes mentionnés"
 msgstr "Mentioned accounts"
 
-#: src/api.rs:1638
+#: src/api.rs:1646
 msgid "Personne"
 msgstr "No one"
 
-#: src/api.rs:1910 src/edit_profile.rs:198
+#: src/api.rs:1918 src/edit_profile.rs:198
 msgid "Une image n'a pas pu être envoyée : {}"
 msgstr "An image could not be uploaded: {}"
 
-#: src/api.rs:2024
+#: src/api.rs:2032
 msgid "La vidéo n'a pas pu être envoyée."
 msgstr "The video could not be uploaded."
 
-#: src/api.rs:2082
+#: src/api.rs:2090
 msgid "La vidéo a été refusée : {}"
 msgstr "The video was rejected: {}"
 
-#: src/api.rs:2083
+#: src/api.rs:2091
 msgid "La vidéo n'a pas pu être convertie."
 msgstr "The video could not be processed."
 
-#: src/api.rs:2102
+#: src/api.rs:2110
 msgid "La conversion de la vidéo prend trop de temps."
 msgstr "Processing the video is taking too long."
 
-#: src/api.rs:2117
+#: src/api.rs:2125
 msgid "janv."
 msgstr "Jan"
 
-#: src/api.rs:2118
+#: src/api.rs:2126
 msgid "févr."
 msgstr "Feb"
 
-#: src/api.rs:2119
+#: src/api.rs:2127
 msgid "mars"
 msgstr "Mar"
 
-#: src/api.rs:2120
+#: src/api.rs:2128
 msgid "avr."
 msgstr "Apr"
 
-#: src/api.rs:2121
+#: src/api.rs:2129
 msgid "mai"
 msgstr "May"
 
-#: src/api.rs:2122
+#: src/api.rs:2130
 msgid "juin"
 msgstr "Jun"
 
-#: src/api.rs:2123
+#: src/api.rs:2131
 msgid "juil."
 msgstr "Jul"
 
-#: src/api.rs:2124
+#: src/api.rs:2132
 msgid "août"
 msgstr "Aug"
 
-#: src/api.rs:2125
+#: src/api.rs:2133
 msgid "sept."
 msgstr "Sep"
 
-#: src/api.rs:2126
+#: src/api.rs:2134
 msgid "oct."
 msgstr "Oct"
 
-#: src/api.rs:2127
+#: src/api.rs:2135
 msgid "nov."
 msgstr "Nov"
 
-#: src/api.rs:2128
+#: src/api.rs:2136
 msgid "déc."
 msgstr "Dec"
 
-#: src/api.rs:2138
+#: src/api.rs:2146
 msgid "à l'instant"
 msgstr "now"
 
-#: src/api.rs:2140
+#: src/api.rs:2148
 msgid "{} min"
 msgstr "{} min"
 
-#: src/api.rs:2142
+#: src/api.rs:2150
 msgid "{} h"
 msgstr "{} h"
 
-#: src/api.rs:2145
+#: src/api.rs:2153
 msgid "{} j"
 msgid_plural "{} j"
 msgstr[0] "{} d"
 msgstr[1] "{} d"
 
-#: src/api.rs:2152
+#: src/api.rs:2160
 msgctxt "jour, mois abrégé et année"
 msgid "{day} {month} {year}"
 msgstr "{month} {day}, {year}"
 
-#: src/api.rs:2163
+#: src/api.rs:2171
 msgctxt "date et heure d'un post"
 msgid "{day} {month} {year}, {time}"
 msgstr "{month} {day}, {year}, {time}"
 
-#: src/api.rs:2175
+#: src/api.rs:2183
 msgctxt "jour et mois abrégé"
 msgid "{day} {month}"
 msgstr "{month} {day}"
@@ -392,7 +392,7 @@ msgstr "unknown account identity"
 msgid "Voir le profil de {}"
 msgstr "View the profile of {}"
 
-#: src/card.rs:122 src/card.rs:263 src/compose.rs:1415
+#: src/card.rs:122 src/card.rs:263 src/compose.rs:1421
 msgid "Image sans texte alternatif"
 msgstr "Image without alternative text"
 
@@ -445,135 +445,139 @@ msgstr "Copy link"
 msgid "Envoyer en message…"
 msgstr "Send in a message…"
 
-#: src/card.rs:504
+#: src/card.rs:500
+msgid "Traduire"
+msgstr "Translate"
+
+#: src/card.rs:507
 msgid "Retirer du haut du profil"
 msgstr "Unpin from profile"
 
-#: src/card.rs:506
+#: src/card.rs:509
 msgid "Épingler sur le profil"
 msgstr "Pin to profile"
 
-#: src/card.rs:511
+#: src/card.rs:514
 msgid "Supprimer le post…"
 msgstr "Delete post…"
 
-#: src/card.rs:516
+#: src/card.rs:519
 msgid "Signaler le post…"
 msgstr "Report post…"
 
-#: src/card.rs:521
+#: src/card.rs:524
 msgid "Masquer @{}"
 msgstr "Mute @{}"
 
-#: src/card.rs:526
+#: src/card.rs:529
 msgid "Bloquer @{}"
 msgstr "Block @{}"
 
-#: src/card.rs:532
+#: src/card.rs:535
 msgid "Signaler @{}…"
 msgstr "Report @{}…"
 
-#: src/card.rs:541 src/card.rs:544 src/profile.rs:187 src/profile.rs:190
+#: src/card.rs:544 src/card.rs:547 src/profile.rs:187 src/profile.rs:190
 msgid "Plus d'actions"
 msgstr "More actions"
 
-#: src/card.rs:552
+#: src/card.rs:555
 msgid "Aimer, {} j'aime"
 msgid_plural "Aimer, {} j'aime"
 msgstr[0] "Like, {} like"
 msgstr[1] "Like, {} likes"
 
-#: src/card.rs:554
+#: src/card.rs:557
 msgid "Ne plus aimer, {} j'aime"
 msgid_plural "Ne plus aimer, {} j'aime"
 msgstr[0] "Unlike, {} like"
 msgstr[1] "Unlike, {} likes"
 
-#: src/card.rs:559
+#: src/card.rs:562
 msgid "Reposter ou citer, {} repost"
 msgid_plural "Reposter ou citer, {} reposts"
 msgstr[0] "Repost or quote, {} repost"
 msgstr[1] "Repost or quote, {} reposts"
 
-#: src/card.rs:564
+#: src/card.rs:567
 msgid "Annuler le repost ou citer, {} repost"
 msgid_plural "Annuler le repost ou citer, {} reposts"
 msgstr[0] "Undo repost or quote, {} repost"
 msgstr[1] "Undo repost or quote, {} reposts"
 
-#: src/card.rs:568
+#: src/card.rs:571
 msgid "Ajouter aux signets"
 msgstr "Add to bookmarks"
 
-#: src/card.rs:569
+#: src/card.rs:572
 msgid "Retirer des signets"
 msgstr "Remove from bookmarks"
 
-#: src/card.rs:577
+#: src/card.rs:580
 msgid "J'aime · {}"
 msgstr "Like · {}"
 
-#: src/card.rs:578
+#: src/card.rs:581
 msgid "Aimé · {}"
 msgstr "Liked · {}"
 
-#: src/card.rs:579
+#: src/card.rs:582
 msgid "Reposter · {}"
 msgstr "Repost · {}"
 
-#: src/card.rs:580
+#: src/card.rs:583
 msgid "Reposté · {}"
 msgstr "Reposted · {}"
 
-#: src/card.rs:581
+#: src/card.rs:584
 msgid "Signet"
 msgstr "Bookmark"
 
-#: src/card.rs:582
+#: src/card.rs:585
 msgid "Dans les signets"
 msgstr "Bookmarked"
 
-#: src/card.rs:599
+#: src/card.rs:602
 msgid "Annuler le repost"
 msgstr "Undo repost"
 
-#: src/card.rs:601
+#: src/card.rs:604
 msgid "Reposter"
 msgstr "Repost"
 
-#: src/card.rs:605
+#: src/card.rs:608
 msgid "Citer…"
 msgstr "Quote…"
 
-#: src/card.rs:827
+#: src/card.rs:830
 msgid "Ouvrir le lien : {}"
 msgstr "Open link: {}"
 
-#: src/card.rs:902
+#: src/card.rs:905
 msgid "Post cité de {} : {}"
 msgstr "Quoted post by {}: {}"
 
-#: src/card.rs:975 src/feeds.rs:317
+#: src/card.rs:978 src/feeds.rs:317
 msgid "{} j'aime"
 msgid_plural "{} j'aime"
 msgstr[0] "{} like"
 msgstr[1] "{} likes"
 
-#: src/card.rs:976
+#: src/card.rs:979
 msgid "Voir qui a aimé"
 msgstr "See who liked"
 
-#: src/card.rs:979
+#: src/card.rs:982
 msgid "{} repost"
 msgid_plural "{} reposts"
 msgstr[0] "{} repost"
 msgstr[1] "{} reposts"
 
-#: src/card.rs:980
+#: src/card.rs:983
 msgid "Voir qui a reposté"
 msgstr "See who reposted"
 
-#: src/card.rs:1032 src/compose.rs:246
+#: src/card.rs:1035 src/compose.rs:252
 msgid "Répondre"
 msgstr "Reply"
 
@@ -613,7 +617,7 @@ msgstr ""
 msgid "Linux et libre"
 msgstr "Linux and free software"
 
-#: src/column.rs:113 src/preferences.rs:178 src/window.rs:2066
+#: src/column.rs:113 src/preferences.rs:181 src/window.rs:2089
 msgid "Notifications"
 msgstr "Notifications"
 
@@ -690,242 +694,242 @@ msgstr "No label"
 msgid "Étiquette de contenu : {}"
 msgstr "Content label: {}"
 
-#: src/compose.rs:248
+#: src/compose.rs:254
 msgctxt "titre de la boîte de rédaction"
 msgid "Citer"
 msgstr "Quote"
 
-#: src/compose.rs:250 src/window.rs:2110 src/window.rs:2113 src/window.rs:2157
-#: src/window.rs:2160
+#: src/compose.rs:256 src/window.rs:2133 src/window.rs:2136 src/window.rs:2180
+#: src/window.rs:2183
 msgid "Nouveau post"
 msgstr "New post"
 
 #. En-tête : Annuler, titre, Publier.
-#: src/compose.rs:257 src/compose.rs:1805 src/edit_profile.rs:234
+#: src/compose.rs:263 src/compose.rs:1811 src/edit_profile.rs:234
 #: src/lists.rs:305 src/lists.rs:584 src/login.rs:150 src/profile.rs:1280
-#: src/report.rs:180 src/window.rs:572 src/window.rs:1171 src/window.rs:1324
+#: src/report.rs:180 src/window.rs:572 src/window.rs:1171 src/window.rs:1346
 msgid "Annuler"
 msgstr "Cancel"
 
-#: src/compose.rs:259 src/compose.rs:1341
+#: src/compose.rs:265 src/compose.rs:1347
 msgid "Publier"
 msgstr "Post"
 
-#: src/compose.rs:284 src/compose.rs:297
+#: src/compose.rs:290 src/compose.rs:303
 msgid "Brouillons"
 msgstr "Drafts"
 
-#: src/compose.rs:316
+#: src/compose.rs:322
 msgid "Citation de {}"
 msgstr "Quoting {}"
 
-#: src/compose.rs:366
+#: src/compose.rs:372
 msgid "Votre réponse"
 msgstr "Your reply"
 
-#: src/compose.rs:368
+#: src/compose.rs:374
 msgid "Quoi de neuf ?"
 msgstr "What's up?"
 
-#: src/compose.rs:417
+#: src/compose.rs:423
 msgid ""
 "Décrivez chaque image ou vidéo pour les personnes qui utilisent un lecteur "
 "d'écran."
 msgstr "Describe each image or video for people who use a screen reader."
 
-#: src/compose.rs:436
+#: src/compose.rs:442
 msgid "Ajouter un post au fil"
 msgstr "Add a post to the thread"
 
-#: src/compose.rs:470
+#: src/compose.rs:476
 msgid "Langue du post"
 msgstr "Post language"
 
-#: src/compose.rs:490 src/compose.rs:494 src/compose.rs:1602
+#: src/compose.rs:496 src/compose.rs:500 src/compose.rs:1608
 msgid "Ajouter des images ou une vidéo"
 msgstr "Add images or a video"
 
-#: src/compose.rs:508
+#: src/compose.rs:514
 msgid "Qui peut répondre"
 msgstr "Who can reply"
 
-#: src/compose.rs:511
+#: src/compose.rs:517
 msgid "Autoriser les citations"
 msgstr "Allow quotes"
 
-#: src/compose.rs:523 src/compose.rs:528
+#: src/compose.rs:529 src/compose.rs:534
 msgid "Qui peut répondre et citer"
 msgstr "Who can reply and quote"
 
-#: src/compose.rs:533 src/compose.rs:537
+#: src/compose.rs:539 src/compose.rs:543
 msgid "Insérer un émoji"
 msgstr "Insert emoji"
 
-#: src/compose.rs:780
+#: src/compose.rs:786
 msgid "Post {} du fil"
 msgstr "Post {} of the thread"
 
-#: src/compose.rs:788 src/compose.rs:793
+#: src/compose.rs:794 src/compose.rs:799
 msgid "Retirer ce post du fil"
 msgstr "Remove this post from the thread"
 
-#: src/compose.rs:804 src/compose.rs:808
+#: src/compose.rs:810 src/compose.rs:814
 msgid "Ajouter une image à ce post"
 msgstr "Add an image to this post"
 
-#: src/compose.rs:939 src/compose.rs:944
+#: src/compose.rs:945 src/compose.rs:950
 msgid "Supprimer le brouillon"
 msgstr "Delete draft"
 
-#: src/compose.rs:1071
+#: src/compose.rs:1077
 msgid "Le brouillon garde le texte, mais pas les images."
 msgstr "The draft keeps the text, but not the images."
 
-#: src/compose.rs:1073
+#: src/compose.rs:1079
 msgid "Vous pouvez garder le texte en brouillon."
 msgstr "You can keep the text as a draft."
 
-#: src/compose.rs:1075
+#: src/compose.rs:1081
 msgid "Le texte saisi sera perdu."
 msgstr "The text you typed will be lost."
 
-#: src/compose.rs:1079
+#: src/compose.rs:1085
 msgid "Garder ce post en brouillon ?"
 msgstr "Keep this post as a draft?"
 
-#: src/compose.rs:1081
+#: src/compose.rs:1087
 msgid "Abandonner ce post ?"
 msgstr "Discard this post?"
 
-#: src/compose.rs:1086
+#: src/compose.rs:1092
 msgid "Continuer la rédaction"
 msgstr "Keep writing"
 
-#: src/compose.rs:1087
+#: src/compose.rs:1093
 msgid "Abandonner"
 msgstr "Discard"
 
-#: src/compose.rs:1090
+#: src/compose.rs:1096
 msgid "Garder en brouillon"
 msgstr "Keep as draft"
 
-#: src/compose.rs:1134
+#: src/compose.rs:1140
 msgid "Le brouillon n'a pas pu être enregistré."
 msgstr "The draft could not be saved."
 
-#: src/compose.rs:1217 src/lists.rs:388 src/lists.rs:594 src/messages.rs:1360
+#: src/compose.rs:1223 src/lists.rs:388 src/lists.rs:594 src/messages.rs:1360
 #: src/starter_packs.rs:420
 msgid "Mode démonstration : rien n'est publié."
 msgstr "Demo mode: nothing is posted."
 
-#: src/compose.rs:1224
+#: src/compose.rs:1230
 msgid "Publication…"
 msgstr "Posting…"
 
-#: src/compose.rs:1308
+#: src/compose.rs:1314
 msgid "La publication a été interrompue."
 msgstr "Posting was interrupted."
 
-#: src/compose.rs:1316
+#: src/compose.rs:1322
 msgid "Fil publié en partie : {} posts sur {}."
 msgstr "Thread partly posted: {} posts out of {}."
 
-#: src/compose.rs:1321
+#: src/compose.rs:1327
 msgid ""
 "Post publié, mais ses réglages de réponse et de citation n'ont pas été "
 "enregistrés."
 msgstr "Post published, but its reply and quote settings were not saved."
 
-#: src/compose.rs:1324
+#: src/compose.rs:1330
 msgid "Fil publié."
 msgstr "Thread posted."
 
-#: src/compose.rs:1326
+#: src/compose.rs:1332
 msgid "Réponse publiée."
 msgstr "Reply posted."
 
-#: src/compose.rs:1328
+#: src/compose.rs:1334
 msgid "Post publié."
 msgstr "Post published."
 
-#: src/compose.rs:1398
+#: src/compose.rs:1404
 msgid "ALT ✓"
 msgstr "ALT ✓"
 
-#: src/compose.rs:1400
+#: src/compose.rs:1406
 msgid "+ ALT"
 msgstr "+ ALT"
 
-#: src/compose.rs:1404
+#: src/compose.rs:1410
 msgid "Modifier le texte alternatif"
 msgstr "Edit alternative text"
 
-#: src/compose.rs:1409
+#: src/compose.rs:1415
 msgid "Ajouter un texte alternatif"
 msgstr "Add alternative text"
 
-#: src/compose.rs:1411
+#: src/compose.rs:1417
 msgid "GIF sans texte alternatif"
 msgstr "GIF without alternative text"
 
-#: src/compose.rs:1413
+#: src/compose.rs:1419
 msgid "Vidéo sans texte alternatif"
 msgstr "Video without alternative text"
 
-#: src/compose.rs:1497
+#: src/compose.rs:1503
 msgid "Une image n'a pas pu être préparée : {}"
 msgstr "An image could not be prepared: {}"
 
-#: src/compose.rs:1525
+#: src/compose.rs:1531
 msgid "Ce fichier n'a pas pu être lu."
 msgstr "This file could not be read."
 
-#: src/compose.rs:1538 src/compose.rs:1542
+#: src/compose.rs:1544 src/compose.rs:1548
 msgid "Une vidéo se publie seule, sans images."
 msgstr "A video is posted on its own, without images."
 
-#: src/compose.rs:1540
+#: src/compose.rs:1546
 msgid "Cette vidéo dépasse 100 Mo."
 msgstr "This video is larger than 100 MB."
 
-#: src/compose.rs:1568 src/edit_profile.rs:491
+#: src/compose.rs:1574 src/edit_profile.rs:491
 msgid "Ce fichier n'est pas une image lisible."
 msgstr "This file is not a readable image."
 
-#: src/compose.rs:1586
+#: src/compose.rs:1592
 msgid "Images et vidéos"
 msgstr "Images and videos"
 
-#: src/compose.rs:1702 src/compose.rs:1706
+#: src/compose.rs:1708 src/compose.rs:1712
 msgid "Retirer l'image"
 msgstr "Remove image"
 
-#: src/compose.rs:1729
+#: src/compose.rs:1735
 msgid "GIF"
 msgstr "GIF"
 
-#: src/compose.rs:1802 src/compose.rs:1841
+#: src/compose.rs:1808 src/compose.rs:1847
 msgid "Texte alternatif"
 msgstr "Alternative text"
 
-#: src/compose.rs:1807 src/edit_profile.rs:236 src/lists.rs:310
+#: src/compose.rs:1813 src/edit_profile.rs:236 src/lists.rs:310
 msgid "Enregistrer"
 msgstr "Save"
 
-#: src/compose.rs:1825
+#: src/compose.rs:1831
 msgid "Vidéo à décrire"
 msgstr "Video to describe"
 
-#: src/compose.rs:1827
+#: src/compose.rs:1833
 msgid "Image à décrire"
 msgstr "Image to describe"
 
-#: src/compose.rs:1845
+#: src/compose.rs:1851
 msgid ""
 "Décrivez ce que montre la vidéo pour les personnes qui ne la voient pas."
 msgstr "Describe what the video shows for people who cannot see it."
 
-#: src/compose.rs:1847
+#: src/compose.rs:1853
 msgid ""
 "Décrivez ce que montre l'image pour les personnes qui ne la voient pas."
 msgstr "Describe what the image shows for people who cannot see it."
@@ -1005,10 +1009,10 @@ msgstr "Choose an avatar"
 
 #: src/edit_profile.rs:576 src/explore.rs:182 src/feeds.rs:734
 #: src/lists.rs:419 src/lists.rs:449 src/messages.rs:882
-#: src/preferences.rs:429 src/preferences.rs:520 src/preferences.rs:635
+#: src/preferences.rs:432 src/preferences.rs:523 src/preferences.rs:638
 #: src/profile.rs:987 src/profile.rs:1106 src/profile.rs:1154
 #: src/profile.rs:1209 src/report.rs:271 src/window.rs:1120 src/window.rs:1188
-#: src/window.rs:1243 src/window.rs:1344 src/window.rs:1723
+#: src/window.rs:1265 src/window.rs:1366 src/window.rs:1745
 msgid "Requête interrompue."
 msgstr "Request interrupted."
 
@@ -1095,8 +1099,8 @@ msgstr "No feeds match this search."
 #: src/explore.rs:687 src/explore.rs:712 src/feed_page.rs:94
 #: src/feed_page.rs:269 src/feed_page.rs:386 src/feeds.rs:450 src/feeds.rs:571
 #: src/lists.rs:714 src/lists.rs:848 src/messages.rs:657 src/messages.rs:753
-#: src/messages.rs:921 src/messages.rs:1120 src/preferences.rs:293
-#: src/preferences.rs:466 src/preferences.rs:571 src/profile.rs:657
+#: src/messages.rs:921 src/messages.rs:1120 src/preferences.rs:296
+#: src/preferences.rs:469 src/preferences.rs:574 src/profile.rs:657
 #: src/profile.rs:830 src/profile.rs:953 src/starter_packs.rs:404
 msgid "Chargement interrompu."
 msgstr "Loading interrupted."
@@ -1376,11 +1380,11 @@ msgstr "Reopen the browser"
 msgid "Ouverture de la session…"
 msgstr "Opening session…"
 
-#: src/login.rs:169 src/window.rs:2138
+#: src/login.rs:169 src/window.rs:2161
 msgid "À propos de Tsubame"
 msgstr "About Tsubame"
 
-#: src/login.rs:174 src/login.rs:177 src/window.rs:2144 src/window.rs:2146
+#: src/login.rs:174 src/login.rs:177 src/window.rs:2167 src/window.rs:2169
 msgid "Menu principal"
 msgstr "Main menu"
 
@@ -1523,7 +1527,7 @@ msgstr "Conversation"
 msgid "Demandes · {}"
 msgstr "Requests · {}"
 
-#: src/messages.rs:816 src/window.rs:1303
+#: src/messages.rs:816 src/window.rs:1325
 msgid "Signalement envoyé. Merci."
 msgstr "Report sent. Thank you."
 
@@ -1578,11 +1582,11 @@ msgctxt "réglage d'une étiquette de contenu"
 msgid "Masquer"
 msgstr "Hide"
 
-#: src/moderation.rs:575
+#: src/moderation.rs:592
 msgid "Contenu signalé par la modération"
 msgstr "Content flagged by moderation"
 
-#: src/moderation.rs:646
+#: src/moderation.rs:666
 msgid "Préférences illisibles."
 msgstr "Unreadable preferences."
 
@@ -1594,7 +1598,7 @@ msgstr "Nothing to show yet"
 msgid "Pas encore disponible"
 msgstr "Not available yet"
 
-#: src/preferences.rs:107 src/window.rs:2134
+#: src/preferences.rs:107 src/window.rs:2157
 msgid "Préférences"
 msgstr "Preferences"
 
@@ -1606,19 +1610,19 @@ msgstr "Moderation"
 msgid "Listes et comptes"
 msgstr "Lists and accounts"
 
-#: src/preferences.rs:120 src/preferences.rs:481 src/preferences.rs:547
+#: src/preferences.rs:120 src/preferences.rs:484 src/preferences.rs:550
 msgid "Comptes masqués"
 msgstr "Muted accounts"
 
-#: src/preferences.rs:121 src/preferences.rs:484 src/preferences.rs:545
+#: src/preferences.rs:121 src/preferences.rs:487 src/preferences.rs:548
 msgid "Comptes bloqués"
 msgstr "Blocked accounts"
 
-#: src/preferences.rs:122 src/preferences.rs:696
+#: src/preferences.rs:122 src/preferences.rs:699
 msgid "Mots et mots-clics masqués"
 msgstr "Muted words and tags"
 
-#: src/preferences.rs:124 src/preferences.rs:456
+#: src/preferences.rs:124 src/preferences.rs:459
 msgid "Listes de modération suivies"
 msgstr "Subscribed moderation lists"
 
@@ -1653,113 +1657,145 @@ msgstr "Bluesky Moderation"
 msgid "Service par défaut · activé"
 msgstr "Default service · enabled"
 
-#: src/preferences.rs:183
+#: src/preferences.rs:186
 msgid ""
 "Tsubame vérifie les notifications toutes les minutes tant qu'il est ouvert."
 msgstr "Tsubame checks notifications every minute while it is open."
 
-#: src/preferences.rs:187
+#: src/preferences.rs:190
 msgid "Notifications du bureau"
 msgstr "Desktop notifications"
 
-#: src/preferences.rs:189
+#: src/preferences.rs:192
 msgid ""
 "Prévenir des nouvelles notifications quand la fenêtre n'est pas au premier "
 "plan"
 msgstr "Notify about new notifications when the window is in the background"
 
-#: src/preferences.rs:335
+#: src/preferences.rs:338
 msgid "Abonnement actif"
 msgstr "Active subscription"
 
-#: src/preferences.rs:367
+#: src/preferences.rs:370
 msgid "Se désabonner"
 msgstr "Unsubscribe"
 
-#: src/preferences.rs:371
+#: src/preferences.rs:374
 msgid "Se désabonner de {}"
 msgstr "Unsubscribe from {}"
 
-#: src/preferences.rs:438
+#: src/preferences.rs:441
 msgid "La préférence n'a pas été enregistrée."
 msgstr "The preference was not saved."
 
-#: src/preferences.rs:450
+#: src/preferences.rs:453
 msgid "Les comptes de ces listes sont masqués ou bloqués pour vous."
 msgstr "Accounts in these lists are muted or blocked for you."
 
-#: src/preferences.rs:493
+#: src/preferences.rs:496
 msgid "Ne plus bloquer"
 msgstr "Unblock"
 
-#: src/preferences.rs:495 src/preferences.rs:601 src/profile.rs:1038
+#: src/preferences.rs:498 src/preferences.rs:604 src/profile.rs:1038
 msgid "Ne plus masquer"
 msgstr "Unmute"
 
-#: src/preferences.rs:500
+#: src/preferences.rs:503
 msgid "Ne plus suivre la liste {}"
 msgstr "Unsubscribe from the list {}"
 
-#: src/preferences.rs:599 src/profile.rs:1044
+#: src/preferences.rs:602 src/profile.rs:1044
 msgid "Débloquer"
 msgstr "Unblock"
 
-#: src/preferences.rs:661
+#: src/preferences.rs:664
 msgid "Ajouter un mot ou un mot-clic"
 msgstr "Add a word or tag"
 
-#: src/preferences.rs:666
+#: src/preferences.rs:669
 msgid ""
 "Les posts qui contiennent ces mots sont cachés dans vos fils, de tous les "
 "comptes."
 msgstr ""
 "Posts that contain these words are hidden from your feeds, for all accounts."
 
-#: src/preferences.rs:675
+#: src/preferences.rs:678
 msgid "Toujours"
 msgstr "Forever"
 
-#: src/preferences.rs:676
+#: src/preferences.rs:679
 msgid "24 heures"
 msgstr "24 hours"
 
-#: src/preferences.rs:677
+#: src/preferences.rs:680
 msgid "7 jours"
 msgstr "7 days"
 
-#: src/preferences.rs:678
+#: src/preferences.rs:681
 msgid "30 jours"
 msgstr "30 days"
 
-#: src/preferences.rs:682
+#: src/preferences.rs:685
 msgid "Durée"
 msgstr "Duration"
 
-#: src/preferences.rs:686 src/preferences.rs:712
+#: src/preferences.rs:689 src/preferences.rs:715
 msgid "Mots-clics seulement"
 msgstr "Hashtags only"
 
-#: src/preferences.rs:687
+#: src/preferences.rs:690
 msgid "Ne pas chercher le mot dans le texte des posts."
 msgstr "Do not look for the word in the text of posts."
 
-#: src/preferences.rs:715
+#: src/preferences.rs:718
 msgid "Expiré"
 msgstr "Expired"
 
-#: src/preferences.rs:718
+#: src/preferences.rs:721
 msgid "Jusqu'au {}"
 msgstr "Until {}"
 
-#: src/preferences.rs:733 src/preferences.rs:737
+#: src/preferences.rs:736 src/preferences.rs:740
 msgid "Retirer « {} »"
 msgstr "Remove “{}”"
 
-#: src/preferences.rs:777
+#: src/preferences.rs:784
+msgid "Langues"
+msgstr "Languages"
+
+#: src/preferences.rs:789
+msgid "Vos posts"
+msgstr "Your posts"
+
+#: src/preferences.rs:792
+msgid "Celle du système"
+msgstr "System language"
+
+#: src/preferences.rs:797
+msgid "Langue proposée"
+msgstr "Suggested language"
+
+#: src/preferences.rs:798
+msgid "Elle se change aussi dans chaque post."
+msgstr "It can also be changed in each post."
+
+#: src/preferences.rs:821
+msgid "Posts affichés"
+msgstr "Shown posts"
+
+#: src/preferences.rs:823
+msgid ""
+"Seuls les posts dans ces langues s'affichent dans vos fils. Aucune langue "
+"cochée : toutes."
+msgstr ""
+"Only posts in these languages are shown in your feeds. None selected: all of"
+" them."
+
+#: src/preferences.rs:858
 msgid "Aucune liste"
 msgstr "No lists"
 
-#: src/preferences.rs:784
+#: src/preferences.rs:865
 msgid "Aucun compte"
 msgstr "No accounts"
 
@@ -1829,11 +1865,11 @@ msgid "Profil enregistré."
 msgstr "Profile saved."
 
 #: src/profile.rs:529 src/profile.rs:1231 src/window.rs:1110
-#: src/window.rs:1335
+#: src/window.rs:1357
 msgid "Mode démonstration : rien n'est enregistré."
 msgstr "Demo mode: nothing is saved."
 
-#: src/profile.rs:629 src/window.rs:94 src/window.rs:1454
+#: src/profile.rs:629 src/window.rs:94 src/window.rs:1476
 msgid "Profil"
 msgstr "Profile"
 
@@ -1940,11 +1976,11 @@ msgstr "@{} is no longer muted."
 msgid "@{} est débloqué."
 msgstr "@{} is unblocked."
 
-#: src/profile.rs:1274 src/window.rs:1318
+#: src/profile.rs:1274 src/window.rs:1340
 msgid "Bloquer @{} ?"
 msgstr "Block @{}?"
 
-#: src/profile.rs:1276 src/window.rs:1320
+#: src/profile.rs:1276 src/window.rs:1342
 msgid ""
 "Ses posts et son profil vous seront cachés, et ce compte ne pourra plus "
 "interagir avec vous. Le blocage est public."
@@ -1952,11 +1988,11 @@ msgstr ""
 "Their posts and profile will be hidden from you, and this account will no "
 "longer be able to interact with you. Blocks are public."
 
-#: src/profile.rs:1281 src/window.rs:1325
+#: src/profile.rs:1281 src/window.rs:1347
 msgid "Bloquer"
 msgstr "Block"
 
-#: src/profile.rs:1294 src/window.rs:1349
+#: src/profile.rs:1294 src/window.rs:1371
 msgid "@{} est bloqué."
 msgstr "@{} is blocked."
 
@@ -2132,7 +2168,7 @@ msgstr "No post open"
 msgid "Choisissez un post pour afficher la discussion."
 msgstr "Choose a post to show the conversation."
 
-#: src/thread.rs:84 src/window.rs:1005 src/window.rs:2016
+#: src/thread.rs:84 src/window.rs:1005 src/window.rs:2039
 msgid "Discussion"
 msgstr "Conversation"
 
@@ -2170,7 +2206,7 @@ msgstr "No alternative text."
 msgid "Explorer"
 msgstr "Explore"
 
-#: src/window.rs:82 src/window.rs:1373
+#: src/window.rs:82 src/window.rs:1395
 msgid "Signets"
 msgstr "Bookmarks"
 
@@ -2236,74 +2272,78 @@ msgstr ""
 msgid "Post supprimé."
 msgstr "Post deleted."
 
-#: src/window.rs:1248
+#: src/window.rs:1225
+msgid "Le navigateur n'a pas pu être ouvert."
+msgstr "The browser could not be opened."
+
+#: src/window.rs:1270
 msgid "Post épinglé sur votre profil."
 msgstr "Post pinned to your profile."
 
-#: src/window.rs:1250
+#: src/window.rs:1272
 msgid "Post retiré du haut de votre profil."
 msgstr "Post unpinned from your profile."
 
-#: src/window.rs:1277
+#: src/window.rs:1299
 msgid "Ce post ne peut pas être signalé."
 msgstr "This post cannot be reported."
 
-#: src/window.rs:1302
+#: src/window.rs:1324
 msgid "Mode démonstration : rien n'est envoyé."
 msgstr "Demo mode: nothing is sent."
 
-#: src/window.rs:1455
+#: src/window.rs:1477
 msgid "Connectez-vous pour voir votre profil."
 msgstr "Sign in to see your profile."
 
-#: src/window.rs:1516
+#: src/window.rs:1538
 msgid "Le chargement a été interrompu."
 msgstr "Loading was interrupted."
 
-#: src/window.rs:1735
+#: src/window.rs:1757
 msgid "Le j'aime n'a pas été enregistré."
 msgstr "The like was not saved."
 
-#: src/window.rs:1738
+#: src/window.rs:1760
 msgid "Le j'aime n'a pas été retiré."
 msgstr "The like was not removed."
 
-#: src/window.rs:1741
+#: src/window.rs:1763
 msgid "Le repost n'a pas été enregistré."
 msgstr "The repost was not saved."
 
-#: src/window.rs:1744
+#: src/window.rs:1766
 msgid "Le repost n'a pas été retiré."
 msgstr "The repost was not removed."
 
-#: src/window.rs:1747
+#: src/window.rs:1769
 msgid "Le post n'a pas été ajouté aux signets."
 msgstr "The post was not added to bookmarks."
 
-#: src/window.rs:1750
+#: src/window.rs:1772
 msgid "Le post n'a pas été retiré des signets."
 msgstr "The post was not removed from bookmarks."
 
-#: src/window.rs:2034
+#: src/window.rs:2057
 msgid "Aucune colonne ouverte"
 msgstr "No columns open"
 
-#: src/window.rs:2044
+#: src/window.rs:2067
 msgid "Accueil"
 msgstr "Home"
 
-#: src/window.rs:2131
+#: src/window.rs:2154
 msgid "Navigation"
 msgstr "Navigation"
 
-#: src/window.rs:2135
+#: src/window.rs:2158
 msgid "Se déconnecter…"
 msgstr "Sign out…"
 
-#: src/window.rs:2283
+#: src/window.rs:2326
 msgid "Colonnes ouvertes"
 msgstr "Open columns"
 
-#: src/window.rs:2285
+#: src/window.rs:2328
 msgid "Ailleurs"
 msgstr "Elsewhere"

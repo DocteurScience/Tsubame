@@ -173,6 +173,9 @@ pub fn present(
     page.add(&labelers);
     dialog.add(&page);
 
+    // Langues, réglages de cet ordinateur (GSettings).
+    dialog.add(&languages_page());
+
     // Notifications du bureau, réglage de cet ordinateur (GSettings).
     let notifications = adw::PreferencesPage::builder()
         .title(gettext("Notifications"))
@@ -770,6 +773,84 @@ impl Dialog {
             }
         });
     }
+}
+
+/// Page « Langues » : langue proposée pour les posts, langues des posts
+/// affichés dans les fils.
+fn languages_page() -> adw::PreferencesPage {
+    use crate::compose::LANGUAGES;
+    let settings = crate::settings::settings();
+    let page = adw::PreferencesPage::builder()
+        .title(gettext("Langues"))
+        .icon_name("preferences-desktop-locale-symbolic")
+        .build();
+
+    let mine = adw::PreferencesGroup::builder()
+        .title(gettext("Vos posts"))
+        .build();
+    let names = gtk::StringList::new(&[]);
+    names.append(&gettext("Celle du système"));
+    for (_, name) in LANGUAGES {
+        names.append(name);
+    }
+    let post_language = adw::ComboRow::builder()
+        .title(gettext("Langue proposée"))
+        .subtitle(gettext("Elle se change aussi dans chaque post."))
+        .model(&names)
+        .build();
+    let current = settings.string("post-language");
+    let index = LANGUAGES
+        .iter()
+        .position(|(code, _)| *code == current.as_str())
+        .map_or(0, |i| i + 1);
+    post_language.set_selected(index as u32);
+    {
+        let settings = settings.clone();
+        post_language.connect_selected_notify(move |row| {
+            let code = match row.selected() {
+                0 => "",
+                i => LANGUAGES.get(i as usize - 1).map_or("", |(code, _)| *code),
+            };
+            let _ = settings.set_string("post-language", code);
+        });
+    }
+    mine.add(&post_language);
+    page.add(&mine);
+
+    let shown = adw::PreferencesGroup::builder()
+        .title(gettext("Posts affichés"))
+        .description(gettext(
+            "Seuls les posts dans ces langues s'affichent dans vos fils. Aucune langue cochée : toutes.",
+        ))
+        .build();
+    let wanted: Vec<String> = settings
+        .strv("content-languages")
+        .iter()
+        .map(|l| l.to_string())
+        .collect();
+    for (code, name) in LANGUAGES {
+        let row = adw::SwitchRow::builder()
+            .title(name)
+            .active(wanted.iter().any(|w| w == code))
+            .build();
+        let settings = settings.clone();
+        row.connect_active_notify(move |row| {
+            let mut wanted: Vec<String> = settings
+                .strv("content-languages")
+                .iter()
+                .map(|l| l.to_string())
+                .filter(|l| l != code)
+                .collect();
+            if row.is_active() {
+                wanted.push(code.to_owned());
+            }
+            let refs: Vec<&str> = wanted.iter().map(String::as_str).collect();
+            let _ = settings.set_strv("content-languages", refs.as_slice());
+        });
+        shown.add(&row);
+    }
+    page.add(&shown);
+    page
 }
 
 fn empty_list_row() -> adw::ActionRow {

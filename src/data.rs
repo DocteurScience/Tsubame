@@ -38,6 +38,8 @@ pub struct Post {
     pub text: String,
     /// Liens, mentions et mots-dièse du texte.
     pub facets: Vec<crate::richtext::Facet>,
+    /// Langues déclarées par l'auteur (« fr », « en-US »…).
+    pub langs: Vec<String>,
     /// Adresse de l'avatar de l'auteur (miniature).
     pub avatar: Option<String>,
     /// Image ou vidéo jointe.
@@ -99,6 +101,7 @@ impl Post {
             date: String::new(),
             text: String::new(),
             facets: Vec::new(),
+            langs: Vec::new(),
             avatar: None,
             media: None,
             replies: 0,
@@ -330,6 +333,7 @@ fn post(
         text: text.into(),
         // Les mentions de démonstration ouvrent le profil par identifiant.
         facets: crate::richtext::detect(text),
+        langs: vec!["fr".into()],
         avatar: None,
         media: None,
         replies,

@@ -192,7 +192,7 @@ impl Followup {
 }
 
 /// Langues proposées, sous leur propre nom.
-const LANGUAGES: [(&str, &str); 6] = [
+pub const LANGUAGES: [(&str, &str); 6] = [
     ("fr", "Français"),
     ("en", "English"),
     ("es", "Español"),
@@ -202,7 +202,13 @@ const LANGUAGES: [(&str, &str); 6] = [
 ];
 
 /// Langue de l'interface si elle est proposée, sinon le français.
+/// Langue proposée : celle choisie dans les préférences, sinon celle du
+/// système, sinon le français.
 fn default_language() -> &'static str {
+    let chosen = crate::settings::settings().string("post-language");
+    if let Some((code, _)) = LANGUAGES.iter().find(|(c, _)| *c == chosen.as_str()) {
+        return code;
+    }
     glib::language_names()
         .iter()
         .filter_map(|name| name.split(['_', '.', '@']).next().map(str::to_owned))

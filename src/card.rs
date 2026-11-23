@@ -496,6 +496,9 @@ fn more_menu(post: &Post, key: &str) -> gtk::MenuButton {
     if post.uri.is_some() {
         sharing.append_item(&item(gettext("Envoyer en message…"), "win.send-post", key));
     }
+    if !post.text.trim().is_empty() {
+        sharing.append_item(&item(gettext("Traduire"), "win.translate", key));
+    }
     menu.append_section(None, &sharing);
     if crate::interactions::is_mine(post) {
         let mine = gio::Menu::new();

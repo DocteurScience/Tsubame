@@ -450,6 +450,13 @@ pub fn post_from_view(post: &PostView, now: DateTime<Utc>) -> Post {
         facets: serde_json::to_value(&post.record)
             .map(|record| crate::richtext::from_record(&record))
             .unwrap_or_default(),
+        langs: serde_json::to_value(&post.record)
+            .ok()
+            .and_then(|record| record.get("langs")?.as_array().cloned())
+            .into_iter()
+            .flatten()
+            .filter_map(|l| l.as_str().map(str::to_owned))
+            .collect(),
         avatar: post.author.avatar.clone(),
         media: media(post),
         replies: count(post.reply_count),
@@ -850,6 +857,7 @@ pub fn post_from_notification(
             facets: serde_json::to_value(&notification.record)
                 .map(|record| crate::richtext::from_record(&record))
                 .unwrap_or_default(),
+            langs: Vec::new(),
             avatar: None,
             media: None,
             replies: 0,
