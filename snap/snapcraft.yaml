@@ -44,8 +44,12 @@ parts:
     # Cargo, installé par rustup-init ci-dessous, pour Meson.
     build-environment:
       - PATH: /root/.cargo/bin:$PATH
+      # OpenSSL du système (reqwest) : pkg-config ne cherche que dans le SDK.
+      - OPENSSL_INCLUDE_DIR: /usr/include
+      - OPENSSL_LIB_DIR: /usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR
     build-packages:
       - curl
+      - libssl-dev
       - gettext
       - desktop-file-utils
     override-build: |
