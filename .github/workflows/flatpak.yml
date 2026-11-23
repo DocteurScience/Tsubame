@@ -12,6 +12,8 @@ jobs:
   flatpak:
     name: Paquet Flatpak
     runs-on: ubuntu-24.04
+    # Un blocage (miroir apt, LXD) échoue au lieu de tourner six heures.
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - name: Outils Flatpak
