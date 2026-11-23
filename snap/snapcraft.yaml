@@ -41,6 +41,9 @@ parts:
     meson-parameters:
       - --prefix=/usr
       - -Dbuildtype=release
+    # Cargo, installé par rustup-init ci-dessous, pour Meson.
+    build-environment:
+      - PATH: /root/.cargo/bin:$PATH
     build-packages:
       - curl
       - gettext
@@ -49,9 +52,8 @@ parts:
       # Tsubame demande Rust 1.95 au moins (édition 2024) : installé par
       # rustup-init, hors de l'environnement du SDK GNOME (dont la libc ne
       # convient pas au snap rustup).
-      if [ ! -x "$HOME/.cargo/bin/cargo" ]; then
+      if [ ! -x /root/.cargo/bin/cargo ]; then
         curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
           | env -u LD_LIBRARY_PATH sh -s -- -y --profile minimal --default-toolchain stable
       fi
-      export PATH="$HOME/.cargo/bin:$PATH"
       craftctl default
