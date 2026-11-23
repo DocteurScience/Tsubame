@@ -79,16 +79,21 @@ GitHub Actions construit aussi le Snap (workflow `Snap`, artefact `tsubame-snap`
 
 ## Client OAuth d'une version distribuée
 
-Par défaut, Tsubame se connecte avec le client de développement « localhost » du protocole AT, qui ne demande rien de publié mais n'est pas fait pour une version distribuée. Une version distribuée utilise un client publié :
+Une version distribuée se présente aux serveurs Bluesky comme un client OAuth publié : l'adresse https de `docs/oauth/client-metadata.json`, que le serveur de chaque personne lit à la connexion (nom affiché, adresse de retour). Le Flatpak et le Snap sont construits avec l'adresse GitHub Pages du dépôt :
 
-1. Publier `docs/oauth/client-metadata.json` en https, à l'adresse indiquée dans son champ `client_id` (par exemple GitHub Pages, dossier `docs/` de la branche principale). Si l'adresse change, mettre à jour `client_id` et `client_uri`.
-2. Construire avec cette adresse : option Meson `oauth-client-id` (ou variable `TSUBAME_OAUTH_CLIENT_ID` avec Cargo). Dans le manifeste Flatpak et dans `snap/snapcraft.yaml`, l'ajouter aux options de Meson :
+```
+https://docteurscience.github.io/Tsubame/oauth/client-metadata.json
+```
+
+Elle doit donc rester en ligne : GitHub Pages activé (Settings → Pages, branche `main`, dossier `/docs`). Si l'adresse change, mettre à jour `client_id` et `client_uri` dans ce fichier, et l'option `oauth-client-id` dans le manifeste Flatpak et `snap/snapcraft.yaml`.
+
+Sans cette option (`cargo run`, `meson setup` par défaut), Tsubame utilise le client de développement « localhost » du protocole AT, qui ne demande rien de publié. Pour tester le client publié depuis les sources :
 
 ```bash
 meson setup _build -Doauth-client-id=https://docteurscience.github.io/Tsubame/oauth/client-metadata.json
 ```
 
-Le client est natif et public (`token_endpoint_auth_method: none`) ; la réponse du navigateur revient sur `http://127.0.0.1:<port>/callback`.
+Le client est natif et public (`token_endpoint_auth_method: none`, aucun secret) ; la réponse du navigateur revient sur `http://127.0.0.1:<port>/callback`.
 
 ## Licence
 

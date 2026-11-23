@@ -32,7 +32,8 @@
             "name": "tsubame",
             "buildsystem": "meson",
             "config-opts": [
-                "-Dbuildtype=release"
+                "-Dbuildtype=release",
+                "-Doauth-client-id=https://docteurscience.github.io/Tsubame/oauth/client-metadata.json"
             ],
             "sources": [
                 {

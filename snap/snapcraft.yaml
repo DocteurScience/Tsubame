@@ -41,6 +41,8 @@ parts:
     meson-parameters:
       - --prefix=/usr
       - -Dbuildtype=release
+      # Client OAuth publié (docs/oauth/client-metadata.json, GitHub Pages).
+      - -Doauth-client-id=https://docteurscience.github.io/Tsubame/oauth/client-metadata.json
     # Cargo, installé par rustup-init ci-dessous, pour Meson.
     build-environment:
       - PATH: /root/.cargo/bin:$PATH
