@@ -21,7 +21,7 @@ Logiciels et Flathub).
 
 ### Lire
 
-- Messages : actualisation automatique, messages plus anciens, nouvelle conversation, réactions, bouton « Envoyer un message » sur les profils.
+- Messages : actualisation automatique, messages plus anciens, nouvelle conversation, réactions, partage de posts, bouton « Envoyer un message » sur les profils.
 - Listes : créer, modifier, supprimer, ajouter ou retirer des comptes ; masquer ou bloquer les comptes d'une liste de modération.
 - Starter packs dans Explorer : voir leurs comptes et leurs flux, tout suivre.
 - Recherche de flux dans Explorer.

@@ -175,6 +175,11 @@ columnsview > .column headerbar {
   padding: 2px 8px;
 }
 
+/* Post partagé dans un message. */
+.shared-post {
+  padding: 8px 12px;
+}
+
 /* Réactions sous une bulle de message. */
 .reaction {
   min-height: 24px;

@@ -214,6 +214,49 @@ fn bubble(message: &Message, react: Option<&React>) -> gtk::Box {
         "{who}{}",
         message.text
     ))]);
+    if let Some((author, text)) = &message.shared {
+        // Post partagé : petite carte sous le texte (ou seule).
+        let card = gtk::Box::builder()
+            .orientation(gtk::Orientation::Vertical)
+            .spacing(2)
+            .css_classes(["card", "shared-post"])
+            .build();
+        let name = gtk::Label::builder()
+            .label(author)
+            .xalign(0.0)
+            .css_classes(["heading"])
+            .build();
+        let body = gtk::Label::builder()
+            .label(text)
+            .xalign(0.0)
+            .wrap(true)
+            .lines(3)
+            .ellipsize(gtk::pango::EllipsizeMode::End)
+            .max_width_chars(44)
+            .build();
+        card.append(&name);
+        card.append(&body);
+        card.update_property(&[gtk::accessible::Property::Label(
+            &gettext("Post de {} : {}")
+                .replacen("{}", author, 1)
+                .replacen("{}", text, 1),
+        )]);
+        card.set_accessible_role(gtk::AccessibleRole::Group);
+        let holder = gtk::Box::builder()
+            .orientation(gtk::Orientation::Vertical)
+            .spacing(4)
+            .build();
+        if !message.text.is_empty() {
+            holder.append(&label);
+        }
+        holder.append(&card);
+        return bubble_line(message, holder.upcast(), react);
+    }
+    bubble_line(message, label.upcast(), react)
+}
+
+/// Bulle (ou post partagé), avec « Réagir » et les réactions dessous.
+fn bubble_line(message: &Message, content: gtk::Widget, react: Option<&React>) -> gtk::Box {
     let align = if message.mine {
         gtk::Align::End
     } else {
@@ -225,7 +268,7 @@ fn bubble(message: &Message, react: Option<&React>) -> gtk::Box {
     if let (true, Some(button)) = (message.mine, &button) {
         line.append(button);
     }
-    line.append(&label);
+    line.append(&content);
     if let (false, Some(button)) = (message.mine, &button) {
         line.append(button);
     }
@@ -930,6 +973,7 @@ impl MessagesPage {
             day: gettext("Aujourd'hui"),
             failed: false,
             reactions: Vec::new(),
+            shared: None,
         };
         self.messages.borrow_mut().push(pending.clone());
         self.render();
@@ -950,7 +994,7 @@ impl MessagesPage {
         let Some(session) = self.host.session.clone() else {
             return;
         };
-        let task = runtime().spawn(chat::send(session, convo.id, text));
+        let task = runtime().spawn(chat::send(session, convo.id, text, None));
         let weak = Rc::downgrade(self);
         glib::spawn_future_local(async move {
             let result = task
@@ -1162,6 +1206,122 @@ impl MessagesPage {
         });
         dialog.present(Some(parent));
         entry.grab_focus();
+    }
+
+    /// Boîte « Envoyer en message » : choisir une conversation, avec un
+    /// mot facultatif, pour y partager le post `uri` (de contenu `cid`).
+    pub fn share_post(self: &Rc<Self>, parent: &impl IsA<gtk::Widget>, uri: &str, cid: &str) {
+        let dialog = adw::Dialog::builder()
+            .title(gettext("Envoyer en message"))
+            .content_width(420)
+            .content_height(520)
+            .build();
+        let note = gtk::Entry::builder()
+            .placeholder_text(gettext("Ajouter un message (facultatif)"))
+            .build();
+        note.update_property(&[gtk::accessible::Property::Label(&gettext(
+            "Message accompagnant le post",
+        ))]);
+        let rows = gtk::ListBox::builder()
+            .selection_mode(gtk::SelectionMode::None)
+            .valign(gtk::Align::Start)
+            .css_classes(["boxed-list"])
+            .build();
+        rows.update_property(&[gtk::accessible::Property::Label(&gettext("Conversations"))]);
+        let convos = self.accepted.borrow().clone();
+        for convo in &convos {
+            let row = adw::ActionRow::builder()
+                .title(&convo.title)
+                .use_markup(false)
+                .activatable(true)
+                .build();
+            if let Some(handle) = &convo.handle {
+                row.set_subtitle(&format!("@{handle}"));
+            }
+            row.add_prefix(
+                &adw::Avatar::builder()
+                    .size(32)
+                    .text(&convo.title)
+                    .show_initials(true)
+                    .accessible_role(gtk::AccessibleRole::Presentation)
+                    .build(),
+            );
+            row.add_suffix(&crate::card::decorative_icon("mail-send-symbolic"));
+            rows.append(&row);
+        }
+        let content = gtk::Box::builder()
+            .orientation(gtk::Orientation::Vertical)
+            .spacing(12)
+            .margin_top(12)
+            .margin_bottom(12)
+            .margin_start(12)
+            .margin_end(12)
+            .build();
+        content.append(&note);
+        if convos.is_empty() {
+            content.append(
+                &adw::StatusPage::builder()
+                    .title(gettext("Aucune conversation"))
+                    .description(gettext(
+                        "Commencez une conversation depuis la page Messages.",
+                    ))
+                    .css_classes(["compact"])
+                    .build(),
+            );
+        } else {
+            content.append(&rows);
+        }
+        let view = adw::ToolbarView::builder()
+            .content(
+                &gtk::ScrolledWindow::builder()
+                    .hscrollbar_policy(gtk::PolicyType::Never)
+                    .child(&content)
+                    .build(),
+            )
+            .build();
+        view.add_top_bar(&adw::HeaderBar::new());
+        dialog.set_child(Some(&view));
+
+        let (host, uri, cid, closing) = (
+            self.host.clone(),
+            uri.to_owned(),
+            cid.to_owned(),
+            dialog.downgrade(),
+        );
+        rows.connect_row_activated(move |_, row| {
+            let Some(convo) = convos.get(row.index() as usize).cloned() else {
+                return;
+            };
+            if let Some(dialog) = closing.upgrade() {
+                dialog.close();
+            }
+            let Some(session) = host.session.clone() else {
+                host.toasts.add_toast(adw::Toast::new(&gettext(
+                    "Mode démonstration : rien n'est publié.",
+                )));
+                return;
+            };
+            let task = runtime().spawn(chat::send(
+                session,
+                convo.id.clone(),
+                note.text().trim().to_owned(),
+                Some((uri.clone(), cid.clone())),
+            ));
+            let host = host.clone();
+            glib::spawn_future_local(async move {
+                match task
+                    .await
+                    .unwrap_or_else(|_| Err(ApiError::new(gettext("Envoi interrompu."))))
+                {
+                    Ok(_) => host.toasts.add_toast(adw::Toast::new(
+                        &gettext("Post envoyé à {}.").replace("{}", &convo.title),
+                    )),
+                    Err(error) if error.expired => (host.expired)(error.message),
+                    Err(error) => host.toasts.add_toast(adw::Toast::new(&error.message)),
+                }
+            });
+        });
+        dialog.present(Some(parent));
     }
 
     /// Accepter une demande : elle rejoint les conversations.

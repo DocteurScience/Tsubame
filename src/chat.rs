@@ -47,6 +47,23 @@ pub struct Message {
     pub failed: bool,
     /// Réactions, regroupées par émoji, dans l'ordre d'arrivée.
     pub reactions: Vec<Reaction>,
+    /// Post partagé : son auteur et son texte.
+    pub shared: Option<(String, String)>,
+}
+
+/// Post partagé dans un message (embed `app.bsky.embed.record#view`).
+fn shared_from_json(message: &Value) -> Option<(String, String)> {
+    let record = message.get("embed")?.get("record")?;
+    let author = record.get("author")?;
+    let name = name_or_handle(
+        author.get("displayName").and_then(Value::as_str),
+        author
+            .get("handle")
+            .and_then(Value::as_str)
+            .unwrap_or_default(),
+    );
+    let text = str_at(record, &["value", "text"]).unwrap_or_default();
+    Some((name, text.to_owned()))
 }
 
 /// Réaction à un message : un émoji, combien l'ont mis, et si j'en suis.
@@ -238,6 +255,7 @@ pub fn message_from_json(message: &Value, me: &str, now: DateTime<Utc>) -> Optio
         day: sent.map(|t| day_label(t, now)).unwrap_or_default(),
         failed: false,
         reactions: reactions_from_json(message, me),
+        shared: shared_from_json(message),
     })
 }
 
@@ -343,31 +361,38 @@ pub async fn messages(
     Ok((messages, cursor))
 }
 
+/// Message à envoyer : du texte et, s'il y en a un, un post partagé
+/// (adresse et CID).
+pub fn message_input(text: &str, post: Option<(&str, &str)>) -> Value {
+    let mut input = serde_json::json!({"text": text});
+    if let Some((uri, cid)) = post {
+        input["embed"] = serde_json::json!({
+            "$type": "app.bsky.embed.record",
+            "record": {"uri": uri, "cid": cid},
+        });
+    }
+    input
+}
+
 pub async fn send(
     session: Arc<Session>,
     convo_id: String,
     text: String,
+    post: Option<(String, String)>,
 ) -> Result<Message, ApiError> {
-    use atrium_api::chat::bsky::convo::{defs, send_message};
+    use atrium_api::chat::bsky::convo::send_message;
+    let message = serde_json::from_value(message_input(
+        &text,
+        post.as_ref().map(|(uri, cid)| (uri.as_str(), cid.as_str())),
+    ))
+    .map_err(|_| ApiError::new(gettext("Réponse illisible du service de messages.")))?;
     let api = session.api().await?;
     let chat = api.api_with_proxy(chat_did(), CHAT_SERVICE_TYPE);
     let output = chat
         .chat
         .bsky
         .convo
-        .send_message(
-            send_message::InputData {
-                convo_id,
-                message: defs::MessageInputData {
-                    embed: None,
-                    facets: None,
-                    reply_to: None,
-                    text,
-                }
-                .into(),
-            }
-            .into(),
-        )
+        .send_message(send_message::InputData { convo_id, message }.into())
         .await
         .map_err(chat_failed)?;
     message_from_json(&to_json(&output.data), &session.account.did, Utc::now())
@@ -565,6 +590,7 @@ pub fn demo_messages(convo_id: &str) -> Vec<Message> {
         day: gettext("Aujourd'hui"),
         failed: false,
         reactions: Vec::new(),
+        shared: None,
     };
     match convo_id {
         "lucie" => {
@@ -590,6 +616,10 @@ pub fn demo_messages(convo_id: &str) -> Vec<Message> {
                     "14:40",
                 ),
             ];
+            messages[4].shared = Some((
+                "Aya Koné".into(),
+                "Lever de soleil sur le Vercors ce matin, 6 h 40, moins 3 degrés.".into(),
+            ));
             messages[3].reactions = vec![Reaction {
                 value: "👍".into(),
                 count: 1,
@@ -687,6 +717,31 @@ mod tests {
     }
 
     #[test]
+    fn shared_posts_are_sent_and_read() {
+        let input = message_input(
+            "Regarde",
+            Some(("at://did:plc:a/app.bsky.feed.post/1", CID)),
+        );
+        let _: atrium_api::chat::bsky::convo::defs::MessageInput =
+            serde_json::from_value(input).unwrap();
+        let message = serde_json::json!({
+            "id": "m1", "text": "", "sender": {"did": "did:plc:lucie"},
+            "embed": {"$type": "app.bsky.embed.record#view", "record": {
+                "$type": "app.bsky.embed.record#viewRecord",
+                "author": {"did": "did:plc:a", "handle": "aya.example.social", "displayName": "Aya"},
+                "value": {"text": "Lever de soleil"}
+            }}
+        });
+        let message = message_from_json(&message, "did:plc:moi", now()).unwrap();
+        assert_eq!(
+            message.shared,
+            Some(("Aya".into(), "Lever de soleil".into()))
+        );
+    }
+
+    const CID: &str = "bafyreie5737gdxlw5i64vzichcalba3z2v5n6icifvx5xytvske7mr3hpm";
+
+    #[test]
     fn reactions_are_grouped() {
         let message = serde_json::json!({
             "id": "m1", "text": "Bravo", "sender": {"did": "did:plc:lucie"},
@@ -725,6 +780,7 @@ mod tests {
             day: String::new(),
             failed,
             reactions: Vec::new(),
+            shared: None,
         };
         let shown = vec![
             message("1", false),

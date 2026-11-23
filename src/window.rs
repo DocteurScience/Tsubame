@@ -1192,6 +1192,19 @@ impl State {
     }
 
     /// Épingler un de mes posts en haut de mon profil, ou l'en retirer.
+    /// Partager un post dans une conversation.
+    fn send_post(self: &Rc<Self>, key: &str) {
+        let Some(post) = interactions::find(key).map(|entry| entry.post()) else {
+            return;
+        };
+        let (Some(uri), Some(cid)) = (post.uri.clone(), post.cid.clone()) else {
+            return;
+        };
+        if let Some(page) = self.messages.borrow().as_ref() {
+            page.share_post(&self.toasts, &uri, &cid);
+        }
+    }
+
     fn toggle_pin(self: &Rc<Self>, key: &str) {
         let Some(post) = interactions::find(key).map(|entry| entry.post()) else {
             return;
@@ -1850,6 +1863,7 @@ fn install_actions(window: &adw::ApplicationWindow, state: &Rc<State>) {
     window.add_action(&preferences);
     for (name, handler) in [
         ("copy-link", State::copy_link as fn(&Rc<State>, &str)),
+        ("send-post", State::send_post),
         ("mute-author", State::mute_author),
         ("block-author", State::confirm_block),
         ("report-post", State::report_post),

@@ -493,6 +493,9 @@ fn more_menu(post: &Post, key: &str) -> gtk::MenuButton {
     let menu = gio::Menu::new();
     let sharing = gio::Menu::new();
     sharing.append_item(&item(gettext("Copier le lien"), "win.copy-link", key));
+    if post.uri.is_some() {
+        sharing.append_item(&item(gettext("Envoyer en message…"), "win.send-post", key));
+    }
     menu.append_section(None, &sharing);
     if crate::interactions::is_mine(post) {
         let mine = gio::Menu::new();
