@@ -247,6 +247,8 @@ pub struct Profile {
     pub known_count: u64,
     /// Notifications d'activité demandées : ses posts, ses réponses.
     pub activity: (bool, bool),
+    /// Nombre de flux, de listes et de starter packs créés par le compte.
+    pub associated: (u64, u64, u64),
 }
 
 /// Référence à un post : son adresse et son contenu (CID).

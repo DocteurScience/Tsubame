@@ -24,8 +24,23 @@ enum Tab {
     Posts,
     Replies,
     Media,
+    Videos,
     Likes,
+    Feeds,
+    Lists,
+    Packs,
 }
+
+const TABS: [Tab; 8] = [
+    Tab::Posts,
+    Tab::Replies,
+    Tab::Media,
+    Tab::Videos,
+    Tab::Likes,
+    Tab::Feeds,
+    Tab::Lists,
+    Tab::Packs,
+];
 
 impl Tab {
     fn title(self) -> String {
@@ -33,8 +48,18 @@ impl Tab {
             Tab::Posts => gettext("Posts"),
             Tab::Replies => gettext("Réponses"),
             Tab::Media => gettext("Médias"),
+            Tab::Videos => gettext("Vidéos"),
             Tab::Likes => pgettext("onglet du profil", "J'aime"),
+            Tab::Feeds => gettext("Flux"),
+            Tab::Lists => gettext("Listes"),
+            Tab::Packs => gettext("Starter packs"),
         }
+    }
+
+    /// Onglet de posts (les autres listent des flux, listes ou starter
+    /// packs).
+    fn is_posts(self) -> bool {
+        !matches!(self, Tab::Feeds | Tab::Lists | Tab::Packs)
     }
 
     fn source(self, actor: &str) -> Source {
@@ -46,7 +71,10 @@ impl Tab {
             Tab::Posts => author(AuthorFilter::Posts),
             Tab::Replies => author(AuthorFilter::Replies),
             Tab::Media => author(AuthorFilter::Media),
+            Tab::Videos => author(AuthorFilter::Videos),
             Tab::Likes => Source::Likes(actor.to_owned()),
+            // Pas de posts : `is_posts` les écarte avant.
+            Tab::Feeds | Tab::Lists | Tab::Packs => author(AuthorFilter::Posts),
         }
     }
 }
@@ -115,11 +143,24 @@ pub struct ProfilePage {
     edit: gtk::Button,
     /// Menu ⋮ : lien, masquer, bloquer, signaler.
     more: gtk::MenuButton,
-    likes_tab: gtk::ToggleButton,
+    /// Boutons des onglets, pour montrer ceux qui ont un contenu.
+    tab_buttons: Vec<(Tab, gtk::ToggleButton)>,
     scroll: gtk::ScrolledWindow,
     posts: PostList,
+    /// Flux, listes ou starter packs du compte (onglets sans posts).
+    others: gtk::ListBox,
+    others_status: gtk::Label,
+    /// Ce qu'ouvre chaque rangée de `others`.
+    other_items: RefCell<Vec<Other>>,
     tab: Cell<Tab>,
     profile: RefCell<Option<Profile>>,
+}
+
+/// Élément d'un onglet sans posts.
+enum Other {
+    Feed(crate::feeds::FeedInfo),
+    List(crate::data::List),
+    Pack(crate::starter_packs::StarterPack),
 }
 
 /// Texte de l'en-tête. Non sélectionnable : une étiquette sélectionnable
@@ -255,15 +296,21 @@ impl ProfilePage {
             .halign(gtk::Align::Start)
             .accessible_role(gtk::AccessibleRole::Group)
             .margin_top(6)
+            // Place pour la barre de défilement, sous les onglets.
+            .margin_bottom(8)
             .build();
         tabs.update_property(&[gtk::accessible::Property::Label(&gettext(
             "Contenu du profil",
         ))]);
         let mut buttons = Vec::new();
-        for tab in [Tab::Posts, Tab::Replies, Tab::Media, Tab::Likes] {
+        for tab in TABS {
             let button = gtk::ToggleButton::builder()
                 .label(tab.title())
                 .active(tab == Tab::Posts)
+                .visible(matches!(
+                    tab,
+                    Tab::Posts | Tab::Replies | Tab::Media | Tab::Videos
+                ))
                 .build();
             if let Some((_, first)) = buttons.first() {
                 button.set_group(Some(first));
@@ -271,8 +318,31 @@ impl ProfilePage {
             tabs.append(&button);
             buttons.push((tab, button));
         }
-        let likes_tab = buttons[3].1.clone();
-        likes_tab.set_visible(false);
+        let tab_buttons = buttons.clone();
+        // Défilement horizontal si les onglets ne tiennent pas (mobile).
+        let tabs_scroll = gtk::ScrolledWindow::builder()
+            .vscrollbar_policy(gtk::PolicyType::Never)
+            .hscrollbar_policy(gtk::PolicyType::Automatic)
+            .propagate_natural_height(true)
+            .child(&tabs)
+            .build();
+        let others = gtk::ListBox::builder()
+            .selection_mode(gtk::SelectionMode::None)
+            .valign(gtk::Align::Start)
+            .margin_start(12)
+            .margin_end(12)
+            .visible(false)
+            .css_classes(["boxed-list"])
+            .build();
+        others.update_property(&[gtk::accessible::Property::Label(&gettext(
+            "Contenu du profil",
+        ))]);
+        let others_status = gtk::Label::builder()
+            .wrap(true)
+            .margin_top(24)
+            .visible(false)
+            .css_classes(["dim-label"])
+            .build();
 
         let posts = PostList::new(
             &gettext("Posts du profil"),
@@ -304,7 +374,7 @@ impl ProfilePage {
             )
             .build();
         details.append(&known);
-        details.append(&tabs);
+        details.append(&tabs_scroll);
         let column = gtk::Box::builder()
             .orientation(gtk::Orientation::Vertical)
             .spacing(12)
@@ -321,6 +391,8 @@ impl ProfilePage {
         column.append(&banner_frame);
         column.append(&details);
         column.append(&posts.root);
+        column.append(&others);
+        column.append(&others_status);
         let scroll = gtk::ScrolledWindow::builder()
             .hscrollbar_policy(gtk::PolicyType::Never)
             // Même largeur que les cartes (et leurs marges), pour aligner
@@ -384,7 +456,10 @@ impl ProfilePage {
             known,
             edit,
             more,
-            likes_tab,
+            tab_buttons,
+            others,
+            others_status,
+            other_items: RefCell::default(),
             scroll,
             posts,
             tab: Cell::new(Tab::Posts),
@@ -402,6 +477,12 @@ impl ProfilePage {
                 }
             });
         }
+        let weak = Rc::downgrade(&page);
+        page.others.connect_row_activated(move |_, row| {
+            if let Some(page) = weak.upgrade() {
+                page.open_other(row.index() as usize);
+            }
+        });
         let weak = Rc::downgrade(&page);
         retry.connect_clicked(move |_| {
             if let Some(page) = weak.upgrade() {
@@ -598,7 +679,16 @@ impl ProfilePage {
         });
         self.bio.set_label(&profile.bio);
         self.bio.set_visible(!profile.bio.trim().is_empty());
-        self.likes_tab.set_visible(is_me);
+        let (feeds, lists, packs) = profile.associated;
+        for (tab, button) in &self.tab_buttons {
+            match tab {
+                Tab::Likes => button.set_visible(is_me),
+                Tab::Feeds => button.set_visible(feeds > 0),
+                Tab::Lists => button.set_visible(lists > 0),
+                Tab::Packs => button.set_visible(packs > 0),
+                _ => {}
+            }
+        }
         self.edit.set_visible(is_me);
         self.follow
             .set_visible(!is_me && self.host.session.is_some() && !profile.did.is_empty());
@@ -690,8 +780,140 @@ impl ProfilePage {
         }
     }
 
+    /// Flux, listes ou starter packs du compte.
+    fn load_others(self: &Rc<Self>, tab: Tab) {
+        use crate::{feeds, starter_packs};
+        let actor = self
+            .profile
+            .borrow()
+            .as_ref()
+            .map(|p| p.did.clone())
+            .filter(|did| !did.is_empty())
+            .unwrap_or_else(|| self.actor.clone());
+        let Some(session) = self.host.session.clone() else {
+            let items = match tab {
+                Tab::Feeds => feeds::demo_feeds()
+                    .into_iter()
+                    .take(1)
+                    .map(Other::Feed)
+                    .collect(),
+                Tab::Lists => data::demo_lists().into_iter().map(Other::List).collect(),
+                _ => starter_packs::demo_packs()
+                    .into_iter()
+                    .take(1)
+                    .map(Other::Pack)
+                    .collect(),
+            };
+            self.show_others(tab, Ok(items));
+            return;
+        };
+        self.others_status.set_label(&gettext("Chargement…"));
+        self.others_status.set_visible(true);
+        let task = runtime().spawn(async move {
+            match tab {
+                Tab::Feeds => Box::pin(feeds::by_actor(session, actor))
+                    .await
+                    .map(|v| v.into_iter().map(Other::Feed).collect()),
+                Tab::Lists => Box::pin(api::lists(session, actor))
+                    .await
+                    .map(|v| v.into_iter().map(Other::List).collect()),
+                _ => Box::pin(starter_packs::by_actor(session, actor))
+                    .await
+                    .map(|v| v.into_iter().map(Other::Pack).collect()),
+            }
+        });
+        let weak = Rc::downgrade(self);
+        glib::spawn_future_local(async move {
+            let result: Result<Vec<Other>, ApiError> = task
+                .await
+                .unwrap_or_else(|_| Err(ApiError::new(gettext("Chargement interrompu."))));
+            let Some(page) = weak.upgrade() else { return };
+            // Un autre onglet a été choisi entre-temps.
+            if page.tab.get() != tab {
+                return;
+            }
+            match result {
+                Err(error) if error.expired => (page.host.expired)(error.message),
+                result => page.show_others(tab, result),
+            }
+        });
+    }
+
+    fn show_others(&self, tab: Tab, result: Result<Vec<Other>, ApiError>) {
+        self.others.remove_all();
+        match result {
+            Ok(items) if !items.is_empty() => {
+                for item in &items {
+                    let row = match item {
+                        Other::Feed(info) => crate::feeds::feed_row(info),
+                        Other::List(list) => crate::feed_page::list_row(list),
+                        Other::Pack(pack) => crate::starter_packs::pack_row(pack),
+                    };
+                    self.others.append(&row);
+                }
+                self.other_items.replace(items);
+                self.others.set_visible(true);
+                self.others_status.set_visible(false);
+            }
+            Ok(_) => {
+                self.others_status.set_label(&match tab {
+                    Tab::Feeds => gettext("Aucun flux."),
+                    Tab::Lists => gettext("Aucune liste."),
+                    _ => gettext("Aucun starter pack."),
+                });
+                self.others_status.set_visible(true);
+            }
+            Err(error) => {
+                self.others_status.set_label(&error.message);
+                self.others_status.set_visible(true);
+            }
+        }
+    }
+
+    fn open_other(self: &Rc<Self>, index: usize) {
+        let items = self.other_items.borrow();
+        let Some(item) = items.get(index) else { return };
+        let page = match item {
+            Other::Feed(info) => crate::feed_page::FeedPage::new(
+                &info.name,
+                Source::Feed(info.uri.clone()),
+                data::posts(data::Feed::Discover),
+                self.host.clone(),
+            )
+            .navigation_page(&info.name),
+            Other::List(list) if list.moderation => {
+                crate::lists::members_page(list, &self.host, Rc::new(|| {}))
+            }
+            Other::List(list) => {
+                let feed = crate::feed_page::FeedPage::new(
+                    &list.name,
+                    Source::List(list.uri.clone()),
+                    data::posts(data::Feed::LinuxEtLibre),
+                    self.host.clone(),
+                );
+                feed.header
+                    .pack_end(&crate::lists::menu_button(list, &self.host, Rc::new(|| {})));
+                feed.navigation_page(&list.name)
+            }
+            Other::Pack(pack) => {
+                crate::starter_packs::StarterPackPage::new(pack, self.host.clone())
+                    .navigation_page()
+            }
+        };
+        (self.host.push)(page);
+    }
+
     fn load_posts(self: &Rc<Self>, more: bool) {
         let tab = self.tab.get();
+        self.posts.root.set_visible(tab.is_posts());
+        self.others.set_visible(false);
+        self.others_status.set_visible(false);
+        if !tab.is_posts() {
+            if !more {
+                self.load_others(tab);
+            }
+            return;
+        }
         if self
             .profile
             .borrow()
@@ -1026,7 +1248,8 @@ fn demo_posts(handle: &str, tab: Tab) -> Vec<Post> {
     posts.retain(|post| seen.insert(post.date.clone()));
     match tab {
         Tab::Media => posts.retain(|post| post.media.is_some()),
-        Tab::Likes => posts.clear(),
+        Tab::Videos => posts.retain(|post| post.media.as_ref().is_some_and(|m| m.video.is_some())),
+        Tab::Likes | Tab::Feeds | Tab::Lists | Tab::Packs => posts.clear(),
         Tab::Posts | Tab::Replies => {}
     }
     posts
@@ -1056,6 +1279,7 @@ fn demo_profile(handle: &str) -> Profile {
         known_followers: vec!["Nadia Safi".into(), "Romain Bailly".into()],
         known_count: 5,
         activity: (false, false),
+        associated: (1, 2, 1),
     }
 }
 

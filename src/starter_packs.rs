@@ -116,6 +116,27 @@ pub async fn search(session: Arc<Session>, query: String) -> Result<Vec<StarterP
     Ok(output.data.starter_packs.iter().map(from_basic).collect())
 }
 
+/// Starter packs créés par un compte (`getActorStarterPacks`).
+pub async fn by_actor(session: Arc<Session>, actor: String) -> Result<Vec<StarterPack>, ApiError> {
+    let api = session.api().await?;
+    let output = api
+        .api
+        .app
+        .bsky
+        .graph
+        .get_actor_starter_packs(
+            atrium_api::app::bsky::graph::get_actor_starter_packs::ParametersData {
+                actor: actor.parse().map_err(|_| api::invalid_actor())?,
+                cursor: None,
+                limit: 100.try_into().ok(),
+            }
+            .into(),
+        )
+        .await
+        .map_err(api::request_failed)?;
+    Ok(output.data.starter_packs.iter().map(from_basic).collect())
+}
+
 /// Un starter pack et ses comptes (`getStarterPack`, puis `getList`).
 pub async fn load(
     session: Arc<Session>,

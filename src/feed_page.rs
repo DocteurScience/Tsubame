@@ -169,7 +169,7 @@ pub struct ListsPage {
     lists: std::cell::RefCell<Vec<List>>,
 }
 
-fn list_row(list: &List) -> adw::ActionRow {
+pub(crate) fn list_row(list: &List) -> adw::ActionRow {
     let mut subtitle = ngettext(
         "{} membre",
         "{} membres",

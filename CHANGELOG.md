@@ -21,7 +21,7 @@ Logiciels et Flathub).
 
 ### Lire
 
-- Profils : « Suivi par … » (comptes que vous suivez), notifications d'activité d'un compte.
+- Profils : « Suivi par … » (comptes que vous suivez), notifications d'activité d'un compte, onglets Vidéos, Flux, Listes et Starter packs.
 - Messages : actualisation automatique, messages plus anciens, nouvelle conversation, réactions, partage de posts, bouton « Envoyer un message » sur les profils.
 - Listes : créer, modifier, supprimer, ajouter ou retirer des comptes ; masquer ou bloquer les comptes d'une liste de modération.
 - Starter packs dans Explorer : voir leurs comptes et leurs flux, tout suivre.

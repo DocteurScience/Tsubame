@@ -58,6 +58,8 @@ pub enum AuthorFilter {
     Replies,
     /// Posts avec image ou vidéo.
     Media,
+    /// Posts avec vidéo.
+    Videos,
 }
 
 impl AuthorFilter {
@@ -66,6 +68,7 @@ impl AuthorFilter {
             AuthorFilter::Posts => "posts_no_replies",
             AuthorFilter::Replies => "posts_with_replies",
             AuthorFilter::Media => "posts_with_media",
+            AuthorFilter::Videos => "posts_with_video",
         }
     }
 }
@@ -1109,6 +1112,11 @@ pub fn profile_from_view(
             .and_then(|v| v.activity_subscription.as_ref())
             .map(|a| (a.post, a.reply))
             .unwrap_or((false, false)),
+        associated: profile
+            .associated
+            .as_ref()
+            .map(|a| (count(a.feedgens), count(a.lists), count(a.starter_packs)))
+            .unwrap_or_default(),
     }
 }
 

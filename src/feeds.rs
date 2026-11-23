@@ -218,6 +218,26 @@ pub async fn discover(
     Ok(output.data.feeds.iter().map(info_from_view).collect())
 }
 
+/// Flux créés par un compte (`getActorFeeds`).
+pub async fn by_actor(session: Arc<Session>, actor: String) -> Result<Vec<FeedInfo>, ApiError> {
+    let api = session.api().await?;
+    let output = Box::pin(
+        api.api.app.bsky.feed.get_actor_feeds(
+            atrium_api::app::bsky::feed::get_actor_feeds::ParametersData {
+                actor: actor
+                    .parse()
+                    .map_err(|_| ApiError::new(gettext("Ce compte n'existe pas.")))?,
+                cursor: None,
+                limit: 100.try_into().ok(),
+            }
+            .into(),
+        ),
+    )
+    .await
+    .map_err(request_failed)?;
+    Ok(output.data.feeds.iter().map(info_from_view).collect())
+}
+
 /// Flux de démonstration.
 pub fn demo_feeds() -> Vec<FeedInfo> {
     let feed = |uri: &str, name: &str, description: &str, creator: &str, likes| FeedInfo {
