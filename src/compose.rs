@@ -133,6 +133,16 @@ fn show_link(
     update();
 }
 
+/// Retient `view` comme dernière zone de texte focalisée.
+fn track_focus(view: &gtk::TextView, last: &Rc<RefCell<glib::WeakRef<gtk::TextView>>>) {
+    let focus = gtk::EventControllerFocus::new();
+    let (last, weak) = (last.clone(), view.downgrade());
+    focus.connect_enter(move |_| {
+        last.replace(weak.clone());
+    });
+    view.add_controller(focus);
+}
+
 /// Posts ajoutés au fil, au plus, après le premier.
 const MAX_FOLLOWUPS: usize = 9;
 
@@ -338,6 +348,11 @@ pub fn present(
         .css_classes(["dim-label"])
         .build();
     crate::mentions::attach(&text, session.clone());
+    // Zone de texte qui a eu le focus en dernier (premier post ou post
+    // suivant du fil) : l'émoji y va.
+    let last_text: Rc<RefCell<glib::WeakRef<gtk::TextView>>> =
+        Rc::new(RefCell::new(text.downgrade()));
+    track_focus(&text, &last_text);
     let editor = gtk::Overlay::builder().child(&text).build();
     editor.add_overlay(&placeholder);
     let row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
@@ -482,7 +497,17 @@ pub fn present(
     gate_button.update_property(&[gtk::accessible::Property::Label(&gettext(
         "Qui peut répondre et citer",
     ))]);
+    // Émojis : le sélecteur de GTK, dans la zone de texte qui avait le focus.
+    let emoji = gtk::Button::builder()
+        .icon_name("face-smile-symbolic")
+        .tooltip_text(gettext("Insérer un émoji"))
+        .css_classes(["flat"])
+        .build();
+    emoji.update_property(&[gtk::accessible::Property::Label(&gettext(
+        "Insérer un émoji",
+    ))]);
     bottom.append(&add_image);
+    bottom.append(&emoji);
     bottom.append(&language_button);
     bottom.append(&gate_button);
     bottom.append(&counter);
@@ -649,6 +674,7 @@ pub fn present(
             author.clone(),
         );
         let session = session.clone();
+        let last_text = last_text.clone();
         Rc::new(move |initial: &str| {
             if followups.borrow().len() >= MAX_FOLLOWUPS {
                 return;
@@ -663,6 +689,7 @@ pub fn present(
                 .build();
             view.buffer().set_text(initial);
             crate::mentions::attach(&view, session.clone());
+            track_focus(&view, &last_text);
             let number = followups.borrow().len() + 2;
             view.update_property(&[gtk::accessible::Property::Label(
                 &gettext("Post {} du fil").replace("{}", &number.to_string()),
@@ -935,6 +962,98 @@ pub fn present(
                     update();
                 });
             });
+        });
+    }
+
+    // Coller une image (Ctrl+V) et déposer des fichiers sur la boîte.
+    let attach_files: Rc<dyn Fn(Vec<gio::File>)> = {
+        let (attachments, tiles, update, error) = (
+            attachments.clone(),
+            tiles.clone(),
+            update.clone(),
+            error.clone(),
+        );
+        Rc::new(move |files: Vec<gio::File>| {
+            let (attachments, tiles, update, error) = (
+                attachments.clone(),
+                tiles.clone(),
+                update.clone(),
+                error.clone(),
+            );
+            glib::spawn_future_local(async move {
+                for file in files {
+                    if attachments.borrow().len() >= MAX_IMAGES {
+                        break;
+                    }
+                    let loaded = file
+                        .load_bytes_future()
+                        .await
+                        .map_err(|e| e.to_string())
+                        .and_then(|(bytes, _)| {
+                            gdk::Texture::from_bytes(&bytes)
+                                .map(|texture| (bytes, texture))
+                                .map_err(|e| e.to_string())
+                        });
+                    match loaded {
+                        Ok((bytes, texture)) => {
+                            attach(&attachments, &tiles, &update, bytes, texture)
+                        }
+                        Err(_) => {
+                            error.set_label(&gettext("Ce fichier n'est pas une image lisible."));
+                            error.set_visible(true);
+                        }
+                    }
+                }
+                update();
+            });
+        })
+    };
+    {
+        let (attachments, tiles, update) = (attachments.clone(), tiles.clone(), update.clone());
+        text.connect_paste_clipboard(move |view| {
+            let clipboard = view.clipboard();
+            if !clipboard
+                .formats()
+                .contains_type(gdk::Texture::static_type())
+            {
+                return; // Du texte : collage habituel.
+            }
+            view.stop_signal_emission_by_name("paste-clipboard");
+            let (attachments, tiles, update) = (attachments.clone(), tiles.clone(), update.clone());
+            glib::spawn_future_local(async move {
+                let Ok(Some(texture)) = clipboard.read_texture_future().await else {
+                    return;
+                };
+                if attachments.borrow().len() >= MAX_IMAGES {
+                    return;
+                }
+                let bytes = texture.save_to_png_bytes();
+                attach(&attachments, &tiles, &update, bytes, texture);
+                update();
+            });
+        });
+    }
+    {
+        let drop = gtk::DropTarget::new(gdk::FileList::static_type(), gdk::DragAction::COPY);
+        let attach_files = attach_files.clone();
+        drop.connect_drop(move |_, value, _, _| {
+            let Ok(list) = value.get::<gdk::FileList>() else {
+                return false;
+            };
+            attach_files(list.files());
+            true
+        });
+        content.add_controller(drop);
+    }
+    {
+        let last_text = last_text.clone();
+        emoji.connect_clicked(move |_| {
+            // Emprunt relâché avant grab_focus, qui met à jour last_text.
+            let view = last_text.borrow().upgrade();
+            if let Some(view) = view {
+                view.grab_focus();
+                view.emit_insert_emoji();
+            }
         });
     }
 

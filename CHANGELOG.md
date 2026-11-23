@@ -12,6 +12,10 @@ Logiciels et Flathub).
 
 ## Non publié
 
+### Écrire
+
+- Émojis, coller une image (Ctrl+V) ou la déposer sur la boîte de rédaction.
+
 ### Lire
 
 - Page « Flux » : épingler, réordonner, retirer ses flux ; découvrir et
