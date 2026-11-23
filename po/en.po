@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: tsubame\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-23 16:59+0000\n"
+"POT-Creation-Date: 2026-11-23 17:02+0000\n"
 "PO-Revision-Date: 2026-11-22\n"
 "Last-Translator: \n"
 "Language-Team: English\n"
@@ -801,7 +801,7 @@ msgstr "Keep as draft"
 msgid "Le brouillon n'a pas pu être enregistré."
 msgstr "The draft could not be saved."
 
-#: src/compose.rs:1217 src/starter_packs.rs:404
+#: src/compose.rs:1217 src/starter_packs.rs:399
 msgid "Mode démonstration : rien n'est publié."
 msgstr "Demo mode: nothing is posted."
 
@@ -989,101 +989,114 @@ msgstr "Choose a banner"
 msgid "Choisir un avatar"
 msgstr "Choose an avatar"
 
-#: src/edit_profile.rs:576 src/explore.rs:171 src/feeds.rs:714
+#: src/edit_profile.rs:576 src/explore.rs:182 src/feeds.rs:714
 #: src/preferences.rs:339 src/preferences.rs:451 src/profile.rs:646
 #: src/profile.rs:730 src/report.rs:241 src/window.rs:1105 src/window.rs:1173
 #: src/window.rs:1215 src/window.rs:1316 src/window.rs:1687
 msgid "Requête interrompue."
 msgstr "Request interrupted."
 
-#: src/explore.rs:121
+#: src/explore.rs:132
 msgctxt "bouton : vous suivez ce compte"
 msgid "Abonné"
 msgstr "Following"
 
-#: src/explore.rs:123 src/profile.rs:570
+#: src/explore.rs:134 src/profile.rs:570
 msgid "Suivre"
 msgstr "Follow"
 
-#: src/explore.rs:126
+#: src/explore.rs:137
 msgid "Ne plus suivre {}"
 msgstr "Unfollow {}"
 
-#: src/explore.rs:128
+#: src/explore.rs:139
 msgid "Suivre {}"
 msgstr "Follow {}"
 
-#: src/explore.rs:180 src/profile.rs:665
+#: src/explore.rs:191 src/profile.rs:665
 msgid "L'abonnement n'a pas changé."
 msgstr "Following did not change."
 
-#: src/explore.rs:209
-msgid "Rechercher des posts, des personnes…"
-msgstr "Search posts, people…"
+#: src/explore.rs:220
+msgid "Rechercher des posts, des personnes, des flux…"
+msgstr "Search posts, people, feeds…"
 
-#: src/explore.rs:213
+#: src/explore.rs:224
 msgid "Rechercher"
 msgstr "Search"
 
 #. Sans recherche : sujets du moment, personnes à suivre.
-#: src/explore.rs:224 src/explore.rs:235
+#: src/explore.rs:235 src/explore.rs:246
 msgid "Sujets du moment"
 msgstr "Trending topics"
 
-#: src/explore.rs:225 src/explore.rs:237
+#: src/explore.rs:236 src/explore.rs:248
 msgid "Personnes à suivre"
 msgstr "People to follow"
 
-#: src/explore.rs:226 src/explore.rs:239 src/explore.rs:268
+#: src/explore.rs:237 src/explore.rs:250 src/explore.rs:285
 msgid "Starter packs"
 msgstr "Starter packs"
 
-#: src/explore.rs:258 src/feeds.rs:531
+#: src/explore.rs:271 src/feeds.rs:531
 msgid "Résultats"
 msgstr "Results"
 
-#: src/explore.rs:260 src/profile.rs:33
+#: src/explore.rs:273 src/profile.rs:33
 msgid "Posts"
 msgstr "Posts"
 
-#: src/explore.rs:264
+#: src/explore.rs:277
 msgid "Personnes"
 msgstr "People"
 
-#: src/explore.rs:274
+#: src/explore.rs:281 src/feeds.rs:378 src/starter_packs.rs:269
+#: src/window.rs:76
+msgid "Flux"
+msgstr "Feeds"
+
+#: src/explore.rs:292
+msgid "Flux trouvés"
+msgstr "Feeds found"
+
+#: src/explore.rs:307
 msgid "Starter packs trouvés"
 msgstr "Starter packs found"
 
-#: src/explore.rs:289
+#: src/explore.rs:322
 msgid "Posts trouvés"
 msgstr "Posts found"
 
-#: src/explore.rs:290
+#: src/explore.rs:323
 msgid "Personnes trouvées"
 msgstr "People found"
 
-#: src/explore.rs:447
-msgid "Aucun starter pack."
-msgstr "No starter packs."
+#: src/explore.rs:485
+msgid "Aucun flux ne correspond à cette recherche."
+msgstr "No feeds match this search."
 
-#: src/explore.rs:467 src/explore.rs:490 src/explore.rs:499 src/explore.rs:593
-#: src/explore.rs:618 src/feed_page.rs:91 src/feed_page.rs:211
-#: src/feed_page.rs:310 src/feed_page.rs:419 src/feeds.rs:430 src/feeds.rs:551
-#: src/messages.rs:425 src/messages.rs:514 src/preferences.rs:258
-#: src/preferences.rs:387 src/profile.rs:471 src/profile.rs:612
-#: src/starter_packs.rs:388
+#: src/explore.rs:506 src/explore.rs:560 src/explore.rs:583 src/explore.rs:592
+#: src/explore.rs:687 src/explore.rs:712 src/feed_page.rs:91
+#: src/feed_page.rs:211 src/feed_page.rs:310 src/feed_page.rs:419
+#: src/feeds.rs:430 src/feeds.rs:551 src/messages.rs:425 src/messages.rs:514
+#: src/preferences.rs:258 src/preferences.rs:387 src/profile.rs:471
+#: src/profile.rs:612 src/starter_packs.rs:383
 msgid "Chargement interrompu."
 msgstr "Loading interrupted."
 
-#: src/explore.rs:530
+#: src/explore.rs:540
+msgid "Aucun starter pack."
+msgstr "No starter packs."
+
+#: src/explore.rs:623
 msgid "Aucun sujet pour l'instant."
 msgstr "No topics yet."
 
-#: src/explore.rs:549
+#: src/explore.rs:642
 msgid "Aucune suggestion pour l'instant."
 msgstr "No suggestions yet."
 
-#: src/explore.rs:646
+#: src/explore.rs:740
 msgid "Personne ne correspond à cette recherche."
 msgstr "No one matches this search."
 
@@ -1140,10 +1153,6 @@ msgstr "Pinned feeds can open as columns on the home page."
 #: src/feeds.rs:351 src/feeds.rs:529
 msgid "Flux populaires"
 msgstr "Popular feeds"
-
-#: src/feeds.rs:378 src/starter_packs.rs:274 src/window.rs:76
-msgid "Flux"
-msgstr "Feeds"
 
 #: src/feeds.rs:450
 msgid "Aucun flux enregistré."
@@ -1710,49 +1719,49 @@ msgstr ""
 msgid "Précisions (facultatif)"
 msgstr "Details (optional)"
 
-#: src/starter_packs.rs:194
+#: src/starter_packs.rs:189
 msgid "Par {}"
 msgstr "By {}"
 
-#: src/starter_packs.rs:199
+#: src/starter_packs.rs:194
 msgid "{} compte"
 msgid_plural "{} comptes"
 msgstr[0] "{} account"
 msgstr[1] "{} accounts"
 
-#: src/starter_packs.rs:209
+#: src/starter_packs.rs:204
 msgid "{} flux"
 msgid_plural "{} flux"
 msgstr[0] "{} feed"
 msgstr[1] "{} feeds"
 
-#: src/starter_packs.rs:266
+#: src/starter_packs.rs:261
 msgid "Starter pack"
 msgstr "Starter pack"
 
-#: src/starter_packs.rs:270
+#: src/starter_packs.rs:265
 msgid "Tout suivre"
 msgstr "Follow all"
 
-#: src/starter_packs.rs:275
+#: src/starter_packs.rs:270
 msgid "Flux du starter pack"
 msgstr "Starter pack feeds"
 
-#: src/starter_packs.rs:276
+#: src/starter_packs.rs:271
 msgid "Comptes du starter pack"
 msgstr "Starter pack accounts"
 
-#: src/starter_packs.rs:289
+#: src/starter_packs.rs:284
 msgid "Comptes"
 msgstr "Accounts"
 
-#: src/starter_packs.rs:422
+#: src/starter_packs.rs:417
 msgid "{} compte suivi, puis une erreur s'est produite."
 msgid_plural "{} comptes suivis, puis une erreur s'est produite."
 msgstr[0] "Followed {} account, then an error occurred."
 msgstr[1] "Followed {} accounts, then an error occurred."
 
-#: src/starter_packs.rs:427
+#: src/starter_packs.rs:422
 msgid "{} compte suivi."
 msgid_plural "{} comptes suivis."
 msgstr[0] "Followed {} account."

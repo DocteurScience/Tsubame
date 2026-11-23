@@ -24,6 +24,7 @@ use crate::starter_packs::{self, StarterPack, StarterPackPage, pack_row};
 enum Results {
     Posts,
     People,
+    Feeds,
     Packs,
 }
 
@@ -41,11 +42,21 @@ pub struct ExplorePage {
     /// Starter packs suggérés (sans recherche) et trouvés.
     packs: gtk::ListBox,
     pack_results: gtk::ListBox,
+    /// Flux trouvés (adresse et nom par rangée).
+    feed_results: gtk::ListBox,
     known_packs: RefCell<Vec<StarterPack>>,
     query: RefCell<String>,
     /// Numéro de la dernière recherche de personnes : les réponses à une
     /// recherche dépassée sont ignorées.
     people_generation: Cell<u64>,
+}
+
+/// Étiquette d'onglet, raccourcie si la place manque (palier mobile).
+fn tab_label(text: &str) -> gtk::Label {
+    gtk::Label::builder()
+        .label(text)
+        .ellipsize(gtk::pango::EllipsizeMode::End)
+        .build()
 }
 
 fn heading(text: &str) -> gtk::Label {
@@ -206,7 +217,7 @@ fn topic_row(rank: usize, topic: &Topic) -> adw::ActionRow {
 impl ExplorePage {
     pub fn new(host: Host) -> Rc<Self> {
         let entry = gtk::SearchEntry::builder()
-            .placeholder_text(gettext("Rechercher des posts, des personnes…"))
+            .placeholder_text(gettext("Rechercher des posts, des personnes, des flux…"))
             .search_delay(500)
             .hexpand(true)
             .build();
@@ -253,24 +264,46 @@ impl ExplorePage {
             .css_classes(["linked"])
             .halign(gtk::Align::Center)
             .margin_top(12)
+            .margin_start(12)
+            .margin_end(12)
             .accessible_role(gtk::AccessibleRole::Group)
             .build();
         tabs.update_property(&[gtk::accessible::Property::Label(&gettext("Résultats"))]);
         let posts_tab = gtk::ToggleButton::builder()
-            .label(gettext("Posts"))
+            .child(&tab_label(&gettext("Posts")))
             .active(true)
             .build();
         let people_tab = gtk::ToggleButton::builder()
-            .label(gettext("Personnes"))
+            .child(&tab_label(&gettext("Personnes")))
+            .group(&posts_tab)
+            .build();
+        let feeds_tab = gtk::ToggleButton::builder()
+            .child(&tab_label(&gettext("Flux")))
             .group(&posts_tab)
             .build();
         let packs_tab = gtk::ToggleButton::builder()
-            .label(gettext("Starter packs"))
+            .child(&tab_label(&gettext("Starter packs")))
             .group(&posts_tab)
             .build();
         tabs.append(&posts_tab);
         tabs.append(&people_tab);
+        tabs.append(&feeds_tab);
         tabs.append(&packs_tab);
+        let feed_results = boxed_list(&gettext("Flux trouvés"));
+        let feeds_scroll = gtk::ScrolledWindow::builder()
+            .hscrollbar_policy(gtk::PolicyType::Never)
+            .vexpand(true)
+            .child(
+                &adw::Clamp::builder()
+                    .maximum_size(crate::columns::COLUMN_MAX_WIDTH + 24)
+                    .margin_top(12)
+                    .margin_bottom(24)
+                    .margin_start(12)
+                    .margin_end(12)
+                    .child(&feed_results)
+                    .build(),
+            )
+            .build();
         let pack_results = boxed_list(&gettext("Starter packs trouvés"));
         let packs_scroll = gtk::ScrolledWindow::builder()
             .hscrollbar_policy(gtk::PolicyType::Never)
@@ -315,6 +348,7 @@ impl ExplorePage {
         let results = gtk::Stack::new();
         results.add_named(&posts.root, Some("posts"));
         results.add_named(&people_scroll, Some("people"));
+        results.add_named(&feeds_scroll, Some("feeds"));
         results.add_named(&packs_scroll, Some("packs"));
         let results_box = gtk::Box::new(gtk::Orientation::Vertical, 0);
         results_box.append(&tabs);
@@ -342,6 +376,7 @@ impl ExplorePage {
             people_status,
             packs,
             pack_results,
+            feed_results,
             known_packs: RefCell::default(),
             query: RefCell::default(),
             people_generation: Cell::new(0),
@@ -362,6 +397,7 @@ impl ExplorePage {
         for (tab, button) in [
             (Results::Posts, posts_tab),
             (Results::People, people_tab),
+            (Results::Feeds, feeds_tab),
             (Results::Packs, packs_tab),
         ] {
             let weak = Rc::downgrade(&page);
@@ -372,6 +408,7 @@ impl ExplorePage {
                     page.results.set_visible_child_name(match tab {
                         Results::Posts => "posts",
                         Results::People => "people",
+                        Results::Feeds => "feeds",
                         Results::Packs => "packs",
                     });
                 }
@@ -414,9 +451,65 @@ impl ExplorePage {
                 }
             });
         }
+        let weak = Rc::downgrade(&page);
+        page.feed_results.connect_row_activated(move |_, row| {
+            let Some(page) = weak.upgrade() else { return };
+            let Some(row) = row.downcast_ref::<adw::ActionRow>() else {
+                return;
+            };
+            let name = row.title().to_string();
+            let feed = crate::feed_page::FeedPage::new(
+                &name,
+                Source::Feed(row.widget_name().to_string()),
+                data::posts(data::Feed::Discover),
+                page.host.clone(),
+            );
+            (page.host.push)(feed.navigation_page(&name));
+        });
 
         page.load_discover();
         page
+    }
+
+    fn show_feeds(&self, feeds: Result<Vec<crate::feeds::FeedInfo>, ApiError>) {
+        clear(&self.feed_results);
+        match feeds {
+            Ok(feeds) if !feeds.is_empty() => {
+                for info in &feeds {
+                    let row = crate::feeds::feed_row(info);
+                    row.set_widget_name(&info.uri);
+                    self.feed_results.append(&row);
+                }
+            }
+            Ok(_) => self.feed_results.append(&message_row(&gettext(
+                "Aucun flux ne correspond à cette recherche.",
+            ))),
+            Err(error) => self.feed_results.append(&message_row(&error.message)),
+        }
+    }
+
+    fn load_feeds(self: &Rc<Self>) {
+        let query = self.query.borrow().clone();
+        let Some(session) = self.host.session.clone() else {
+            let found = crate::feeds::demo_feeds()
+                .into_iter()
+                .filter(|f| matches(&f.name, &query) || matches(&f.description, &query))
+                .collect();
+            self.show_feeds(Ok(found));
+            return;
+        };
+        let task = runtime().spawn(crate::feeds::discover(session, Some(query.clone())));
+        let weak = Rc::downgrade(self);
+        glib::spawn_future_local(async move {
+            let result = task
+                .await
+                .unwrap_or_else(|_| Err(ApiError::new(gettext("Chargement interrompu."))));
+            let Some(page) = weak.upgrade() else { return };
+            if *page.query.borrow() != query {
+                return;
+            }
+            page.show_feeds(result);
+        });
     }
 
     fn open_pack(&self, uri: &str) {
@@ -567,6 +660,7 @@ impl ExplorePage {
         self.stack.set_visible_child_name("results");
         self.load_posts(false);
         self.load_people();
+        self.load_feeds();
         self.load_packs();
     }
 

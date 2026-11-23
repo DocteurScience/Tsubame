@@ -59,12 +59,7 @@ fn from_view(view: &atrium_api::app::bsky::graph::defs::StarterPackView) -> Star
         creator: creator_name(&view.creator),
         members: view.list.as_ref().and_then(|l| l.list_item_count),
         list: view.list.as_ref().map(|l| l.uri.clone()),
-        feeds: view
-            .feeds
-            .iter()
-            .flatten()
-            .map(info_from_view)
-            .collect(),
+        feeds: view.feeds.iter().flatten().map(info_from_view).collect(),
     }
 }
 
