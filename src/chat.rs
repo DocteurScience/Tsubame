@@ -43,6 +43,30 @@ pub struct Message {
     /// Heure (« 14:40 ») et jour (« Aujourd'hui », « Hier », « 18 nov. »).
     pub time: String,
     pub day: String,
+    /// Envoi échoué (message resté sur cet appareil).
+    pub failed: bool,
+}
+
+/// Messages d'une page, du plus ancien au plus récent, et le curseur des
+/// messages plus anciens s'il en reste.
+pub type MessagePage = (Vec<Message>, Option<String>);
+
+/// Préfixe des messages en cours d'envoi, pas encore connus du service.
+pub const LOCAL_ID: &str = "local:";
+
+/// Fusionne une page récente (`latest`) avec les messages affichés : ceux
+/// qu'elle ne contient pas restent devant (plus anciens) ; ceux en cours
+/// d'envoi ou qui n'ont pas pu partir restent à la fin.
+pub fn merge(shown: &[Message], latest: Vec<Message>) -> Vec<Message> {
+    let local = |m: &Message| m.failed || m.id.starts_with(LOCAL_ID);
+    let known = |m: &Message| latest.iter().any(|l| l.id == m.id);
+    let older = shown.iter().filter(|m| !local(m) && !known(m));
+    let failed = shown.iter().filter(|m| local(m));
+    older
+        .cloned()
+        .chain(latest.iter().cloned())
+        .chain(failed.cloned())
+        .collect()
 }
 
 fn str_at<'a>(value: &'a Value, path: &[&str]) -> Option<&'a str> {
@@ -171,6 +195,7 @@ pub fn message_from_json(message: &Value, me: &str, now: DateTime<Utc>) -> Optio
             })
             .unwrap_or_default(),
         day: sent.map(|t| day_label(t, now)).unwrap_or_default(),
+        failed: false,
     })
 }
 
@@ -238,8 +263,13 @@ pub async fn convos(session: Arc<Session>) -> Result<(Vec<Convo>, Vec<Convo>), A
     Ok((accepted, requests))
 }
 
-/// Derniers messages d'une conversation, du plus ancien au plus récent.
-pub async fn messages(session: Arc<Session>, convo_id: String) -> Result<Vec<Message>, ApiError> {
+/// Messages d'une conversation, du plus ancien au plus récent : les
+/// derniers, ou ceux d'avant `cursor`.
+pub async fn messages(
+    session: Arc<Session>,
+    convo_id: String,
+    cursor: Option<String>,
+) -> Result<MessagePage, ApiError> {
     use atrium_api::chat::bsky::convo::get_messages;
     let api = session.api().await?;
     let chat = api.api_with_proxy(chat_did(), CHAT_SERVICE_TYPE);
@@ -250,13 +280,14 @@ pub async fn messages(session: Arc<Session>, convo_id: String) -> Result<Vec<Mes
         .get_messages(
             get_messages::ParametersData {
                 convo_id,
-                cursor: None,
+                cursor,
                 limit: 50.try_into().ok(),
             }
             .into(),
         )
         .await
         .map_err(chat_failed)?;
+    let cursor = output.data.cursor.clone();
     let me = session.account.did.clone();
     let now = Utc::now();
     let mut messages: Vec<Message> = to_json(&output.data.messages)
@@ -267,7 +298,7 @@ pub async fn messages(session: Arc<Session>, convo_id: String) -> Result<Vec<Mes
         .collect();
     // L'API donne les plus récents d'abord.
     messages.reverse();
-    Ok(messages)
+    Ok((messages, cursor))
 }
 
 pub async fn send(
@@ -415,6 +446,7 @@ pub fn demo_messages(convo_id: &str) -> Vec<Message> {
         sender: String::new(),
         time: time.to_owned(),
         day: gettext("Aujourd'hui"),
+        failed: false,
     };
     match convo_id {
         "lucie" => vec![
@@ -526,5 +558,34 @@ mod tests {
         let system =
             serde_json::json!({"$type": "chat.bsky.convo.defs#systemMessageView", "id": "s"});
         assert_eq!(message_from_json(&system, "did:plc:moi", now()), None);
+    }
+
+    #[test]
+    fn refreshed_messages_are_merged() {
+        let message = |id: &str, failed| Message {
+            id: id.into(),
+            text: id.into(),
+            mine: true,
+            sender: String::new(),
+            time: String::new(),
+            day: String::new(),
+            failed,
+        };
+        let shown = vec![
+            message("1", false),
+            message("2", false),
+            message("local:1", true),
+            message("3", false),
+        ];
+        let latest = vec![
+            message("2", false),
+            message("3", false),
+            message("4", false),
+        ];
+        let ids: Vec<String> = merge(&shown, latest)
+            .into_iter()
+            .map(|m| if m.failed { "échec".into() } else { m.id })
+            .collect();
+        assert_eq!(ids, ["1", "2", "3", "4", "échec"]);
     }
 }

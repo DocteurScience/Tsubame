@@ -9,7 +9,7 @@ use gettextrs::{gettext, ngettext};
 use gtk::glib;
 
 use crate::api::ApiError;
-use crate::chat::{self, Convo, Message};
+use crate::chat::{self, Convo, Message, MessagePage};
 use crate::images;
 use crate::profile::Host;
 use crate::runtime::runtime;
@@ -37,6 +37,13 @@ pub struct MessagesPage {
     entry: gtk::Entry,
     send: gtk::Button,
     current: RefCell<Option<Convo>>,
+    /// Messages affichés, du plus ancien au plus récent.
+    messages: RefCell<Vec<Message>>,
+    /// Curseur des messages plus anciens, s'il en reste.
+    older: RefCell<Option<String>>,
+    older_button: gtk::Button,
+    /// Numéro du prochain message envoyé (identifiant local).
+    sent: Cell<u64>,
     /// Numéro du dernier chargement de messages, pour ignorer les réponses
     /// d'une conversation quittée entre-temps.
     generation: Cell<u64>,
@@ -133,6 +140,9 @@ fn convo_row(convo: &Convo) -> gtk::ListBoxRow {
 }
 
 /// Bulle d'un message, à droite pour les miens, à gauche pour les autres.
+/// Secondes entre deux actualisations, page Messages affichée.
+const REFRESH_SECONDS: u32 = 15;
+
 fn bubble(message: &Message) -> gtk::Box {
     let label = gtk::Label::builder()
         .label(&message.text)
@@ -144,6 +154,10 @@ fn bubble(message: &Message) -> gtk::Box {
         .tooltip_text(&message.time)
         .css_classes(["bubble", if message.mine { "mine" } else { "theirs" }])
         .build();
+    if message.failed {
+        label.add_css_class("failed");
+        label.set_tooltip_text(Some(&gettext("Message non envoyé")));
+    }
     let who = if message.mine {
         gettext("Vous, {} : ")
     } else {
@@ -260,13 +274,26 @@ impl MessagesPage {
             .margin_end(12)
             .valign(gtk::Align::End)
             .build();
+        let older_button = gtk::Button::builder()
+            .label(gettext("Messages plus anciens"))
+            .halign(gtk::Align::Center)
+            .margin_top(12)
+            .visible(false)
+            .css_classes(["pill"])
+            .build();
+        let thread = gtk::Box::builder()
+            .orientation(gtk::Orientation::Vertical)
+            .valign(gtk::Align::End)
+            .build();
+        thread.append(&older_button);
+        thread.append(&bubbles);
         let scroll = gtk::ScrolledWindow::builder()
             .hscrollbar_policy(gtk::PolicyType::Never)
             .vexpand(true)
             .child(
                 &adw::Clamp::builder()
                     .maximum_size(720)
-                    .child(&bubbles)
+                    .child(&thread)
                     .build(),
             )
             .build();
@@ -349,7 +376,29 @@ impl MessagesPage {
             entry,
             send,
             current: RefCell::default(),
+            messages: RefCell::default(),
+            older: RefCell::default(),
+            older_button,
+            sent: Cell::new(0),
             generation: Cell::new(0),
+        });
+        let weak = Rc::downgrade(&page);
+        page.older_button.connect_clicked(move |_| {
+            if let Some(page) = weak.upgrade() {
+                page.load_older();
+            }
+        });
+        // Actualisation régulière, seulement quand la page est affichée.
+        let weak = Rc::downgrade(&page);
+        glib::timeout_add_seconds_local(REFRESH_SECONDS, move || {
+            let Some(page) = weak.upgrade() else {
+                return glib::ControlFlow::Break;
+            };
+            if page.root.is_mapped() && page.host.session.is_some() {
+                page.load_convos();
+                page.refresh_messages();
+            }
+            glib::ControlFlow::Continue
         });
 
         for (requests, button) in [(false, accepted_tab), (true, requests_tab)] {
@@ -434,6 +483,13 @@ impl MessagesPage {
     fn show_convos(&self, result: Result<(Vec<Convo>, Vec<Convo>), ApiError>) {
         match result {
             Ok((accepted, requests)) => {
+                // Rien de neuf : la liste reste telle quelle (focus compris).
+                if *self.accepted.borrow() == accepted
+                    && *self.requests.borrow() == requests
+                    && self.list_stack.visible_child_name().as_deref() == Some("list")
+                {
+                    return;
+                }
                 self.accepted.replace(accepted);
                 self.requests.replace(requests);
                 self.fill_list();
@@ -502,11 +558,11 @@ impl MessagesPage {
         self.mark_read(&convo);
 
         let Some(session) = self.host.session.clone() else {
-            self.show_messages(Ok(chat::demo_messages(&convo.id)));
+            self.show_messages(Ok((chat::demo_messages(&convo.id), None)));
             return;
         };
         self.convo_stack.set_visible_child_name("loading");
-        let task = runtime().spawn(chat::messages(session, convo.id.clone()));
+        let task = runtime().spawn(chat::messages(session, convo.id.clone(), None));
         let weak = Rc::downgrade(self);
         glib::spawn_future_local(async move {
             let result = task
@@ -523,26 +579,118 @@ impl MessagesPage {
         });
     }
 
-    fn show_messages(&self, result: Result<Vec<Message>, ApiError>) {
-        while let Some(child) = self.bubbles.first_child() {
-            self.bubbles.remove(&child);
-        }
+    fn show_messages(&self, result: Result<MessagePage, ApiError>) {
         match result {
-            Ok(messages) => {
-                let mut day = String::new();
-                for message in &messages {
-                    if message.day != day {
-                        day = message.day.clone();
-                        self.bubbles.append(&day_separator(&day));
-                    }
-                    self.bubbles.append(&bubble(message));
-                }
+            Ok((messages, cursor)) => {
+                self.messages.replace(messages);
+                self.older.replace(cursor);
+                self.render();
             }
-            Err(error) => self.bubbles.append(&day_separator(&error.message)),
+            Err(error) => {
+                self.messages.replace(Vec::new());
+                self.older.replace(None);
+                self.render();
+                self.bubbles.append(&day_separator(&error.message));
+            }
         }
         self.convo_stack.set_visible_child_name("convo");
         self.scroll_to_end();
         self.entry.grab_focus();
+    }
+
+    /// Bulles des messages affichés, séparées par jour.
+    fn render(&self) {
+        while let Some(child) = self.bubbles.first_child() {
+            self.bubbles.remove(&child);
+        }
+        let mut day = String::new();
+        for message in self.messages.borrow().iter() {
+            if message.day != day {
+                day = message.day.clone();
+                self.bubbles.append(&day_separator(&day));
+            }
+            self.bubbles.append(&bubble(message));
+        }
+        self.older_button.set_visible(self.older.borrow().is_some());
+    }
+
+    /// Messages d'avant ceux affichés, sans bouger ce qu'on lit.
+    fn load_older(self: &Rc<Self>) {
+        let (Some(session), Some(convo), Some(cursor)) = (
+            self.host.session.clone(),
+            self.current.borrow().clone(),
+            self.older.borrow().clone(),
+        ) else {
+            return;
+        };
+        self.older_button.set_sensitive(false);
+        let generation = self.generation.get();
+        let task = runtime().spawn(chat::messages(session, convo.id, Some(cursor)));
+        let weak = Rc::downgrade(self);
+        glib::spawn_future_local(async move {
+            let result = task
+                .await
+                .unwrap_or_else(|_| Err(ApiError::new(gettext("Chargement interrompu."))));
+            let Some(page) = weak.upgrade() else { return };
+            page.older_button.set_sensitive(true);
+            if page.generation.get() != generation {
+                return;
+            }
+            match result {
+                Ok((older, cursor)) => {
+                    let adjustment = page.scroll.vadjustment();
+                    let from_end = adjustment.upper() - adjustment.value();
+                    {
+                        let mut messages = page.messages.borrow_mut();
+                        let shown = std::mem::take(&mut *messages);
+                        *messages = older.into_iter().chain(shown).collect();
+                    }
+                    page.older.replace(cursor);
+                    page.render();
+                    // Même distance à la fin qu'avant : le message lu reste en place.
+                    glib::idle_add_local_once(move || {
+                        adjustment.set_value(adjustment.upper() - from_end);
+                    });
+                }
+                Err(error) if error.expired => (page.host.expired)(error.message),
+                Err(error) => page.host.toasts.add_toast(adw::Toast::new(&error.message)),
+            }
+        });
+    }
+
+    /// Nouveaux messages de la conversation ouverte (actualisation).
+    fn refresh_messages(self: &Rc<Self>) {
+        let (Some(session), Some(convo)) =
+            (self.host.session.clone(), self.current.borrow().clone())
+        else {
+            return;
+        };
+        if self.convo_stack.visible_child_name().as_deref() != Some("convo") {
+            return;
+        }
+        let generation = self.generation.get();
+        let task = runtime().spawn(chat::messages(session, convo.id.clone(), None));
+        let weak = Rc::downgrade(self);
+        glib::spawn_future_local(async move {
+            let Ok(Ok((latest, _))) = task.await else {
+                return;
+            };
+            let Some(page) = weak.upgrade() else { return };
+            if page.generation.get() != generation {
+                return;
+            }
+            let merged = chat::merge(&page.messages.borrow(), latest);
+            if *page.messages.borrow() == merged {
+                return;
+            }
+            let adjustment = page.scroll.vadjustment();
+            let at_end = adjustment.value() + adjustment.page_size() >= adjustment.upper() - 24.0;
+            page.messages.replace(merged);
+            page.render();
+            if at_end {
+                page.scroll_to_end();
+            }
+        });
     }
 
     fn scroll_to_end(&self) {
@@ -586,16 +734,19 @@ impl MessagesPage {
         self.entry.set_text("");
         // Affiché tout de suite ; marqué si l'envoi échoue.
         let now = chrono::Local::now();
+        self.sent.set(self.sent.get() + 1);
+        let local_id = format!("{}{}", chat::LOCAL_ID, self.sent.get());
         let pending = Message {
-            id: String::new(),
+            id: local_id.clone(),
             text: text.clone(),
             mine: true,
             sender: String::new(),
             time: now.format("%H:%M").to_string(),
             day: gettext("Aujourd'hui"),
+            failed: false,
         };
-        let row = bubble(&pending);
-        self.bubbles.append(&row);
+        self.messages.borrow_mut().push(pending.clone());
+        self.render();
         self.scroll_to_end();
         // La conversation remonte en tête, avec ce dernier message.
         {
@@ -620,19 +771,36 @@ impl MessagesPage {
                 .await
                 .unwrap_or_else(|_| Err(ApiError::new(gettext("Envoi interrompu."))));
             let Some(page) = weak.upgrade() else { return };
-            if let Err(error) = result {
-                if error.expired {
-                    (page.host.expired)(error.message);
-                    return;
+            match result {
+                Ok(sent) => {
+                    // Le message local devient celui du service (sauf si
+                    // une actualisation l'a déjà apporté).
+                    let mut messages = page.messages.borrow_mut();
+                    let known = messages.iter().any(|m| m.id == sent.id);
+                    messages.retain(|m| m.id != local_id || !known);
+                    if let Some(m) = messages.iter_mut().find(|m| m.id == local_id) {
+                        *m = sent;
+                    }
                 }
-                if let Some(label) = row.first_child() {
-                    label.add_css_class("failed");
-                    label.set_tooltip_text(Some(&gettext("Message non envoyé")));
+                Err(error) => {
+                    if error.expired {
+                        (page.host.expired)(error.message);
+                        return;
+                    }
+                    if let Some(m) = page
+                        .messages
+                        .borrow_mut()
+                        .iter_mut()
+                        .find(|m| m.id == local_id)
+                    {
+                        m.failed = true;
+                    }
+                    page.render();
+                    glib::g_debug!("tsubame", "message : {}", error.message);
+                    page.host
+                        .toasts
+                        .add_toast(adw::Toast::new(&gettext("Message non envoyé.")));
                 }
-                glib::g_debug!("tsubame", "message : {}", error.message);
-                page.host
-                    .toasts
-                    .add_toast(adw::Toast::new(&gettext("Message non envoyé.")));
             }
         });
     }
