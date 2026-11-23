@@ -454,7 +454,30 @@ pub fn post_from_view(post: &PostView, now: DateTime<Utc>) -> Post {
         labels: labels(post),
         pinned: viewer.and_then(|v| v.pinned).unwrap_or(false),
         quote: quote(post, now),
+        link: link(post),
     }
+}
+
+/// Lien joint à `post`, seul ou avec une citation.
+fn link(post: &PostView) -> Option<crate::data::Link> {
+    use atrium_api::app::bsky::embed::external;
+    let view: &external::View = match post.embed.as_ref()? {
+        Union::Refs(PostViewEmbedRefs::AppBskyEmbedExternalView(view)) => view,
+        Union::Refs(PostViewEmbedRefs::AppBskyEmbedRecordWithMediaView(with_media)) => {
+            match &with_media.media {
+                Union::Refs(ViewMediaRefs::AppBskyEmbedExternalView(view)) => view,
+                _ => return None,
+            }
+        }
+        _ => return None,
+    };
+    let external = &view.external;
+    Some(crate::data::Link {
+        uri: external.uri.clone(),
+        title: external.title.clone(),
+        description: external.description.clone(),
+        thumb: external.thumb.clone(),
+    })
 }
 
 /// Post cité par `post` (citation seule ou avec des images).
@@ -816,6 +839,7 @@ pub fn post_from_notification(
             labels: Vec::new(),
             pinned: false,
             quote: None,
+            link: None,
         },
     };
     let author = &notification.author;
@@ -2480,6 +2504,25 @@ mod tests {
             Some("https://video.example/watch/thumbnail.jpg")
         );
         assert_eq!(media.aspect_ratio, Some((1920, 1080)));
+    }
+
+    #[test]
+    fn external_links_are_read() {
+        let mut item: serde_json::Value = serde_json::from_str(FEED_ITEM).unwrap();
+        item["post"]["embed"] = serde_json::json!({
+            "$type": "app.bsky.embed.external#view",
+            "external": {
+                "uri": "https://example.org/billet",
+                "title": "Un billet",
+                "description": "Sa description",
+                "thumb": "https://cdn.example/link.jpg"
+            }
+        });
+        let item: FeedViewPost = serde_json::from_value(item).unwrap();
+        let link = post_from_feed(&item, now()).link.unwrap();
+        assert_eq!(link.uri, "https://example.org/billet");
+        assert_eq!(link.title, "Un billet");
+        assert_eq!(link.thumb.as_deref(), Some("https://cdn.example/link.jpg"));
     }
 
     #[test]

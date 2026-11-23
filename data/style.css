@@ -244,3 +244,21 @@ button.quote-card:hover {
   min-width: 48px;
   min-height: 48px;
 }
+
+/* Carte d'un lien joint à un post. */
+.link-card {
+  margin-top: 6px;
+  padding: 0;
+  border-radius: 8px;
+  border: 1px solid alpha(currentColor, 0.15);
+  background: none;
+  font-weight: normal;
+}
+
+.link-card:hover {
+  background-color: alpha(currentColor, 0.05);
+}
+
+.link-card picture {
+  border-radius: 8px 8px 0 0;
+}

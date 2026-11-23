@@ -54,6 +54,30 @@ pub struct Post {
     /// Post cité. Sans adresse : supprimé ou invisible, avec la raison
     /// dans le texte.
     pub quote: Option<Box<Post>>,
+    /// Lien joint, avec son aperçu.
+    pub link: Option<Link>,
+}
+
+/// Aperçu d'un lien joint à un post (embed `external`).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Link {
+    pub uri: String,
+    pub title: String,
+    pub description: String,
+    pub thumb: Option<String>,
+}
+
+impl Link {
+    /// Domaine affiché sur la carte : « exemple.org ».
+    pub fn domain(&self) -> String {
+        let rest = self
+            .uri
+            .split_once("://")
+            .map(|(_, rest)| rest)
+            .unwrap_or(&self.uri);
+        let host = rest.split(['/', '?', '#']).next().unwrap_or_default();
+        host.strip_prefix("www.").unwrap_or(host).to_owned()
+    }
 }
 
 impl Post {
@@ -82,6 +106,7 @@ impl Post {
             labels: Vec::new(),
             pinned: false,
             quote: None,
+            link: None,
         }
     }
 }
@@ -292,6 +317,7 @@ fn post(
         labels: Vec::new(),
         pinned: false,
         quote: None,
+        link: None,
     }
 }
 
@@ -388,17 +414,28 @@ pub fn posts(feed: Feed) -> Vec<Post> {
                     212,
                 )
             },
-            post(
-                "Pierre Delmas",
-                "pierre.example.social",
-                "2 h",
-                "20 nov., 12:47",
-                "Un billet sur l'accessibilité des applications GTK4 : ce que Orca lit \
-                 vraiment.",
-                3,
-                6,
-                57,
-            ),
+            // Post avec un lien joint.
+            Post {
+                link: Some(Link {
+                    uri: "https://www.example.org/blog/accessibilite-gtk4".into(),
+                    title: "Ce que Orca lit vraiment dans une application GTK4".into(),
+                    description: "Noms accessibles, rôles, états : un tour des \
+                                  applications GNOME avec un lecteur d'écran."
+                        .into(),
+                    thumb: None,
+                }),
+                ..post(
+                    "Pierre Delmas",
+                    "pierre.example.social",
+                    "2 h",
+                    "20 nov., 12:47",
+                    "Un billet sur l'accessibilité des applications GTK4 : ce que Orca lit \
+                     vraiment.",
+                    3,
+                    6,
+                    57,
+                )
+            },
             // Post étiqueté : son image est floutée sous un avertissement.
             Post {
                 media: Some(Media::with_alt(
@@ -621,6 +658,20 @@ pub fn notifications() -> Vec<Post> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn link_domains_drop_scheme_path_and_www() {
+        let link = |uri: &str| Link {
+            uri: uri.into(),
+            ..Default::default()
+        };
+        assert_eq!(
+            link("https://www.example.org/blog/a?b=1").domain(),
+            "example.org"
+        );
+        assert_eq!(link("http://gnome.org").domain(), "gnome.org");
+        assert_eq!(link("https://docs.gtk.org#top").domain(), "docs.gtk.org");
+    }
 
     #[test]
     fn demo_mentions_keep_replies_and_mentions_only() {

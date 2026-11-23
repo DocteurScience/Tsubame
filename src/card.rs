@@ -5,7 +5,7 @@ use adw::prelude::*;
 use gettextrs::{gettext, ngettext, pgettext};
 use gtk::{gio, glib};
 
-use crate::data::{Image, Media, Post, Reply};
+use crate::data::{Image, Link, Media, Post, Reply};
 use crate::images;
 use crate::interactions::{self, Interaction, Interactions, Toggle};
 use std::rc::Rc;
@@ -683,11 +683,87 @@ pub fn post_card(post: &Post) -> gtk::Box {
     if let Some(m) = &post.media {
         body.append(&media(m, crate::moderation::media_warning(post)));
     }
+    if let Some(link) = &post.link {
+        body.append(&link_card(link));
+    }
     if let Some(quoted) = &post.quote {
         body.append(&quote_card(quoted));
     }
     body.append(&stats(post));
     card
+}
+
+/// Carte d'un lien joint : image d'aperçu, domaine, titre, description.
+/// Un clic ouvre le lien dans le navigateur.
+fn link_card(link: &Link) -> gtk::Widget {
+    let body = gtk::Box::builder()
+        .orientation(gtk::Orientation::Vertical)
+        .build();
+    if let Some(url) = &link.thumb {
+        let picture = gtk::Picture::builder()
+            .content_fit(gtk::ContentFit::Cover)
+            .can_shrink(true)
+            .height_request(150)
+            .css_classes(["post-media"])
+            .build();
+        let weak = picture.downgrade();
+        images::load(url, move |texture| {
+            if let Some(picture) = weak.upgrade() {
+                picture.set_paintable(Some(texture));
+            }
+        });
+        body.append(&picture);
+    }
+    let text = gtk::Box::builder()
+        .orientation(gtk::Orientation::Vertical)
+        .spacing(2)
+        .margin_top(8)
+        .margin_bottom(10)
+        .margin_start(10)
+        .margin_end(10)
+        .build();
+    let domain = link.domain();
+    let domain_label = label(&domain, &["dim-label", "caption"]);
+    domain_label.set_wrap(false);
+    domain_label.set_ellipsize(gtk::pango::EllipsizeMode::End);
+    text.append(&domain_label);
+    if !link.title.trim().is_empty() {
+        let title = label(link.title.trim(), &["heading"]);
+        title.set_lines(2);
+        title.set_ellipsize(gtk::pango::EllipsizeMode::End);
+        text.append(&title);
+    }
+    if !link.description.trim().is_empty() {
+        let description = label(link.description.trim(), &["dim-label"]);
+        description.set_lines(2);
+        description.set_ellipsize(gtk::pango::EllipsizeMode::End);
+        text.append(&description);
+    }
+    body.append(&text);
+    let button = gtk::Button::builder()
+        .child(&body)
+        .tooltip_text(&link.uri)
+        .css_classes(["link-card"])
+        .build();
+    let name = if link.title.trim().is_empty() {
+        domain.clone()
+    } else {
+        format!("{} ({domain})", link.title.trim())
+    };
+    button.update_property(&[gtk::accessible::Property::Label(&fill(
+        gettext("Ouvrir le lien : {}"),
+        &[&name],
+    ))]);
+    let uri = link.uri.clone();
+    button.connect_clicked(move |button| {
+        let window = button.root().and_downcast::<gtk::Window>();
+        gtk::UriLauncher::new(&uri).launch(window.as_ref(), gio::Cancellable::NONE, |result| {
+            if let Err(error) = result {
+                glib::g_debug!("tsubame", "lien : {}", error.message());
+            }
+        });
+    });
+    button.upcast()
 }
 
 /// Post cité, en petite carte dans celle du post. Un clic l'ouvre ; un
@@ -862,6 +938,9 @@ pub fn post_detail(post: &Post) -> gtk::Box {
     body.append(&label(&post.text, &["post-detail-text"]));
     if let Some(m) = &post.media {
         body.append(&media(m, crate::moderation::media_warning(post)));
+    }
+    if let Some(link) = &post.link {
+        body.append(&link_card(link));
     }
     if let Some(quoted) = &post.quote {
         body.append(&quote_card(quoted));
