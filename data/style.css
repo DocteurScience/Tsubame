@@ -175,6 +175,22 @@ columnsview > .column headerbar {
   padding: 2px 8px;
 }
 
+/* Réactions sous une bulle de message. */
+.reaction {
+  min-height: 24px;
+  padding: 0 8px;
+  border-radius: 999px;
+}
+
+.reaction.mine {
+  background-color: alpha(@accent_bg_color, 0.2);
+}
+
+.reaction-choice {
+  font-size: 1.3em;
+  min-width: 36px;
+}
+
 .compose-play {
   border-radius: 999px;
   padding: 10px;

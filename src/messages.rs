@@ -42,6 +42,8 @@ pub struct MessagesPage {
     /// Curseur des messages plus anciens, s'il en reste.
     older: RefCell<Option<String>>,
     older_button: gtk::Button,
+    /// La page elle-même, pour les rappels des bulles.
+    this: RefCell<std::rc::Weak<Self>>,
     /// Numéro du prochain message envoyé (identifiant local).
     sent: Cell<u64>,
     /// Numéro du dernier chargement de messages, pour ignorer les réponses
@@ -143,7 +145,51 @@ fn convo_row(convo: &Convo) -> gtk::ListBoxRow {
 /// Secondes entre deux actualisations, page Messages affichée.
 const REFRESH_SECONDS: u32 = 15;
 
-fn bubble(message: &Message) -> gtk::Box {
+/// Réagir à un message : identifiant, émoji, ajouter (ou retirer).
+type React = Rc<dyn Fn(&str, &str, bool)>;
+
+/// Nom accessible d'une réaction : « 👍, 2 réactions, dont la vôtre ».
+fn reaction_label(reaction: &chat::Reaction) -> String {
+    let count = ngettext("{} réaction", "{} réactions", reaction.count)
+        .replace("{}", &reaction.count.to_string());
+    if reaction.mine {
+        format!("{}, {count}, {}", reaction.value, gettext("dont la vôtre"))
+    } else {
+        format!("{}, {count}", reaction.value)
+    }
+}
+
+/// Bouton « Réagir » : un menu des émojis proposés.
+fn react_button(message_id: &str, react: &React) -> gtk::MenuButton {
+    let choices = gtk::Box::builder().spacing(2).build();
+    let popover = gtk::Popover::builder().child(&choices).build();
+    for value in chat::REACTIONS {
+        let choice = gtk::Button::builder()
+            .label(value)
+            .tooltip_text(value)
+            .css_classes(["flat", "reaction-choice"])
+            .build();
+        let (react, id, popover) = (react.clone(), message_id.to_owned(), popover.downgrade());
+        choice.connect_clicked(move |_| {
+            if let Some(popover) = popover.upgrade() {
+                popover.popdown();
+            }
+            react(&id, value, true);
+        });
+        choices.append(&choice);
+    }
+    let button = gtk::MenuButton::builder()
+        .icon_name("face-smile-symbolic")
+        .tooltip_text(gettext("Réagir"))
+        .valign(gtk::Align::Center)
+        .popover(&popover)
+        .css_classes(["flat", "circular", "dim-label"])
+        .build();
+    button.update_property(&[gtk::accessible::Property::Label(&gettext("Réagir"))]);
+    button
+}
+
+fn bubble(message: &Message, react: Option<&React>) -> gtk::Box {
     let label = gtk::Label::builder()
         .label(&message.text)
         .wrap(true)
@@ -168,15 +214,55 @@ fn bubble(message: &Message) -> gtk::Box {
         "{who}{}",
         message.text
     ))]);
-    let row = gtk::Box::builder()
-        .halign(if message.mine {
-            gtk::Align::End
-        } else {
-            gtk::Align::Start
-        })
+    let align = if message.mine {
+        gtk::Align::End
+    } else {
+        gtk::Align::Start
+    };
+    let line = gtk::Box::builder().spacing(4).halign(align).build();
+    let react = react.filter(|_| !message.failed && !message.id.starts_with(chat::LOCAL_ID));
+    let button = react.map(|react| react_button(&message.id, react));
+    if let (true, Some(button)) = (message.mine, &button) {
+        line.append(button);
+    }
+    line.append(&label);
+    if let (false, Some(button)) = (message.mine, &button) {
+        line.append(button);
+    }
+    let column = gtk::Box::builder()
+        .orientation(gtk::Orientation::Vertical)
+        .spacing(2)
+        .halign(align)
         .build();
-    row.append(&label);
-    row
+    column.append(&line);
+    if !message.reactions.is_empty() {
+        let pills = gtk::Box::builder().spacing(4).halign(align).build();
+        for reaction in &message.reactions {
+            let pill = gtk::Button::builder()
+                .label(format!("{} {}", reaction.value, reaction.count))
+                .tooltip_text(reaction_label(reaction))
+                .css_classes(["reaction"])
+                .sensitive(react.is_some())
+                .build();
+            if reaction.mine {
+                pill.add_css_class("mine");
+            }
+            pill.update_property(&[gtk::accessible::Property::Label(&reaction_label(reaction))]);
+            if let Some(react) = react {
+                // Cliquer sa réaction la retire ; celle des autres s'y ajoute.
+                let (react, id, value, mine) = (
+                    react.clone(),
+                    message.id.clone(),
+                    reaction.value.clone(),
+                    reaction.mine,
+                );
+                pill.connect_clicked(move |_| react(&id, &value, !mine));
+            }
+            pills.append(&pill);
+        }
+        column.append(&pills);
+    }
+    column
 }
 
 fn day_separator(day: &str) -> gtk::Label {
@@ -388,8 +474,10 @@ impl MessagesPage {
             older: RefCell::default(),
             older_button,
             sent: Cell::new(0),
+            this: RefCell::default(),
             generation: Cell::new(0),
         });
+        page.this.replace(Rc::downgrade(&page));
         let weak = Rc::downgrade(&page);
         new_message.connect_clicked(move |button| {
             if let Some(page) = weak.upgrade() {
@@ -623,9 +711,92 @@ impl MessagesPage {
                 day = message.day.clone();
                 self.bubbles.append(&day_separator(&day));
             }
-            self.bubbles.append(&bubble(message));
+            self.bubbles
+                .append(&bubble(message, Some(&self.react_handler())));
         }
         self.older_button.set_visible(self.older.borrow().is_some());
+    }
+
+    fn react_handler(&self) -> React {
+        let weak = self.this.borrow().clone();
+        Rc::new(move |id: &str, value: &str, add: bool| {
+            if let Some(page) = weak.upgrade() {
+                page.react(id, value, add);
+            }
+        })
+    }
+
+    /// Ajoute ou retire ma réaction : affichée tout de suite, puis
+    /// remplacée par l'état du service.
+    fn react(self: &Rc<Self>, id: &str, value: &str, add: bool) {
+        {
+            let mut messages = self.messages.borrow_mut();
+            let Some(message) = messages.iter_mut().find(|m| m.id == id) else {
+                return;
+            };
+            let reactions = &mut message.reactions;
+            match reactions.iter_mut().position(|r| r.value == value) {
+                Some(i) if add && !reactions[i].mine => {
+                    reactions[i].count += 1;
+                    reactions[i].mine = true;
+                }
+                Some(_) if add => return,
+                Some(i) if reactions[i].mine => {
+                    reactions[i].count -= 1;
+                    reactions[i].mine = false;
+                    if reactions[i].count == 0 {
+                        reactions.remove(i);
+                    }
+                }
+                Some(_) => return,
+                None if add => reactions.push(chat::Reaction {
+                    value: value.to_owned(),
+                    count: 1,
+                    mine: true,
+                }),
+                None => return,
+            }
+        }
+        self.render();
+        // Les bulles sont refaites : le focus revient au champ de saisie.
+        self.entry.grab_focus();
+        let (Some(session), Some(convo)) =
+            (self.host.session.clone(), self.current.borrow().clone())
+        else {
+            return;
+        };
+        let task = runtime().spawn(chat::react(
+            session,
+            convo.id,
+            id.to_owned(),
+            value.to_owned(),
+            add,
+        ));
+        let weak = Rc::downgrade(self);
+        glib::spawn_future_local(async move {
+            let result = task
+                .await
+                .unwrap_or_else(|_| Err(ApiError::new(gettext("Requête interrompue."))));
+            let Some(page) = weak.upgrade() else { return };
+            match result {
+                Ok(updated) => {
+                    if let Some(m) = page
+                        .messages
+                        .borrow_mut()
+                        .iter_mut()
+                        .find(|m| m.id == updated.id)
+                    {
+                        *m = updated;
+                    }
+                    page.render();
+                }
+                Err(error) if error.expired => (page.host.expired)(error.message),
+                Err(error) => {
+                    page.host.toasts.add_toast(adw::Toast::new(&error.message));
+                    page.refresh_messages();
+                }
+            }
+        });
     }
 
     /// Messages d'avant ceux affichés, sans bouger ce qu'on lit.
@@ -758,6 +929,7 @@ impl MessagesPage {
             time: now.format("%H:%M").to_string(),
             day: gettext("Aujourd'hui"),
             failed: false,
+            reactions: Vec::new(),
         };
         self.messages.borrow_mut().push(pending.clone());
         self.render();

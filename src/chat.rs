@@ -45,6 +45,47 @@ pub struct Message {
     pub day: String,
     /// Envoi échoué (message resté sur cet appareil).
     pub failed: bool,
+    /// Réactions, regroupées par émoji, dans l'ordre d'arrivée.
+    pub reactions: Vec<Reaction>,
+}
+
+/// Réaction à un message : un émoji, combien l'ont mis, et si j'en suis.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Reaction {
+    pub value: String,
+    pub count: u32,
+    pub mine: bool,
+}
+
+/// Émojis proposés pour réagir.
+pub const REACTIONS: [&str; 6] = ["❤️", "👍", "😂", "😮", "😢", "🙏"];
+
+/// Réactions d'un message (JSON), regroupées par émoji.
+fn reactions_from_json(message: &Value, me: &str) -> Vec<Reaction> {
+    let mut grouped: Vec<Reaction> = Vec::new();
+    for reaction in message
+        .get("reactions")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+    {
+        let Some(value) = reaction.get("value").and_then(Value::as_str) else {
+            continue;
+        };
+        let mine = str_at(reaction, &["sender", "did"]) == Some(me);
+        match grouped.iter_mut().find(|r| r.value == value) {
+            Some(group) => {
+                group.count += 1;
+                group.mine |= mine;
+            }
+            None => grouped.push(Reaction {
+                value: value.to_owned(),
+                count: 1,
+                mine,
+            }),
+        }
+    }
+    grouped
 }
 
 /// Messages d'une page, du plus ancien au plus récent, et le curseur des
@@ -196,6 +237,7 @@ pub fn message_from_json(message: &Value, me: &str, now: DateTime<Utc>) -> Optio
             .unwrap_or_default(),
         day: sent.map(|t| day_label(t, now)).unwrap_or_default(),
         failed: false,
+        reactions: reactions_from_json(message, me),
     })
 }
 
@@ -358,6 +400,55 @@ pub async fn convo_for(session: Arc<Session>, did: String) -> Result<Convo, ApiE
     .ok_or_else(|| ApiError::new(gettext("Réponse illisible du service de messages.")))
 }
 
+/// Ajoute ou retire ma réaction `value` à un message ; rend le message à
+/// jour.
+pub async fn react(
+    session: Arc<Session>,
+    convo_id: String,
+    message_id: String,
+    value: String,
+    add: bool,
+) -> Result<Message, ApiError> {
+    use atrium_api::chat::bsky::convo::{add_reaction, remove_reaction};
+    let api = session.api().await?;
+    let chat = api.api_with_proxy(chat_did(), CHAT_SERVICE_TYPE);
+    let message = if add {
+        let output = chat
+            .chat
+            .bsky
+            .convo
+            .add_reaction(
+                add_reaction::InputData {
+                    convo_id,
+                    message_id,
+                    value,
+                }
+                .into(),
+            )
+            .await
+            .map_err(chat_failed)?;
+        to_json(&output.data.message)
+    } else {
+        let output = chat
+            .chat
+            .bsky
+            .convo
+            .remove_reaction(
+                remove_reaction::InputData {
+                    convo_id,
+                    message_id,
+                    value,
+                }
+                .into(),
+            )
+            .await
+            .map_err(chat_failed)?;
+        to_json(&output.data.message)
+    };
+    message_from_json(&message, &session.account.did, Utc::now())
+        .ok_or_else(|| ApiError::new(gettext("Réponse illisible du service de messages.")))
+}
+
 /// Marque la conversation comme lue.
 pub async fn mark_read(session: Arc<Session>, convo_id: String) -> Result<(), ApiError> {
     use atrium_api::chat::bsky::convo::update_read;
@@ -473,30 +564,39 @@ pub fn demo_messages(convo_id: &str) -> Vec<Message> {
         time: time.to_owned(),
         day: gettext("Aujourd'hui"),
         failed: false,
+        reactions: Vec::new(),
     };
     match convo_id {
-        "lucie" => vec![
-            message(
-                1,
-                "Salut, tu as vu les nouveautés de la bêta ?",
-                false,
-                "14:31",
-            ),
-            message(
-                2,
-                "Oui, le sélecteur de fichiers est bien mieux. J'ai deux ou trois retours sur l'accessibilité.",
-                true,
-                "14:33",
-            ),
-            message(3, "Parfait, note-les dans le dépôt.", false, "14:35"),
-            message(4, "Merci, je regarde ça cet après-midi.", true, "14:38"),
-            message(
-                5,
-                "Je t'envoie le lien du dépôt tout de suite",
-                false,
-                "14:40",
-            ),
-        ],
+        "lucie" => {
+            let mut messages = vec![
+                message(
+                    1,
+                    "Salut, tu as vu les nouveautés de la bêta ?",
+                    false,
+                    "14:31",
+                ),
+                message(
+                    2,
+                    "Oui, le sélecteur de fichiers est bien mieux. J'ai deux ou trois retours sur l'accessibilité.",
+                    true,
+                    "14:33",
+                ),
+                message(3, "Parfait, note-les dans le dépôt.", false, "14:35"),
+                message(4, "Merci, je regarde ça cet après-midi.", true, "14:38"),
+                message(
+                    5,
+                    "Je t'envoie le lien du dépôt tout de suite",
+                    false,
+                    "14:40",
+                ),
+            ];
+            messages[3].reactions = vec![Reaction {
+                value: "👍".into(),
+                count: 1,
+                mine: false,
+            }];
+            messages
+        }
         _ => demo_convos()
             .0
             .into_iter()
@@ -587,6 +687,34 @@ mod tests {
     }
 
     #[test]
+    fn reactions_are_grouped() {
+        let message = serde_json::json!({
+            "id": "m1", "text": "Bravo", "sender": {"did": "did:plc:lucie"},
+            "reactions": [
+                {"value": "👍", "sender": {"did": "did:plc:nadia"}},
+                {"value": "❤️", "sender": {"did": "did:plc:moi"}},
+                {"value": "👍", "sender": {"did": "did:plc:moi"}},
+            ]
+        });
+        let message = message_from_json(&message, "did:plc:moi", now()).unwrap();
+        assert_eq!(
+            message.reactions,
+            [
+                Reaction {
+                    value: "👍".into(),
+                    count: 2,
+                    mine: true
+                },
+                Reaction {
+                    value: "❤️".into(),
+                    count: 1,
+                    mine: true
+                },
+            ]
+        );
+    }
+
+    #[test]
     fn refreshed_messages_are_merged() {
         let message = |id: &str, failed| Message {
             id: id.into(),
@@ -596,6 +724,7 @@ mod tests {
             time: String::new(),
             day: String::new(),
             failed,
+            reactions: Vec::new(),
         };
         let shown = vec![
             message("1", false),

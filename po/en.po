@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: tsubame\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-23 17:14+0000\n"
+"POT-Creation-Date: 2026-11-23 17:18+0000\n"
 "PO-Revision-Date: 2026-11-22\n"
 "Last-Translator: \n"
 "Language-Team: English\n"
@@ -565,31 +565,31 @@ msgstr "See who reposted"
 msgid "Répondre"
 msgstr "Reply"
 
-#: src/chat.rs:87
+#: src/chat.rs:128
 msgid "hier"
 msgstr "yesterday"
 
-#: src/chat.rs:97 src/chat.rs:474 src/messages.rs:759
+#: src/chat.rs:138 src/chat.rs:565 src/messages.rs:930
 msgid "Aujourd'hui"
 msgstr "Today"
 
-#: src/chat.rs:99
+#: src/chat.rs:140
 msgid "Hier"
 msgstr "Yesterday"
 
-#: src/chat.rs:126
+#: src/chat.rs:167
 msgid "Vous"
 msgstr "You"
 
-#: src/chat.rs:135 src/chat.rs:181
+#: src/chat.rs:176 src/chat.rs:222
 msgid "Message supprimé"
 msgstr "Deleted message"
 
-#: src/chat.rs:332 src/chat.rs:358
+#: src/chat.rs:374 src/chat.rs:400 src/chat.rs:449
 msgid "Réponse illisible du service de messages."
 msgstr "Unreadable response from the chat service."
 
-#: src/chat.rs:401
+#: src/chat.rs:492
 msgid ""
 "La messagerie n'est pas autorisée pour cette session. Déconnectez-vous puis "
 "reconnectez-vous pour l'autoriser."
@@ -618,7 +618,7 @@ msgid "Fermer la colonne"
 msgstr "Close column"
 
 #: src/column.rs:212 src/column.rs:214 src/column.rs:228 src/feed_page.rs:33
-#: src/feed_page.rs:35 src/messages.rs:195 src/messages.rs:197
+#: src/feed_page.rs:35 src/messages.rs:281 src/messages.rs:283
 msgid "Actualiser"
 msgstr "Refresh"
 
@@ -992,10 +992,10 @@ msgid "Choisir un avatar"
 msgstr "Choose an avatar"
 
 #: src/edit_profile.rs:576 src/explore.rs:182 src/feeds.rs:714
-#: src/lists.rs:383 src/lists.rs:413 src/preferences.rs:339
-#: src/preferences.rs:451 src/profile.rs:677 src/profile.rs:777
-#: src/report.rs:241 src/window.rs:1105 src/window.rs:1173 src/window.rs:1215
-#: src/window.rs:1316 src/window.rs:1695
+#: src/lists.rs:383 src/lists.rs:413 src/messages.rs:779
+#: src/preferences.rs:339 src/preferences.rs:451 src/profile.rs:677
+#: src/profile.rs:777 src/report.rs:241 src/window.rs:1105 src/window.rs:1173
+#: src/window.rs:1215 src/window.rs:1316 src/window.rs:1695
 msgid "Requête interrompue."
 msgstr "Request interrupted."
 
@@ -1081,8 +1081,8 @@ msgstr "No feeds match this search."
 #: src/explore.rs:506 src/explore.rs:560 src/explore.rs:583 src/explore.rs:592
 #: src/explore.rs:687 src/explore.rs:712 src/feed_page.rs:94
 #: src/feed_page.rs:269 src/feed_page.rs:386 src/feeds.rs:430 src/feeds.rs:551
-#: src/lists.rs:678 src/lists.rs:812 src/messages.rs:488 src/messages.rs:584
-#: src/messages.rs:647 src/messages.rs:844 src/preferences.rs:258
+#: src/lists.rs:678 src/lists.rs:812 src/messages.rs:576 src/messages.rs:672
+#: src/messages.rs:818 src/messages.rs:1016 src/preferences.rs:258
 #: src/preferences.rs:387 src/profile.rs:496 src/profile.rs:643
 #: src/starter_packs.rs:383
 msgid "Chargement interrompu."
@@ -1396,110 +1396,124 @@ msgstr ""
 msgid "Comptes à mentionner"
 msgstr "Accounts to mention"
 
-#: src/messages.rs:60 src/post_list.rs:77 src/profile.rs:303
+#: src/messages.rs:62 src/post_list.rs:77 src/profile.rs:303
 msgid "Chargement"
 msgstr "Loading"
 
-#: src/messages.rs:134
+#: src/messages.rs:136
 msgid "{} message non lu"
 msgid_plural "{} messages non lus"
 msgstr[0] "{} unread message"
 msgstr[1] "{} unread messages"
 
-#: src/messages.rs:159
+#: src/messages.rs:153
+msgid "{} réaction"
+msgid_plural "{} réactions"
+msgstr[0] "{} reaction"
+msgstr[1] "{} reactions"
+
+#: src/messages.rs:156
+msgid "dont la vôtre"
+msgstr "including yours"
+
+#: src/messages.rs:183 src/messages.rs:188
+msgid "Réagir"
+msgstr "React"
+
+#: src/messages.rs:205
 msgid "Message non envoyé"
 msgstr "Message not sent"
 
-#: src/messages.rs:162
+#: src/messages.rs:208
 msgid "Vous, {} : "
 msgstr "You, {}: "
 
-#: src/messages.rs:164
+#: src/messages.rs:210
 msgid "{} : "
 msgstr "{}: "
 
-#: src/messages.rs:199 src/messages.rs:270 src/window.rs:70
+#: src/messages.rs:285 src/messages.rs:356 src/window.rs:70
 msgid "Messages"
 msgstr "Messages"
 
-#: src/messages.rs:204 src/messages.rs:207 src/messages.rs:876
+#: src/messages.rs:290 src/messages.rs:293 src/messages.rs:1048
 msgid "Nouveau message"
 msgstr "New message"
 
-#: src/messages.rs:211 src/messages.rs:228 src/messages.rs:234
+#: src/messages.rs:297 src/messages.rs:314 src/messages.rs:320
 msgid "Conversations"
 msgstr "Conversations"
 
-#: src/messages.rs:216 src/messages.rs:529
+#: src/messages.rs:302 src/messages.rs:617
 msgid "Demandes"
 msgstr "Requests"
 
-#: src/messages.rs:236 src/post_list.rs:79 src/profile.rs:287
+#: src/messages.rs:322 src/post_list.rs:79 src/profile.rs:287
 msgid "Réessayer"
 msgstr "Try again"
 
-#: src/messages.rs:242 src/post_list.rs:85
+#: src/messages.rs:328 src/post_list.rs:85
 msgid "Chargement impossible"
 msgstr "Could not load"
 
-#: src/messages.rs:258
+#: src/messages.rs:344
 msgid "Aucune conversation"
 msgstr "No conversations"
 
-#: src/messages.rs:286
+#: src/messages.rs:372
 msgid "Messages plus anciens"
 msgstr "Older messages"
 
-#: src/messages.rs:310
+#: src/messages.rs:396
 msgid ""
 "Demande de message : cette personne ne fait pas partie de vos contacts."
 msgstr "Message request: this person is not one of your contacts."
 
-#: src/messages.rs:312
+#: src/messages.rs:398
 msgid "Accepter"
 msgstr "Accept"
 
-#: src/messages.rs:315
+#: src/messages.rs:401
 msgid "Écrire un message…"
 msgstr "Write a message…"
 
-#: src/messages.rs:318
+#: src/messages.rs:404
 msgid "Message"
 msgstr "Message"
 
-#: src/messages.rs:321 src/messages.rs:325 src/report.rs:152
+#: src/messages.rs:407 src/messages.rs:411 src/report.rs:152
 msgid "Envoyer"
 msgstr "Send"
 
-#: src/messages.rs:344
+#: src/messages.rs:430
 msgid "Aucune conversation ouverte"
 msgstr "No conversation open"
 
-#: src/messages.rs:346
+#: src/messages.rs:432
 msgid "Choisissez une conversation pour lire ses messages."
 msgstr "Choose a conversation to read its messages."
 
-#: src/messages.rs:356
+#: src/messages.rs:442
 msgid "Conversation"
 msgstr "Conversation"
 
-#: src/messages.rs:527
+#: src/messages.rs:615
 msgid "Demandes · {}"
 msgstr "Requests · {}"
 
-#: src/messages.rs:786
+#: src/messages.rs:958
 msgid "Envoi interrompu."
 msgstr "Sending interrupted."
 
-#: src/messages.rs:816
+#: src/messages.rs:988
 msgid "Message non envoyé."
 msgstr "Message not sent."
 
-#: src/messages.rs:881 src/messages.rs:886
+#: src/messages.rs:1053 src/messages.rs:1058
 msgid "Rechercher un compte"
 msgstr "Search for an account"
 
-#: src/messages.rs:894 src/starter_packs.rs:284
+#: src/messages.rs:1066 src/starter_packs.rs:284
 msgid "Comptes"
 msgstr "Accounts"
 
