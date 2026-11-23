@@ -585,7 +585,11 @@ pub fn demo_messages(convo_id: &str) -> Vec<Message> {
         id: id.to_string(),
         text: text.to_owned(),
         mine,
-        sender: String::new(),
+        sender: if mine {
+            String::new()
+        } else {
+            "did:plc:demo".to_owned()
+        },
         time: time.to_owned(),
         day: gettext("Aujourd'hui"),
         failed: false,

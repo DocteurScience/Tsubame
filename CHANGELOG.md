@@ -15,6 +15,7 @@ Logiciels et Flathub).
 ### Modération
 
 - Mots masqués pour une durée, ou dans les mots-clics seulement.
+- Signaler un message.
 
 ### Écrire
 

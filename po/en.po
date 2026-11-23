@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: tsubame\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-23 17:35+0000\n"
+"POT-Creation-Date: 2026-11-23 17:38+0000\n"
 "PO-Revision-Date: 2026-11-22\n"
 "Last-Translator: \n"
 "Language-Team: English\n"
@@ -169,7 +169,7 @@ msgstr "reposted your repost"
 msgid "a rejoint Bluesky avec votre starter pack"
 msgstr "joined Bluesky with your starter pack"
 
-#: src/api.rs:1075 src/feeds.rs:229 src/moderation.rs:450 src/report.rs:126
+#: src/api.rs:1075 src/feeds.rs:229 src/moderation.rs:450 src/report.rs:155
 msgid "Ce compte n'existe pas."
 msgstr "This account does not exist."
 
@@ -581,7 +581,7 @@ msgstr "Reply"
 msgid "hier"
 msgstr "yesterday"
 
-#: src/chat.rs:155 src/chat.rs:590 src/messages.rs:973
+#: src/chat.rs:155 src/chat.rs:594 src/messages.rs:1033
 msgid "Aujourd'hui"
 msgstr "Today"
 
@@ -630,7 +630,7 @@ msgid "Fermer la colonne"
 msgstr "Close column"
 
 #: src/column.rs:212 src/column.rs:214 src/column.rs:228 src/feed_page.rs:33
-#: src/feed_page.rs:35 src/messages.rs:324 src/messages.rs:326
+#: src/feed_page.rs:35 src/messages.rs:349 src/messages.rs:351
 msgid "Actualiser"
 msgstr "Refresh"
 
@@ -703,7 +703,7 @@ msgstr "New post"
 #. En-tête : Annuler, titre, Publier.
 #: src/compose.rs:257 src/compose.rs:1805 src/edit_profile.rs:234
 #: src/lists.rs:269 src/lists.rs:548 src/login.rs:150 src/profile.rs:1213
-#: src/report.rs:150 src/window.rs:572 src/window.rs:1156 src/window.rs:1309
+#: src/report.rs:180 src/window.rs:572 src/window.rs:1156 src/window.rs:1309
 msgid "Annuler"
 msgstr "Cancel"
 
@@ -813,7 +813,7 @@ msgstr "Keep as draft"
 msgid "Le brouillon n'a pas pu être enregistré."
 msgstr "The draft could not be saved."
 
-#: src/compose.rs:1217 src/lists.rs:352 src/lists.rs:558 src/messages.rs:1300
+#: src/compose.rs:1217 src/lists.rs:352 src/lists.rs:558 src/messages.rs:1360
 #: src/starter_packs.rs:420
 msgid "Mode démonstration : rien n'est publié."
 msgstr "Demo mode: nothing is posted."
@@ -1004,9 +1004,9 @@ msgid "Choisir un avatar"
 msgstr "Choose an avatar"
 
 #: src/edit_profile.rs:576 src/explore.rs:182 src/feeds.rs:734
-#: src/lists.rs:383 src/lists.rs:413 src/messages.rs:822
+#: src/lists.rs:383 src/lists.rs:413 src/messages.rs:882
 #: src/preferences.rs:346 src/preferences.rs:458 src/profile.rs:986
-#: src/profile.rs:1092 src/profile.rs:1142 src/report.rs:241
+#: src/profile.rs:1092 src/profile.rs:1142 src/report.rs:271
 #: src/window.rs:1105 src/window.rs:1173 src/window.rs:1228 src/window.rs:1329
 #: src/window.rs:1708
 msgid "Requête interrompue."
@@ -1094,8 +1094,8 @@ msgstr "No feeds match this search."
 #: src/explore.rs:506 src/explore.rs:560 src/explore.rs:583 src/explore.rs:592
 #: src/explore.rs:687 src/explore.rs:712 src/feed_page.rs:94
 #: src/feed_page.rs:269 src/feed_page.rs:386 src/feeds.rs:450 src/feeds.rs:571
-#: src/lists.rs:678 src/lists.rs:812 src/messages.rs:619 src/messages.rs:715
-#: src/messages.rs:861 src/messages.rs:1060 src/preferences.rs:265
+#: src/lists.rs:678 src/lists.rs:812 src/messages.rs:657 src/messages.rs:753
+#: src/messages.rs:921 src/messages.rs:1120 src/preferences.rs:265
 #: src/preferences.rs:394 src/profile.rs:656 src/profile.rs:829
 #: src/profile.rs:952 src/starter_packs.rs:404
 msgid "Chargement interrompu."
@@ -1429,129 +1429,137 @@ msgstr[1] "{} reactions"
 msgid "dont la vôtre"
 msgstr "including yours"
 
-#: src/messages.rs:183 src/messages.rs:188
+#: src/messages.rs:176
+msgid "Signaler le message…"
+msgstr "Report message…"
+
+#: src/messages.rs:208 src/messages.rs:213
 msgid "Réagir"
 msgstr "React"
 
-#: src/messages.rs:205
+#: src/messages.rs:230
 msgid "Message non envoyé"
 msgstr "Message not sent"
 
-#: src/messages.rs:208
+#: src/messages.rs:233
 msgid "Vous, {} : "
 msgstr "You, {}: "
 
-#: src/messages.rs:210
+#: src/messages.rs:235
 msgid "{} : "
 msgstr "{}: "
 
-#: src/messages.rs:240
+#: src/messages.rs:265
 msgid "Post de {} : {}"
 msgstr "Post by {}: {}"
 
-#: src/messages.rs:328 src/messages.rs:399 src/window.rs:70
+#: src/messages.rs:353 src/messages.rs:424 src/window.rs:70
 msgid "Messages"
 msgstr "Messages"
 
-#: src/messages.rs:333 src/messages.rs:336 src/messages.rs:1092
+#: src/messages.rs:358 src/messages.rs:361 src/messages.rs:1152
 msgid "Nouveau message"
 msgstr "New message"
 
-#: src/messages.rs:340 src/messages.rs:357 src/messages.rs:363
-#: src/messages.rs:1230
+#: src/messages.rs:365 src/messages.rs:382 src/messages.rs:388
+#: src/messages.rs:1290
 msgid "Conversations"
 msgstr "Conversations"
 
-#: src/messages.rs:345 src/messages.rs:660
+#: src/messages.rs:370 src/messages.rs:698
 msgid "Demandes"
 msgstr "Requests"
 
-#: src/messages.rs:365 src/post_list.rs:79 src/profile.rs:410
+#: src/messages.rs:390 src/post_list.rs:79 src/profile.rs:410
 msgid "Réessayer"
 msgstr "Try again"
 
-#: src/messages.rs:371 src/post_list.rs:85
+#: src/messages.rs:396 src/post_list.rs:85
 msgid "Chargement impossible"
 msgstr "Could not load"
 
-#: src/messages.rs:387 src/messages.rs:1264
+#: src/messages.rs:412 src/messages.rs:1324
 msgid "Aucune conversation"
 msgstr "No conversations"
 
-#: src/messages.rs:415
+#: src/messages.rs:440
 msgid "Messages plus anciens"
 msgstr "Older messages"
 
-#: src/messages.rs:439
+#: src/messages.rs:464
 msgid ""
 "Demande de message : cette personne ne fait pas partie de vos contacts."
 msgstr "Message request: this person is not one of your contacts."
 
-#: src/messages.rs:441
+#: src/messages.rs:466
 msgid "Accepter"
 msgstr "Accept"
 
-#: src/messages.rs:444
+#: src/messages.rs:469
 msgid "Écrire un message…"
 msgstr "Write a message…"
 
-#: src/messages.rs:447
+#: src/messages.rs:472
 msgid "Message"
 msgstr "Message"
 
-#: src/messages.rs:450 src/messages.rs:454 src/report.rs:152
+#: src/messages.rs:475 src/messages.rs:479 src/report.rs:182
 msgid "Envoyer"
 msgstr "Send"
 
-#: src/messages.rs:473
+#: src/messages.rs:498
 msgid "Aucune conversation ouverte"
 msgstr "No conversation open"
 
-#: src/messages.rs:475
+#: src/messages.rs:500
 msgid "Choisissez une conversation pour lire ses messages."
 msgstr "Choose a conversation to read its messages."
 
-#: src/messages.rs:485
+#: src/messages.rs:510
 msgid "Conversation"
 msgstr "Conversation"
 
-#: src/messages.rs:658
+#: src/messages.rs:696
 msgid "Demandes · {}"
 msgstr "Requests · {}"
 
-#: src/messages.rs:1002 src/messages.rs:1314
+#: src/messages.rs:816 src/window.rs:1288
+msgid "Signalement envoyé. Merci."
+msgstr "Report sent. Thank you."
+
+#: src/messages.rs:1062 src/messages.rs:1374
 msgid "Envoi interrompu."
 msgstr "Sending interrupted."
 
-#: src/messages.rs:1032
+#: src/messages.rs:1092
 msgid "Message non envoyé."
 msgstr "Message not sent."
 
-#: src/messages.rs:1097 src/messages.rs:1102
+#: src/messages.rs:1157 src/messages.rs:1162
 msgid "Rechercher un compte"
 msgstr "Search for an account"
 
-#: src/messages.rs:1110 src/starter_packs.rs:305
+#: src/messages.rs:1170 src/starter_packs.rs:305
 msgid "Comptes"
 msgstr "Accounts"
 
-#: src/messages.rs:1215
+#: src/messages.rs:1275
 msgid "Envoyer en message"
 msgstr "Send in a message"
 
-#: src/messages.rs:1220
+#: src/messages.rs:1280
 msgid "Ajouter un message (facultatif)"
 msgstr "Add a message (optional)"
 
-#: src/messages.rs:1223
+#: src/messages.rs:1283
 msgid "Message accompagnant le post"
 msgstr "Message with the post"
 
-#: src/messages.rs:1266
+#: src/messages.rs:1326
 msgid "Commencez une conversation depuis la page Messages."
 msgstr "Start a conversation from the Messages page."
 
-#: src/messages.rs:1317
+#: src/messages.rs:1377
 msgid "Post envoyé à {}."
 msgstr "Post sent to {}."
 
@@ -1928,71 +1936,75 @@ msgid_plural "Suivi par {a}, {b} et {n} autres"
 msgstr[0] "Followed by {a}, {b} and {n} other"
 msgstr[1] "Followed by {a}, {b} and {n} others"
 
-#: src/report.rs:41
+#: src/report.rs:47
 msgid "Spam"
 msgstr "Spam"
 
-#: src/report.rs:42
+#: src/report.rs:48
 msgid "Messages répétés, publicité, faux engagement"
 msgstr "Repeated messages, advertising, fake engagement"
 
-#: src/report.rs:46
+#: src/report.rs:52
 msgid "Contenu trompeur"
 msgstr "Misleading content"
 
-#: src/report.rs:47
+#: src/report.rs:53
 msgid "Usurpation d'identité, fausses informations"
 msgstr "Impersonation, false information"
 
-#: src/report.rs:51
+#: src/report.rs:57
 msgid "Contenu sexuel non étiqueté"
 msgstr "Unlabeled sexual content"
 
-#: src/report.rs:52
+#: src/report.rs:58
 msgid "Nudité ou contenu pour adultes sans étiquette"
 msgstr "Nudity or adult content without a label"
 
-#: src/report.rs:56
+#: src/report.rs:62
 msgid "Comportement hostile"
 msgstr "Hostile behavior"
 
-#: src/report.rs:57
+#: src/report.rs:63
 msgid "Harcèlement, insultes, intimidation"
 msgstr "Harassment, insults, intimidation"
 
-#: src/report.rs:61
+#: src/report.rs:67
 msgid "Infraction aux règles"
 msgstr "Rule violation"
 
-#: src/report.rs:62
+#: src/report.rs:68
 msgid "Contenu illégal ou contraire aux conditions d'utilisation"
 msgstr "Illegal content or content against the terms of service"
 
-#: src/report.rs:66
+#: src/report.rs:72
 msgid "Autre"
 msgstr "Other"
 
-#: src/report.rs:67
+#: src/report.rs:73
 msgid "Un problème qui n'est pas dans cette liste"
 msgstr "An issue not in this list"
 
-#: src/report.rs:81
+#: src/report.rs:87
 msgid "Ce contenu ne peut pas être signalé."
 msgstr "This content cannot be reported."
 
-#: src/report.rs:147
+#: src/report.rs:176
 msgid "Signaler ce post"
 msgstr "Report this post"
 
-#: src/report.rs:148
+#: src/report.rs:177
 msgid "Signaler @{}"
 msgstr "Report @{}"
 
-#: src/report.rs:165
+#: src/report.rs:178
+msgid "Signaler ce message"
+msgstr "Report this message"
+
+#: src/report.rs:195
 msgid "Motif"
 msgstr "Reason"
 
-#: src/report.rs:167
+#: src/report.rs:197
 msgid ""
 "Le signalement est envoyé au service de modération de Bluesky. La personne "
 "signalée n'en est pas informée."
@@ -2000,7 +2012,7 @@ msgstr ""
 "The report is sent to the Bluesky moderation service. The reported person is"
 " not told."
 
-#: src/report.rs:199
+#: src/report.rs:229
 msgid "Précisions (facultatif)"
 msgstr "Details (optional)"
 
@@ -2191,10 +2203,6 @@ msgstr "This post cannot be reported."
 #: src/window.rs:1287
 msgid "Mode démonstration : rien n'est envoyé."
 msgstr "Demo mode: nothing is sent."
-
-#: src/window.rs:1288
-msgid "Signalement envoyé. Merci."
-msgstr "Report sent. Thank you."
 
 #: src/window.rs:1440
 msgid "Connectez-vous pour voir votre profil."

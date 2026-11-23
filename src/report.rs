@@ -31,6 +31,12 @@ pub enum Subject {
     },
     /// Compte, par son identifiant ou son DID.
     Account(String),
+    /// Message d'une conversation, avec le DID de son auteur.
+    Message {
+        did: String,
+        convo_id: String,
+        message_id: String,
+    },
 }
 
 /// Motifs proposés, dans l'ordre affiché.
@@ -80,6 +86,29 @@ pub fn input(
     use atrium_api::com::atproto::repo::strong_ref;
     let invalid = || ApiError::new(gettext("Ce contenu ne peut pas être signalé."));
     let subject = match subject {
+        // Pas de variante pour les messages dans l'union : elle est ouverte,
+        // on la lit depuis le JSON.
+        Subject::Message {
+            did,
+            convo_id,
+            message_id,
+        } => {
+            let subject = serde_json::from_value(serde_json::json!({
+                "$type": "chat.bsky.convo.defs#messageRef",
+                "did": did,
+                "convoId": convo_id,
+                "messageId": message_id,
+            }))
+            .map_err(|_| invalid())?;
+            let details: String = details.trim().chars().take(MAX_DETAILS).collect();
+            return Ok(create_report::InputData {
+                mod_tool: None,
+                reason: (!details.is_empty()).then_some(details),
+                reason_type: reason.to_owned(),
+                subject,
+            }
+            .into());
+        }
         Subject::Post { uri, cid } => {
             create_report::InputSubjectRefs::ComAtprotoRepoStrongRefMain(Box::new(
                 strong_ref::MainData {
@@ -121,7 +150,7 @@ pub async fn send(
                 .await?
                 .did,
         ),
-        Subject::Post { .. } => None,
+        Subject::Post { .. } | Subject::Message { .. } => None,
     }
     .map(|did| Did::new(did).map_err(|_| ApiError::new(gettext("Ce compte n'existe pas."))))
     .transpose()?;
@@ -146,6 +175,7 @@ pub fn present(
     let title = match &subject {
         Subject::Post { .. } => gettext("Signaler ce post"),
         Subject::Account(handle) => gettext("Signaler @{}").replace("{}", handle),
+        Subject::Message { .. } => gettext("Signaler ce message"),
     };
     let cancel = gtk::Button::with_label(&gettext("Annuler"));
     let send_button = gtk::Button::builder()
@@ -279,5 +309,15 @@ mod tests {
         assert_eq!(json["subject"]["did"], "did:plc:r");
         assert_eq!(json["reason"].as_str().unwrap().len(), MAX_DETAILS);
         assert!(input(&account, None, defs::REASON_RUDE, "").is_err());
+
+        let message = Subject::Message {
+            did: "did:plc:r".into(),
+            convo_id: "c1".into(),
+            message_id: "m1".into(),
+        };
+        let json =
+            serde_json::to_value(input(&message, None, defs::REASON_SPAM, "").unwrap()).unwrap();
+        assert_eq!(json["subject"]["$type"], "chat.bsky.convo.defs#messageRef");
+        assert_eq!(json["subject"]["messageId"], "m1");
     }
 }

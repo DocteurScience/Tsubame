@@ -6,7 +6,7 @@ use std::rc::Rc;
 
 use adw::prelude::*;
 use gettextrs::{gettext, ngettext};
-use gtk::glib;
+use gtk::{gio, glib};
 
 use crate::api::ApiError;
 use crate::chat::{self, Convo, Message, MessagePage};
@@ -159,10 +159,35 @@ fn reaction_label(reaction: &chat::Reaction) -> String {
     }
 }
 
-/// Bouton « Réagir » : un menu des émojis proposés.
-fn react_button(message_id: &str, react: &React) -> gtk::MenuButton {
+/// Bouton « Réagir » : un menu des émojis proposés et, pour le message
+/// d'un autre, « Signaler le message… » (action `messages.report`, avec
+/// « auteur\nidentifiant »).
+fn react_button(message: &Message, react: &React) -> gtk::MenuButton {
+    let message_id = message.id.as_str();
     let choices = gtk::Box::builder().spacing(2).build();
-    let popover = gtk::Popover::builder().child(&choices).build();
+    let content = gtk::Box::builder()
+        .orientation(gtk::Orientation::Vertical)
+        .spacing(6)
+        .build();
+    content.append(&choices);
+    let popover = gtk::Popover::builder().child(&content).build();
+    if !message.mine && !message.sender.is_empty() {
+        let report = gtk::Button::builder()
+            .label(gettext("Signaler le message…"))
+            .css_classes(["flat"])
+            .build();
+        let (target, popover) = (
+            format!("{}\n{}", message.sender, message.id),
+            popover.downgrade(),
+        );
+        report.connect_clicked(move |button| {
+            if let Some(popover) = popover.upgrade() {
+                popover.popdown();
+            }
+            let _ = button.activate_action("messages.report", Some(&target.to_variant()));
+        });
+        content.append(&report);
+    }
     for value in chat::REACTIONS {
         let choice = gtk::Button::builder()
             .label(value)
@@ -264,7 +289,7 @@ fn bubble_line(message: &Message, content: gtk::Widget, react: Option<&React>) -
     };
     let line = gtk::Box::builder().spacing(4).halign(align).build();
     let react = react.filter(|_| !message.failed && !message.id.starts_with(chat::LOCAL_ID));
-    let button = react.map(|react| react_button(&message.id, react));
+    let button = react.map(|react| react_button(message, react));
     if let (true, Some(button)) = (message.mine, &button) {
         line.append(button);
     }
@@ -521,6 +546,19 @@ impl MessagesPage {
             generation: Cell::new(0),
         });
         page.this.replace(Rc::downgrade(&page));
+        let actions = gio::SimpleActionGroup::new();
+        let report = gio::SimpleAction::new("report", Some(glib::VariantTy::STRING));
+        let weak = Rc::downgrade(&page);
+        report.connect_activate(move |_, param| {
+            let (Some(page), Some(target)) = (weak.upgrade(), param.and_then(|p| p.str())) else {
+                return;
+            };
+            if let Some((sender, id)) = target.split_once('\n') {
+                page.report_message(sender, id);
+            }
+        });
+        actions.add_action(&report);
+        page.root.insert_action_group("messages", Some(&actions));
         let weak = Rc::downgrade(&page);
         new_message.connect_clicked(move |button| {
             if let Some(page) = weak.upgrade() {
@@ -758,6 +796,28 @@ impl MessagesPage {
                 .append(&bubble(message, Some(&self.react_handler())));
         }
         self.older_button.set_visible(self.older.borrow().is_some());
+    }
+
+    fn report_message(&self, sender: &str, message_id: &str) {
+        let Some(convo) = self.current.borrow().clone() else {
+            return;
+        };
+        let toasts = self.host.toasts.clone();
+        crate::report::present(
+            &self.root,
+            self.host.session.clone(),
+            crate::report::Subject::Message {
+                did: sender.to_owned(),
+                convo_id: convo.id,
+                message_id: message_id.to_owned(),
+            },
+            move |result| {
+                toasts.add_toast(adw::Toast::new(&match result {
+                    Ok(()) => gettext("Signalement envoyé. Merci."),
+                    Err(error) => error.message,
+                }));
+            },
+        );
     }
 
     fn react_handler(&self) -> React {
