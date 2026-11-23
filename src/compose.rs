@@ -21,6 +21,118 @@ use crate::photo;
 use crate::richtext::{MAX_GRAPHEMES, grapheme_count};
 use crate::runtime::runtime;
 
+/// Aperçu du lien en cours : le lien vu dans le texte, son aperçu une fois
+/// lu, et les liens dont l'aperçu a été retiré.
+#[derive(Default)]
+struct LinkState {
+    current: RefCell<Option<String>>,
+    preview: RefCell<Option<api::NewLink>>,
+    dismissed: RefCell<std::collections::HashSet<String>>,
+    generation: Cell<u64>,
+}
+
+/// Affiche la carte du lien (avec « Retirer l'aperçu »), « Aperçu du
+/// lien… » pendant la lecture, ou rien.
+fn show_link(
+    link_box: &gtk::Box,
+    state: &Rc<LinkState>,
+    update: &Rc<dyn Fn()>,
+    link: Option<&api::NewLink>,
+    loading: bool,
+) {
+    while let Some(child) = link_box.first_child() {
+        link_box.remove(&child);
+    }
+    if loading {
+        let row = gtk::Box::builder()
+            .spacing(8)
+            .css_classes(["dim-label"])
+            .build();
+        row.append(&gtk::Spinner::builder().spinning(true).build());
+        row.append(&gtk::Label::new(Some(&gettext("Aperçu du lien…"))));
+        link_box.append(&row);
+    } else if let Some(link) = link {
+        let card = gtk::Box::builder()
+            .orientation(gtk::Orientation::Vertical)
+            .css_classes(["link-card"])
+            .build();
+        if let Some(texture) = link
+            .thumb
+            .as_ref()
+            .and_then(|thumb| gdk::Texture::from_bytes(&glib::Bytes::from(&thumb.bytes)).ok())
+        {
+            card.append(
+                &gtk::Picture::builder()
+                    .paintable(&texture)
+                    .content_fit(gtk::ContentFit::Cover)
+                    .can_shrink(true)
+                    .height_request(120)
+                    .build(),
+            );
+        }
+        let text = gtk::Box::builder()
+            .orientation(gtk::Orientation::Vertical)
+            .spacing(2)
+            .margin_top(8)
+            .margin_bottom(10)
+            .margin_start(10)
+            .margin_end(10)
+            .build();
+        let domain = crate::data::Link {
+            uri: link.uri.clone(),
+            ..Default::default()
+        }
+        .domain();
+        for (value, classes, lines) in [
+            (domain.as_str(), &["dim-label", "caption"][..], 1),
+            (link.title.as_str(), &["heading"][..], 2),
+            (link.description.as_str(), &["dim-label"][..], 2),
+        ] {
+            if value.trim().is_empty() {
+                continue;
+            }
+            text.append(
+                &gtk::Label::builder()
+                    .label(value.trim())
+                    .xalign(0.0)
+                    .wrap(true)
+                    .lines(lines)
+                    .ellipsize(gtk::pango::EllipsizeMode::End)
+                    .css_classes(classes.to_vec())
+                    .build(),
+            );
+        }
+        card.append(&text);
+        let remove = gtk::Button::builder()
+            .icon_name("window-close-symbolic")
+            .tooltip_text(gettext("Retirer l'aperçu du lien"))
+            .halign(gtk::Align::End)
+            .valign(gtk::Align::Start)
+            .margin_top(6)
+            .margin_end(6)
+            .css_classes(["circular", "osd"])
+            .build();
+        remove.update_property(&[gtk::accessible::Property::Label(&gettext(
+            "Retirer l'aperçu du lien",
+        ))]);
+        let overlay = gtk::Overlay::builder().child(&card).build();
+        overlay.add_overlay(&remove);
+        let (weak_box, state, update) = (link_box.downgrade(), state.clone(), update.clone());
+        remove.connect_clicked(move |_| {
+            if let Some(uri) = state.current.borrow().clone() {
+                state.dismissed.borrow_mut().insert(uri);
+            }
+            state.preview.replace(None);
+            state.generation.set(state.generation.get() + 1);
+            if let Some(link_box) = weak_box.upgrade() {
+                show_link(&link_box, &state, &update, None, false);
+            }
+        });
+        link_box.append(&overlay);
+    }
+    update();
+}
+
 /// Posts ajoutés au fil, au plus, après le premier.
 const MAX_FOLLOWUPS: usize = 9;
 
@@ -284,6 +396,14 @@ pub fn present(
     content.insert_child_after(&thread_box, Some(&images_area));
     let followups: Rc<RefCell<Vec<Followup>>> = Rc::default();
 
+    // Aperçu du premier lien du texte (sans images jointes).
+    let link_box = gtk::Box::builder()
+        .orientation(gtk::Orientation::Vertical)
+        .visible(false)
+        .build();
+    content.insert_child_after(&link_box, Some(&images_area));
+    let link_state = Rc::new(LinkState::default());
+
     // Barre du bas : langue, compteur.
     let language = Rc::new(Cell::new(default_language()));
     let language_menu = gio::Menu::new();
@@ -443,6 +563,7 @@ pub fn present(
             saved_drafts,
             followups,
             add_to_thread,
+            link_box,
         ) = (
             publish.clone(),
             counter.clone(),
@@ -457,12 +578,15 @@ pub fn present(
             saved_drafts.clone(),
             followups.clone(),
             add_to_thread.clone(),
+            link_box.clone(),
         );
         Rc::new(move || {
             let buffer = text.buffer();
             let value = buffer.text(&buffer.start_iter(), &buffer.end_iter(), false);
             let images = attachments.borrow().len();
             images_area.set_visible(images > 0);
+            // Les images passent avant la carte du lien.
+            link_box.set_visible(images == 0 && link_box.first_child().is_some());
             add_image.set_sensitive(images < MAX_IMAGES && !busy.get());
             // Une citation suffit, sans texte ni image.
             let result = validate(&value, images + quoting);
@@ -683,6 +807,61 @@ pub fn present(
         drafts_list.append(&row);
     }
 
+    // Aperçu du lien : après une pause dans la frappe, le premier lien du
+    // texte (pas déjà retiré) est lu et proposé en carte.
+    {
+        let (link_box, link_state, update) = (link_box.clone(), link_state.clone(), update.clone());
+        text.buffer().connect_changed(move |buffer| {
+            let value = buffer.text(&buffer.start_iter(), &buffer.end_iter(), false);
+            let uri = crate::richtext::detect(&value)
+                .into_iter()
+                .find_map(|facet| match facet.feature {
+                    crate::richtext::Feature::Link(uri) => Some(uri),
+                    _ => None,
+                })
+                .filter(|uri| !link_state.dismissed.borrow().contains(uri));
+            if *link_state.current.borrow() == uri {
+                return;
+            }
+            link_state.current.replace(uri.clone());
+            link_state.preview.replace(None);
+            let generation = link_state.generation.get() + 1;
+            link_state.generation.set(generation);
+            show_link(&link_box, &link_state, &update, None, uri.is_some());
+            let Some(uri) = uri else { return };
+            let (link_box, link_state, update) =
+                (link_box.clone(), link_state.clone(), update.clone());
+            glib::spawn_future_local(async move {
+                glib::timeout_future(std::time::Duration::from_millis(700)).await;
+                if link_state.generation.get() != generation {
+                    return;
+                }
+                let task = runtime().spawn(crate::link_preview::fetch(uri));
+                let result = task.await.unwrap_or_else(|e| Err(e.to_string()));
+                if link_state.generation.get() != generation {
+                    return;
+                }
+                match result {
+                    Ok((preview, thumb)) => {
+                        let link = api::NewLink {
+                            uri: preview.uri,
+                            title: preview.title,
+                            description: preview.description,
+                            thumb,
+                            thumb_blob: None,
+                        };
+                        link_state.preview.replace(Some(link.clone()));
+                        show_link(&link_box, &link_state, &update, Some(&link), false);
+                    }
+                    Err(error) => {
+                        glib::g_debug!("tsubame", "aperçu du lien : {error}");
+                        show_link(&link_box, &link_state, &update, None, false);
+                    }
+                }
+            });
+        });
+    }
+
     // État de départ : une citation peut se publier sans texte.
     update();
 
@@ -879,6 +1058,7 @@ pub fn present(
             draft_id.clone(),
         );
         let followups = followups.clone();
+        let link_state = link_state.clone();
         move || {
             let more: Vec<String> = followups
                 .borrow()
@@ -923,6 +1103,7 @@ pub fn present(
                 reply: reply.clone(),
                 images: Vec::new(),
                 quote: quote_ref.clone(),
+                link: link_state.preview.borrow().clone(),
                 reply_rule: reply_rule.get(),
                 no_quotes: no_quotes.get(),
             };
@@ -961,6 +1142,7 @@ pub fn present(
                         quote: None,
                         reply_rule: api::ReplyRule::Everyone,
                         no_quotes: false,
+                        link: None,
                     };
                     match Box::pin(api::publish(session.clone(), next)).await {
                         Ok(next) => {

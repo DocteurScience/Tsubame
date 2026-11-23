@@ -14,6 +14,7 @@ src/drafts.rs
 src/edit_profile.rs
 src/explore.rs
 src/feed_page.rs
+src/link_preview.rs
 src/login.rs
 src/main.rs
 src/mentions.rs

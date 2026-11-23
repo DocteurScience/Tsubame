@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: tsubame\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-23 07:09+0000\n"
+"POT-Creation-Date: 2026-11-23 07:37+0000\n"
 "PO-Revision-Date: 2026-11-22\n"
 "Last-Translator: \n"
 "Language-Team: English\n"
@@ -19,7 +19,7 @@ msgid "Tsubame"
 msgstr "Tsubame"
 
 #: data/io.github.DocteurScience.Tsubame.desktop.in:4
-#: data/io.github.DocteurScience.Tsubame.metainfo.xml.in:7 src/main.rs:58
+#: data/io.github.DocteurScience.Tsubame.metainfo.xml.in:7 src/main.rs:59
 msgid "Client Bluesky pour GNOME"
 msgstr "Bluesky client for GNOME"
 
@@ -69,7 +69,7 @@ msgstr "Pinned"
 msgid "{} a reposté"
 msgstr "{} reposted"
 
-#: src/api.rs:579 src/compose.rs:164
+#: src/api.rs:579 src/compose.rs:276
 msgid "En réponse à {}"
 msgstr "Replying to {}"
 
@@ -200,87 +200,87 @@ msgstr "Mentioned accounts"
 msgid "Personne"
 msgstr "No one"
 
-#: src/api.rs:1741 src/edit_profile.rs:198
+#: src/api.rs:1764 src/edit_profile.rs:198
 msgid "Une image n'a pas pu être envoyée : {}"
 msgstr "An image could not be uploaded: {}"
 
-#: src/api.rs:1825
+#: src/api.rs:1865
 msgid "janv."
 msgstr "Jan"
 
-#: src/api.rs:1826
+#: src/api.rs:1866
 msgid "févr."
 msgstr "Feb"
 
-#: src/api.rs:1827
+#: src/api.rs:1867
 msgid "mars"
 msgstr "Mar"
 
-#: src/api.rs:1828
+#: src/api.rs:1868
 msgid "avr."
 msgstr "Apr"
 
-#: src/api.rs:1829
+#: src/api.rs:1869
 msgid "mai"
 msgstr "May"
 
-#: src/api.rs:1830
+#: src/api.rs:1870
 msgid "juin"
 msgstr "Jun"
 
-#: src/api.rs:1831
+#: src/api.rs:1871
 msgid "juil."
 msgstr "Jul"
 
-#: src/api.rs:1832
+#: src/api.rs:1872
 msgid "août"
 msgstr "Aug"
 
-#: src/api.rs:1833
+#: src/api.rs:1873
 msgid "sept."
 msgstr "Sep"
 
-#: src/api.rs:1834
+#: src/api.rs:1874
 msgid "oct."
 msgstr "Oct"
 
-#: src/api.rs:1835
+#: src/api.rs:1875
 msgid "nov."
 msgstr "Nov"
 
-#: src/api.rs:1836
+#: src/api.rs:1876
 msgid "déc."
 msgstr "Dec"
 
-#: src/api.rs:1846
+#: src/api.rs:1886
 msgid "à l'instant"
 msgstr "now"
 
-#: src/api.rs:1848
+#: src/api.rs:1888
 msgid "{} min"
 msgstr "{} min"
 
-#: src/api.rs:1850
+#: src/api.rs:1890
 msgid "{} h"
 msgstr "{} h"
 
-#: src/api.rs:1853
+#: src/api.rs:1893
 msgid "{} j"
 msgid_plural "{} j"
 msgstr[0] "{} d"
 msgstr[1] "{} d"
 
-#: src/api.rs:1860
+#: src/api.rs:1900
 msgctxt "jour, mois abrégé et année"
 msgid "{day} {month} {year}"
 msgstr "{month} {day}, {year}"
 
-#: src/api.rs:1871
+#: src/api.rs:1911
 msgctxt "date et heure d'un post"
 msgid "{day} {month} {year}, {time}"
 msgstr "{month} {day}, {year}, {time}"
 
-#: src/api.rs:1883
+#: src/api.rs:1923
 msgctxt "jour et mois abrégé"
 msgid "{day} {month}"
 msgstr "{month} {day}"
@@ -338,7 +338,7 @@ msgstr "unknown account identity"
 msgid "Voir le profil de {}"
 msgstr "View the profile of {}"
 
-#: src/card.rs:97 src/card.rs:226 src/compose.rs:1089
+#: src/card.rs:97 src/card.rs:226 src/compose.rs:1271
 msgid "Image sans texte alternatif"
 msgstr "Image without alternative text"
 
@@ -515,7 +515,7 @@ msgstr[1] "{} reposts"
 msgid "Voir qui a reposté"
 msgstr "See who reposted"
 
-#: src/card.rs:959 src/compose.rs:95
+#: src/card.rs:959 src/compose.rs:207
 msgid "Répondre"
 msgstr "Reply"
 
@@ -600,203 +600,211 @@ msgstr "Move left"
 msgid "Déplacer vers la droite"
 msgstr "Move right"
 
-#: src/compose.rs:97
+#: src/compose.rs:52
+msgid "Aperçu du lien…"
+msgstr "Link preview…"
+
+#: src/compose.rs:108 src/compose.rs:116
+msgid "Retirer l'aperçu du lien"
+msgstr "Remove link preview"
+
+#: src/compose.rs:209
 msgctxt "titre de la boîte de rédaction"
 msgid "Citer"
 msgstr "Quote"
 
-#: src/compose.rs:99 src/window.rs:2027 src/window.rs:2030 src/window.rs:2074
+#: src/compose.rs:211 src/window.rs:2027 src/window.rs:2030 src/window.rs:2074
 #: src/window.rs:2077
 msgid "Nouveau post"
 msgstr "New post"
 
 #. En-tête : Annuler, titre, Publier.
-#: src/compose.rs:106 src/compose.rs:1199 src/edit_profile.rs:234
+#: src/compose.rs:218 src/compose.rs:1381 src/edit_profile.rs:234
 #: src/login.rs:150 src/profile.rs:795 src/report.rs:150 src/window.rs:565
 #: src/window.rs:1136 src/window.rs:1276
 msgid "Annuler"
 msgstr "Cancel"
 
-#: src/compose.rs:108 src/compose.rs:1026
+#: src/compose.rs:220 src/compose.rs:1208
 msgid "Publier"
 msgstr "Post"
 
-#: src/compose.rs:133 src/compose.rs:146
+#: src/compose.rs:245 src/compose.rs:258
 msgid "Brouillons"
 msgstr "Drafts"
 
-#: src/compose.rs:165
+#: src/compose.rs:277
 msgid "Citation de {}"
 msgstr "Quoting {}"
 
-#: src/compose.rs:213
+#: src/compose.rs:325
 msgid "Votre réponse"
 msgstr "Your reply"
 
-#: src/compose.rs:215
+#: src/compose.rs:327
 msgid "Quoi de neuf ?"
 msgstr "What's up?"
 
-#: src/compose.rs:259
+#: src/compose.rs:371
 msgid ""
 "Décrivez chaque image pour les personnes qui utilisent un lecteur d'écran."
 msgstr "Describe each image for people who use a screen reader."
 
-#: src/compose.rs:277
+#: src/compose.rs:389
 msgid "Ajouter un post au fil"
 msgstr "Add a post to the thread"
 
-#: src/compose.rs:300
+#: src/compose.rs:420
 msgid "Langue du post"
 msgstr "Post language"
 
-#: src/compose.rs:319 src/compose.rs:323
+#: src/compose.rs:439 src/compose.rs:443
 msgid "Ajouter une image"
 msgstr "Add an image"
 
-#: src/compose.rs:337
+#: src/compose.rs:457
 msgid "Qui peut répondre"
 msgstr "Who can reply"
 
-#: src/compose.rs:340
+#: src/compose.rs:460
 msgid "Autoriser les citations"
 msgstr "Allow quotes"
 
-#: src/compose.rs:351 src/compose.rs:356
+#: src/compose.rs:471 src/compose.rs:476
 msgid "Qui peut répondre et citer"
 msgstr "Who can reply and quote"
 
-#: src/compose.rs:537
+#: src/compose.rs:661
 msgid "Post {} du fil"
 msgstr "Post {} of the thread"
 
-#: src/compose.rs:545 src/compose.rs:550
+#: src/compose.rs:669 src/compose.rs:674
 msgid "Retirer ce post du fil"
 msgstr "Remove this post from the thread"
 
-#: src/compose.rs:658 src/compose.rs:663
+#: src/compose.rs:782 src/compose.rs:787
 msgid "Supprimer le brouillon"
 msgstr "Delete draft"
 
-#: src/compose.rs:701 src/edit_profile.rs:447
+#: src/compose.rs:880 src/edit_profile.rs:447
 msgid "Images"
 msgstr "Images"
 
-#: src/compose.rs:708
+#: src/compose.rs:887
 msgid "Ajouter des images"
 msgstr "Add images"
 
-#: src/compose.rs:744 src/edit_profile.rs:491
+#: src/compose.rs:923 src/edit_profile.rs:491
 msgid "Ce fichier n'est pas une image lisible."
 msgstr "This file is not a readable image."
 
-#: src/compose.rs:770
+#: src/compose.rs:949
 msgid "Le brouillon garde le texte, mais pas les images."
 msgstr "The draft keeps the text, but not the images."
 
-#: src/compose.rs:772
+#: src/compose.rs:951
 msgid "Vous pouvez garder le texte en brouillon."
 msgstr "You can keep the text as a draft."
 
-#: src/compose.rs:774
+#: src/compose.rs:953
 msgid "Le texte saisi sera perdu."
 msgstr "The text you typed will be lost."
 
-#: src/compose.rs:778
+#: src/compose.rs:957
 msgid "Garder ce post en brouillon ?"
 msgstr "Keep this post as a draft?"
 
-#: src/compose.rs:780
+#: src/compose.rs:959
 msgid "Abandonner ce post ?"
 msgstr "Discard this post?"
 
-#: src/compose.rs:785
+#: src/compose.rs:964
 msgid "Continuer la rédaction"
 msgstr "Keep writing"
 
-#: src/compose.rs:786
+#: src/compose.rs:965
 msgid "Abandonner"
 msgstr "Discard"
 
-#: src/compose.rs:789
+#: src/compose.rs:968
 msgid "Garder en brouillon"
 msgstr "Keep as draft"
 
-#: src/compose.rs:833
+#: src/compose.rs:1012
 msgid "Le brouillon n'a pas pu être enregistré."
 msgstr "The draft could not be saved."
 
-#: src/compose.rs:910
+#: src/compose.rs:1090
 msgid "Mode démonstration : rien n'est publié."
 msgstr "Demo mode: nothing is posted."
 
-#: src/compose.rs:917
+#: src/compose.rs:1097
 msgid "Publication…"
 msgstr "Posting…"
 
-#: src/compose.rs:939
+#: src/compose.rs:1120
 msgid "Une image n'a pas pu être préparée : {}"
 msgstr "An image could not be prepared: {}"
 
-#: src/compose.rs:993
+#: src/compose.rs:1175
 msgid "La publication a été interrompue."
 msgstr "Posting was interrupted."
 
-#: src/compose.rs:1001
+#: src/compose.rs:1183
 msgid "Fil publié en partie : {} posts sur {}."
 msgstr "Thread partly posted: {} posts out of {}."
 
-#: src/compose.rs:1006
+#: src/compose.rs:1188
 msgid ""
 "Post publié, mais ses réglages de réponse et de citation n'ont pas été "
 "enregistrés."
 msgstr "Post published, but its reply and quote settings were not saved."
 
-#: src/compose.rs:1009
+#: src/compose.rs:1191
 msgid "Fil publié."
 msgstr "Thread posted."
 
-#: src/compose.rs:1011
+#: src/compose.rs:1193
 msgid "Réponse publiée."
 msgstr "Reply posted."
 
-#: src/compose.rs:1013
+#: src/compose.rs:1195
 msgid "Post publié."
 msgstr "Post published."
 
-#: src/compose.rs:1077
+#: src/compose.rs:1259
 msgid "ALT ✓"
 msgstr "ALT ✓"
 
-#: src/compose.rs:1079
+#: src/compose.rs:1261
 msgid "+ ALT"
 msgstr "+ ALT"
 
-#: src/compose.rs:1083
+#: src/compose.rs:1265
 msgid "Modifier le texte alternatif"
 msgstr "Edit alternative text"
 
-#: src/compose.rs:1088
+#: src/compose.rs:1270
 msgid "Ajouter un texte alternatif"
 msgstr "Add alternative text"
 
-#: src/compose.rs:1136 src/compose.rs:1140
+#: src/compose.rs:1318 src/compose.rs:1322
 msgid "Retirer l'image"
 msgstr "Remove image"
 
-#: src/compose.rs:1196 src/compose.rs:1231
+#: src/compose.rs:1378 src/compose.rs:1413
 msgid "Texte alternatif"
 msgstr "Alternative text"
 
-#: src/compose.rs:1201 src/edit_profile.rs:236
+#: src/compose.rs:1383 src/edit_profile.rs:236
 msgid "Enregistrer"
 msgstr "Save"
 
-#: src/compose.rs:1217
+#: src/compose.rs:1399
 msgid "Image à décrire"
 msgstr "Image to describe"
 
-#: src/compose.rs:1235
+#: src/compose.rs:1417
 msgid ""
 "Décrivez ce que montre l'image pour les personnes qui ne la voient pas."
 msgstr "Describe what the image shows for people who cannot see it."
@@ -1046,7 +1054,7 @@ msgid "erreur inattendue"
 msgstr "unexpected error"
 
 #. Traducteurs : remplacez « translator-credits » par vos noms, un par ligne.
-#: src/main.rs:64
+#: src/main.rs:65
 msgid "translator-credits"
 msgstr ""
 

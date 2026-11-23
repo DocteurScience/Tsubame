@@ -1609,6 +1609,19 @@ pub struct NewPost {
     pub reply_rule: ReplyRule,
     /// Interdire de citer ce post.
     pub no_quotes: bool,
+    /// Lien joint, avec son aperçu (sans effet avec des images).
+    pub link: Option<NewLink>,
+}
+
+/// Lien joint à un nouveau post.
+#[derive(Debug, Clone, Default)]
+pub struct NewLink {
+    pub uri: String,
+    pub title: String,
+    pub description: String,
+    pub thumb: Option<crate::photo::Prepared>,
+    /// Blob de l'image, une fois envoyée.
+    pub thumb_blob: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Clone)]
@@ -1674,6 +1687,16 @@ pub fn post_record(
             })
             .collect();
         record["embed"] = json!({"$type": "app.bsky.embed.images", "images": images});
+    } else if let Some(link) = &post.link {
+        let mut external = json!({
+            "uri": link.uri,
+            "title": link.title,
+            "description": link.description,
+        });
+        if let Some(blob) = &link.thumb_blob {
+            external["thumb"] = blob.clone();
+        }
+        record["embed"] = json!({"$type": "app.bsky.embed.external", "external": external});
     }
     if let Some(quote) = &post.quote {
         let quoted = json!({
@@ -1699,7 +1722,7 @@ pub fn post_record(
 }
 
 /// Publie un post, puis ses réglages de réponse et de citation.
-pub async fn publish(session: Arc<Session>, post: NewPost) -> Result<Published, ApiError> {
+pub async fn publish(session: Arc<Session>, mut post: NewPost) -> Result<Published, ApiError> {
     use atrium_api::com::atproto::repo::create_record;
     use atrium_api::types::string::{Datetime, Did, Handle, Nsid};
 
@@ -1742,6 +1765,23 @@ pub async fn publish(session: Arc<Session>, post: NewPost) -> Result<Published, 
                 )
             })?;
         blobs.push(serde_json::to_value(&output.data.blob).map_err(|_| invalid_post())?);
+    }
+    // Image de l'aperçu du lien : sans elle, la carte reste valable.
+    if post.images.is_empty()
+        && let Some(link) = post.link.as_mut()
+        && let Some(thumb) = &link.thumb
+    {
+        match api
+            .api
+            .com
+            .atproto
+            .repo
+            .upload_blob(thumb.bytes.clone())
+            .await
+        {
+            Ok(output) => link.thumb_blob = serde_json::to_value(&output.data.blob).ok(),
+            Err(error) => glib_debug(&format!("aperçu du lien : {error}")),
+        }
     }
     let created_at = Datetime::now();
     let record = post_record(&post, &dids, created_at.as_str(), &blobs);
@@ -2334,6 +2374,7 @@ mod tests {
             quote: None,
             reply_rule: ReplyRule::Everyone,
             no_quotes: false,
+            link: None,
             images: Vec::new(),
         };
         let dids = HashMap::from([(
@@ -2377,6 +2418,7 @@ mod tests {
             quote: None,
             reply_rule: ReplyRule::Everyone,
             no_quotes: false,
+            link: None,
             images: vec![image("Lever de soleil sur le Vercors"), image("")],
         };
         let blob = serde_json::json!({
@@ -2439,6 +2481,42 @@ mod tests {
     }
 
     #[test]
+    fn links_are_embedded_with_their_preview() {
+        let mut post = NewPost {
+            text: "À lire : https://example.org/billet".into(),
+            langs: vec!["fr".into()],
+            reply: None,
+            quote: None,
+            reply_rule: ReplyRule::Everyone,
+            no_quotes: false,
+            images: Vec::new(),
+            link: Some(NewLink {
+                uri: "https://example.org/billet".into(),
+                title: "Un billet".into(),
+                description: "Sa description".into(),
+                thumb: None,
+                thumb_blob: Some(serde_json::json!({
+                    "$type": "blob", "ref": {"$link": CID}, "mimeType": "image/jpeg", "size": 1
+                })),
+            }),
+        };
+        let record = post_record(&post, &HashMap::new(), "2026-11-20T15:00:00.000Z", &[]);
+        assert_eq!(record["embed"]["$type"], "app.bsky.embed.external");
+        assert_eq!(record["embed"]["external"]["title"], "Un billet");
+        assert_eq!(record["embed"]["external"]["thumb"]["size"], 1);
+        let _: atrium_api::app::bsky::feed::post::Record = serde_json::from_value(record).unwrap();
+        // Avec une citation : lien et citation ensemble.
+        post.quote = Some(StrongRef {
+            uri: "at://did:plc:lucie/app.bsky.feed.post/1".into(),
+            cid: CID.into(),
+        });
+        let record = post_record(&post, &HashMap::new(), "2026-11-20T15:00:00.000Z", &[]);
+        assert_eq!(record["embed"]["$type"], "app.bsky.embed.recordWithMedia");
+        assert_eq!(record["embed"]["media"]["$type"], "app.bsky.embed.external");
+        let _: atrium_api::app::bsky::feed::post::Record = serde_json::from_value(record).unwrap();
+    }
+
+    #[test]
     fn quotes_are_embedded_alone_or_with_images() {
         let quoted = StrongRef {
             uri: "at://did:plc:lucie/app.bsky.feed.post/1".into(),
@@ -2451,6 +2529,7 @@ mod tests {
             quote: Some(quoted),
             reply_rule: ReplyRule::Everyone,
             no_quotes: false,
+            link: None,
             images: Vec::new(),
         };
         let record = post_record(&post, &HashMap::new(), "2026-11-20T15:00:00.000Z", &[]);
@@ -2569,6 +2648,7 @@ mod tests {
             quote: None,
             reply_rule: ReplyRule::Everyone,
             no_quotes: false,
+            link: None,
             images: Vec::new(),
         };
         let record = post_record(&post, &HashMap::new(), "2026-11-20T15:00:00.000Z", &[]);

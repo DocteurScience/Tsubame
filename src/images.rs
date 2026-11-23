@@ -86,7 +86,7 @@ pub fn load(url: &str, f: impl FnOnce(&gdk::Texture) + 'static) {
     });
 }
 
-fn client() -> &'static reqwest::Client {
+pub(crate) fn client() -> &'static reqwest::Client {
     static CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
     CLIENT.get_or_init(|| {
         reqwest::Client::builder()
@@ -98,7 +98,7 @@ fn client() -> &'static reqwest::Client {
 
 /// Télécharge les octets d'une image, en refusant ce qui dépasse
 /// `MAX_BYTES`.
-async fn download(url: &str) -> Result<Vec<u8>, String> {
+pub(crate) async fn download(url: &str) -> Result<Vec<u8>, String> {
     static SLOTS: Semaphore = Semaphore::const_new(MAX_DOWNLOADS);
     let _slot = SLOTS.acquire().await.map_err(|e| e.to_string())?;
     let mut response = client()

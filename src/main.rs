@@ -18,6 +18,7 @@ mod feed_page;
 mod i18n;
 mod images;
 mod interactions;
+mod link_preview;
 mod login;
 mod mentions;
 mod messages;
