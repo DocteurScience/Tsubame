@@ -121,7 +121,8 @@ Fils (`src/api.rs`) :
 
 ## Accessibilité
 
-- `build-aux/a11y-audit.py` parcourt l'arbre AT-SPI de Tsubame ouvert (ce que lit Orca) et signale les éléments interactifs sans nom, ceux qu'on ne peut pas atteindre au clavier et les images sans nom. Dernier passage : écran de connexion, accueil (colonnes et discussion), boîte de rédaction, préférences, profil, sans problème.
+- `build-aux/a11y-audit.py` parcourt l'arbre AT-SPI de Tsubame ouvert (ce que lit Orca) et signale les éléments interactifs sans nom, ceux qu'on ne peut pas atteindre au clavier et les images sans nom. `build-aux/a11y-focus.py` donne l'élément focalisé, pour suivre l'ordre de tabulation. Dernier passage, sans problème : connexion, accueil (avec grille d'images et carte de lien), visionneuse, boîte de rédaction, préférences, profil, messagerie, Explorer, Signets, Listes, Notifications. Ordre de tabulation vérifié dans la visionneuse (flèches, texte alternatif ; retour sur la vignette à la fermeture) et la boîte de rédaction.
+- `alternative-text` d'une `GtkPicture` n'arrive que dans la description AT-SPI : une image seule reçoit aussi son texte alternatif comme nom ; dans un bouton (« Agrandir l'image : … ») ou à côté d'un titre (carte de lien), elle a le rôle « présentation » pour ne pas être lue deux fois. Les boutons d'avatar, doublons du nom, aussi.
 - `AdwButtonContent` relie son bouton à l'étiquette visible (`labelled-by`), qui passe avant le nom donné : un bouton « 31 » serait lu « 31 ». Les boutons dont le nom diffère du texte visible (compteurs des cartes) utilisent donc une icône et une étiquette simples (`card::icon_label`).
 - Les icônes décoratives (barre latérale, flèches de liste, avertissements, avatar de la boîte de rédaction) ont le rôle « présentation ». L'avatar d'une carte ouvre le profil à la souris ; au clavier, le nom suffit, pour un seul arrêt de tabulation.
 

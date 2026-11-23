@@ -115,6 +115,7 @@ pub fn present(parent: &impl IsA<gtk::Widget>, images: Vec<Image>, start: usize)
                 alt.remove_css_class("dim-label");
             }
             picture.set_alternative_text(Some(&image.alt));
+            picture.update_property(&[gtk::accessible::Property::Label(&text)]);
             picture.set_paintable(None::<&gdk::Paintable>);
             // La miniature d'abord, puis l'image en grand si elle arrive
             // pendant qu'on la regarde encore.

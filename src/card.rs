@@ -105,13 +105,25 @@ fn media(media: &Media, warning: Option<String>) -> gtk::Widget {
     let content: gtk::Widget = match &media.thumb {
         Some(_) if grid => image_grid(&media.images),
         Some(url) => {
+            // Dans un bouton « Agrandir l'image : … », l'image n'est pas
+            // annoncée une seconde fois ; seule, elle porte son texte
+            // alternatif comme nom (`alternative-text` n'en donne pas).
+            let in_button = !media.images.is_empty();
             let picture = gtk::Picture::builder()
                 .content_fit(gtk::ContentFit::Cover)
                 .can_shrink(true)
                 .height_request(height)
                 .alternative_text(&description)
+                .accessible_role(if in_button {
+                    gtk::AccessibleRole::Presentation
+                } else {
+                    gtk::AccessibleRole::Img
+                })
                 .css_classes(["post-media"])
                 .build();
+            if !in_button {
+                picture.update_property(&[gtk::accessible::Property::Label(&description)]);
+            }
             let weak = picture.downgrade();
             images::load(url, move |texture| {
                 if let Some(picture) = weak.upgrade() {
@@ -232,6 +244,8 @@ fn image_grid(images: &[Image]) -> gtk::Widget {
             .can_shrink(true)
             .height_request(height)
             .alternative_text(&description)
+            // Le bouton autour porte déjà le texte alternatif.
+            .accessible_role(gtk::AccessibleRole::Presentation)
             .css_classes(["post-media"])
             .build();
         let weak = picture.downgrade();
@@ -681,6 +695,7 @@ fn card_frame(
             .child(&avatar)
             .valign(gtk::Align::Start)
             .focusable(false)
+            .accessible_role(gtk::AccessibleRole::Presentation)
             .css_classes(["flat", "circular", "avatar-button"])
             .build();
         link_to_profile(&button, name, handle);
@@ -732,6 +747,8 @@ fn link_card(link: &Link) -> gtk::Widget {
             .content_fit(gtk::ContentFit::Cover)
             .can_shrink(true)
             .height_request(150)
+            // Illustration : le titre du lien suffit.
+            .accessible_role(gtk::AccessibleRole::Presentation)
             .css_classes(["post-media"])
             .build();
         let weak = picture.downgrade();
