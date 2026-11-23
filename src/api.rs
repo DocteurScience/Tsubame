@@ -1091,7 +1091,51 @@ pub fn profile_from_view(
         follows_me: viewer.is_some_and(|v| v.followed_by.is_some()),
         muted: viewer.and_then(|v| v.muted).unwrap_or(false),
         blocking: viewer.and_then(|v| v.blocking.clone()),
+        known_followers: viewer
+            .and_then(|v| v.known_followers.as_ref())
+            .map(|known| {
+                known
+                    .followers
+                    .iter()
+                    .map(|f| name_or_handle(f.display_name.as_deref(), f.handle.as_str()))
+                    .collect()
+            })
+            .unwrap_or_default(),
+        known_count: viewer
+            .and_then(|v| v.known_followers.as_ref())
+            .map(|known| known.count.max(0) as u64)
+            .unwrap_or(0),
+        activity: viewer
+            .and_then(|v| v.activity_subscription.as_ref())
+            .map(|a| (a.post, a.reply))
+            .unwrap_or((false, false)),
     }
+}
+
+/// Demande (ou arrête) les notifications des posts et des réponses d'un
+/// compte (`putActivitySubscription`).
+pub async fn set_activity(
+    session: Arc<Session>,
+    did: String,
+    post: bool,
+    reply: bool,
+) -> Result<(), ApiError> {
+    use atrium_api::app::bsky::notification::{defs, put_activity_subscription};
+    let api = session.api().await?;
+    api.api
+        .app
+        .bsky
+        .notification
+        .put_activity_subscription(
+            put_activity_subscription::InputData {
+                activity_subscription: defs::ActivitySubscriptionData { post, reply }.into(),
+                subject: did.parse().map_err(|_| invalid_actor())?,
+            }
+            .into(),
+        )
+        .await
+        .map_err(request_failed)?;
+    Ok(())
 }
 
 /// Profil d'un compte, par son DID ou identifiant.
@@ -1269,6 +1313,8 @@ pub enum People {
     Follows(String),
     Likers(String),
     Reposters(String),
+    /// Comptes que je suis qui suivent ce compte.
+    Known(String),
 }
 
 impl People {
@@ -1278,6 +1324,7 @@ impl People {
             People::Follows(_) => gettext("Abonnements"),
             People::Likers(_) => pgettext("comptes qui ont aimé un post", "J'aime"),
             People::Reposters(_) => gettext("Reposts"),
+            People::Known(_) => gettext("Abonnés que vous connaissez"),
         }
     }
 
@@ -1287,6 +1334,7 @@ impl People {
             People::Follows(_) => gettext("Aucun abonnement pour l'instant."),
             People::Likers(_) => gettext("Personne n'a encore aimé ce post."),
             People::Reposters(_) => gettext("Personne n'a encore reposté ce post."),
+            People::Known(_) => gettext("Aucun compte que vous suivez ne suit ce compte."),
         }
     }
 }
@@ -1299,6 +1347,26 @@ pub async fn people(
 ) -> Result<(Vec<Actor>, Option<String>), ApiError> {
     use atrium_api::app::bsky::feed::{get_likes, get_reposted_by};
     match people {
+        People::Known(actor) => {
+            use atrium_api::app::bsky::graph::get_known_followers;
+            let api = session.api().await?;
+            let output = Box::pin(
+                api.api.app.bsky.graph.get_known_followers(
+                    get_known_followers::ParametersData {
+                        actor: actor.parse().map_err(|_| invalid_actor())?,
+                        cursor,
+                        limit: 50.try_into().ok(),
+                    }
+                    .into(),
+                ),
+            )
+            .await
+            .map_err(request_failed)?;
+            Ok((
+                output.data.followers.iter().map(actor_from_view).collect(),
+                output.data.cursor,
+            ))
+        }
         People::Followers(actor) => Box::pin(connections(session, actor, true, cursor)).await,
         People::Follows(actor) => Box::pin(connections(session, actor, false, cursor)).await,
         People::Likers(uri) => {

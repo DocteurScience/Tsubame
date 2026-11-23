@@ -242,6 +242,11 @@ pub struct Profile {
     pub muted: bool,
     /// Mon blocage de ce compte (adresse de l'enregistrement), s'il existe.
     pub blocking: Option<String>,
+    /// Comptes que je suis qui le suivent : quelques noms, et leur nombre.
+    pub known_followers: Vec<String>,
+    pub known_count: u64,
+    /// Notifications d'activité demandées : ses posts, ses réponses.
+    pub activity: (bool, bool),
 }
 
 /// Référence à un post : son adresse et son contenu (CID).
