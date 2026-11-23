@@ -211,7 +211,7 @@ def main():
     key("ctrl+comma")
     check_names("préférences")
     key("Escape")
-    for page in ("Explorer", "Messages", "Signets", "Listes"):
+    for page in ("Explorer", "Messages", "Flux", "Signets", "Listes"):
         activate(page)
         check_names(page.lower())
     activate("Following")

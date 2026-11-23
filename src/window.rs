@@ -71,6 +71,12 @@ fn other_pages() -> Vec<OtherPage> {
             None,
         ),
         page(
+            "feeds",
+            "application-rss+xml-symbolic",
+            gettext("Flux"),
+            None,
+        ),
+        page(
             "bookmarks",
             "user-bookmarks-symbolic",
             gettext("Signets"),
@@ -214,6 +220,7 @@ struct State {
     messages_bin: adw::Bin,
     bookmarks_bin: adw::Bin,
     lists_bin: adw::Bin,
+    feeds_bin: adw::Bin,
     /// Signets et Listes, gardés en vie avec leur page.
     other_pages: RefCell<Vec<Rc<dyn std::any::Any>>>,
     messages: RefCell<Option<Rc<MessagesPage>>>,
@@ -1330,8 +1337,16 @@ impl State {
         self.bookmarks_bin.set_child(Some(&bookmarks.root));
         let lists = ListsPage::new(self.profile_host());
         self.lists_bin.set_child(Some(&lists.root));
+        // Flux : un changement des flux épinglés change les colonnes possibles.
+        let weak = Rc::downgrade(self);
+        let feeds = crate::feeds::FeedsPage::new(self.profile_host(), move || {
+            if let Some(state) = weak.upgrade() {
+                state.load_pinned_feeds();
+            }
+        });
+        self.feeds_bin.set_child(Some(&feeds.root));
         self.other_pages
-            .replace(vec![bookmarks as Rc<dyn std::any::Any>, lists]);
+            .replace(vec![bookmarks as Rc<dyn std::any::Any>, lists, feeds]);
     }
 
     /// Page Messages, pour le compte connecté ou la démonstration.
@@ -1993,6 +2008,7 @@ pub fn build(app: &adw::Application) -> adw::ApplicationWindow {
     let messages_bin = adw::Bin::new();
     let bookmarks_bin = adw::Bin::new();
     let lists_bin = adw::Bin::new();
+    let feeds_bin = adw::Bin::new();
     let mut messages_stack_page = None;
     for page in &pages[1..] {
         let child: gtk::Widget = match page.name {
@@ -2000,6 +2016,7 @@ pub fn build(app: &adw::Application) -> adw::ApplicationWindow {
             "messages" => messages_bin.clone().upcast(),
             "bookmarks" => bookmarks_bin.clone().upcast(),
             "lists" => lists_bin.clone().upcast(),
+            "feeds" => feeds_bin.clone().upcast(),
             _ => placeholder_page(page.icon, &page.title).upcast(),
         };
         let stack_page =
@@ -2148,6 +2165,7 @@ pub fn build(app: &adw::Application) -> adw::ApplicationWindow {
         messages_bin,
         bookmarks_bin,
         lists_bin,
+        feeds_bin,
         other_pages: RefCell::default(),
         messages: RefCell::default(),
         messages_page: messages_stack_page.expect("page Messages"),

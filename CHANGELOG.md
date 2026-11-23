@@ -12,6 +12,11 @@ Logiciels et Flathub).
 
 ## Non publié
 
+### Lire
+
+- Page « Flux » : épingler, réordonner, retirer ses flux ; découvrir et
+  rechercher des flux, les ouvrir, les ajouter.
+
 ### Intégration continue
 
 - Durée maximale des jobs : un blocage échoue au bout d'une heure au lieu de

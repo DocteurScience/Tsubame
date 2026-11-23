@@ -15,6 +15,7 @@ mod drafts;
 mod edit_profile;
 mod explore;
 mod feed_page;
+mod feeds;
 mod i18n;
 mod images;
 mod interactions;
