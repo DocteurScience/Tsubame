@@ -1,6 +1,9 @@
 #!/bin/sh
 # Vérification d'accessibilité (voir a11y-check.py). Usage :
 #   build-aux/a11y-check.sh chemin/vers/tsubame
+# Les tailles en palier mobile dépendent de la police : celle de GNOME
+# (Adwaita Sans, proche d'Inter) ; avec une police plus large comme DejaVu
+# Sans, le contenu peut dépasser 360 px.
 # Code 77 (test ignoré par Meson) si un outil manque : xvfb-run, xdotool,
 # dbus-run-session, at-spi-bus-launcher, Python avec pyatspi.
 set -u

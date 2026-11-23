@@ -17,6 +17,7 @@ jobs:
             libgtk-4-dev libadwaita-1-dev libglib2.0-dev-bin meson ninja-build \
             gettext desktop-file-utils appstream \
             xvfb xauth xdotool dbus-x11 at-spi2-core python3-pyatspi \
+            fonts-inter \
             gstreamer1.0-plugins-base gstreamer1.0-plugins-good
       - uses: dtolnay/rust-toolchain@stable
         with:
