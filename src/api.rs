@@ -554,10 +554,19 @@ fn labels(post: &PostView) -> Vec<String> {
         .flatten()
         .chain(post.author.labels.iter().flatten())
     {
+        // Étiquettes de Bluesky et de l'auteur lui-même : la valeur seule ;
+        // celles d'un service tiers : « service#valeur ».
+        let src = label.src.as_str();
+        let value = if src == crate::moderation::BLUESKY_LABELER || src == post.author.did.as_str()
+        {
+            label.val.clone()
+        } else {
+            format!("{src}{}{}", crate::moderation::LABELER_SEPARATOR, label.val)
+        };
         if label.neg == Some(true) {
-            labels.retain(|value| *value != label.val);
-        } else if !labels.contains(&label.val) {
-            labels.push(label.val.clone());
+            labels.retain(|v| *v != value);
+        } else if !labels.contains(&value) {
+            labels.push(value);
         }
     }
     labels
@@ -2301,12 +2310,13 @@ mod tests {
                 "uri": "at://did:plc:r/app.bsky.feed.post/1",
                 "cid": "bafyreie5737gdxlw5i64vzichcalba3z2v5n6icifvx5xytvske7mr3hpm",
                 "author": {"did": "did:plc:r", "handle": "romain.example.social",
-                    "labels": [{"src": "did:plc:m", "uri": "did:plc:r", "val": "nudity", "cts": "2026-11-20T14:56:00.000Z"}]},
+                    "labels": [{"src": "did:plc:ar7c4by46qjdydhdevvrndac", "uri": "did:plc:r", "val": "nudity", "cts": "2026-11-20T14:56:00.000Z"}]},
                 "record": {"$type": "app.bsky.feed.post", "text": "Bonjour", "createdAt": "2026-11-20T14:56:00.000Z"},
                 "labels": [
-                    {"src": "did:plc:m", "uri": "at://did:plc:r/app.bsky.feed.post/1", "val": "graphic-media", "cts": "2026-11-20T14:56:00.000Z"},
-                    {"src": "did:plc:m", "uri": "at://did:plc:r/app.bsky.feed.post/1", "val": "porn", "cts": "2026-11-20T14:56:00.000Z"},
-                    {"src": "did:plc:m", "uri": "at://did:plc:r/app.bsky.feed.post/1", "val": "porn", "neg": true, "cts": "2026-11-20T14:57:00.000Z"}
+                    {"src": "did:plc:ar7c4by46qjdydhdevvrndac", "uri": "at://did:plc:r/app.bsky.feed.post/1", "val": "graphic-media", "cts": "2026-11-20T14:56:00.000Z"},
+                    {"src": "did:plc:ar7c4by46qjdydhdevvrndac", "uri": "at://did:plc:r/app.bsky.feed.post/1", "val": "porn", "cts": "2026-11-20T14:56:00.000Z"},
+                    {"src": "did:plc:ar7c4by46qjdydhdevvrndac", "uri": "at://did:plc:r/app.bsky.feed.post/1", "val": "porn", "neg": true, "cts": "2026-11-20T14:57:00.000Z"},
+                    {"src": "did:plc:veille", "uri": "at://did:plc:r/app.bsky.feed.post/1", "val": "spoiler", "cts": "2026-11-20T14:57:00.000Z"}
                 ],
                 "indexedAt": "2026-11-20T14:56:00.000Z"
             }"#,
@@ -2314,7 +2324,11 @@ mod tests {
         .unwrap();
         assert_eq!(
             post_from_view(&post, now()).labels,
-            vec!["graphic-media".to_owned(), "nudity".to_owned()]
+            vec![
+                "graphic-media".to_owned(),
+                "did:plc:veille#spoiler".to_owned(),
+                "nudity".to_owned()
+            ]
         );
     }
 

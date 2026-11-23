@@ -1064,9 +1064,16 @@ impl State {
                 let session = state.session.borrow().clone();
                 if let Some(session) = session {
                     let labelers = moderation::labelers(&preferences);
-                    let _ = runtime()
-                        .spawn(moderation::configure_labelers(session, labelers))
-                        .await;
+                    let lang = moderation::interface_language();
+                    let task = runtime().spawn(async move {
+                        moderation::configure_labelers(session.clone(), labelers.clone()).await;
+                        moderation::labeler_details(session, labelers, lang).await
+                    });
+                    if let Ok(Ok(details)) = task.await {
+                        moderation::set_definitions(
+                            details.into_iter().flat_map(|(_, _, defs)| defs).collect(),
+                        );
+                    }
                 }
                 moderation::set_preferences(preferences);
                 state.load_all();

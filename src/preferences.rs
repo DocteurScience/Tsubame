@@ -28,6 +28,8 @@ enum Change {
     RemoveWord(String),
     /// Se désabonner d'un service d'étiquetage.
     DropLabeler(String),
+    /// Réglage d'une étiquette d'un service tiers : service, étiquette.
+    LabelerLabel(String, String, Visibility),
 }
 
 impl Change {
@@ -45,6 +47,9 @@ impl Change {
             ),
             Change::RemoveWord(word) => moderation::remove_muted_word(preferences, word),
             Change::DropLabeler(did) => moderation::set_labeler(preferences, did, false),
+            Change::LabelerLabel(did, label, visibility) => {
+                moderation::set_labeler_label_visibility(preferences, did, label, *visibility)
+            }
         }
     }
 }
@@ -256,9 +261,13 @@ impl Dialog {
             let preferences = moderation::preferences(session.clone()).await?;
             let mutes = moderation::mutes(session.clone()).await?.len();
             let blocks = moderation::blocks(session.clone()).await?.len();
-            let names = moderation::labeler_names(session, moderation::labelers(&preferences))
-                .await
-                .unwrap_or_default();
+            let names = moderation::labeler_details(
+                session,
+                moderation::labelers(&preferences),
+                moderation::interface_language(),
+            )
+            .await
+            .unwrap_or_default();
             Ok::<_, ApiError>((preferences, mutes, blocks, names))
         });
         let weak = Rc::downgrade(self);
@@ -281,7 +290,7 @@ impl Dialog {
         preferences: Vec<Value>,
         mutes: usize,
         blocks: usize,
-        labelers: Vec<(String, String)>,
+        labelers: Vec<(String, String, Vec<moderation::LabelDefinition>)>,
     ) {
         self.filling.set(true);
         self.adult
@@ -298,12 +307,46 @@ impl Dialog {
         self.blocked_count.set_label(&blocks.to_string());
         self.words_count
             .set_label(&moderation::muted_words(&preferences).len().to_string());
-        for (did, name) in labelers {
-            let row = adw::ActionRow::builder()
+        let choices = gtk::StringList::new(&[]);
+        for visibility in Visibility::ALL {
+            choices.append(&visibility.title());
+        }
+        for (did, name, definitions) in labelers {
+            // Une rangée par service, ouverte sur le réglage de chacune de
+            // ses étiquettes (les informatives n'en ont pas).
+            let row = adw::ExpanderRow::builder()
                 .title(&name)
                 .subtitle(gettext("Abonnement actif"))
                 .use_markup(false)
                 .build();
+            for definition in definitions.iter().filter(|d| !d.inform_only) {
+                let combo = adw::ComboRow::builder()
+                    .title(&definition.name)
+                    .use_markup(false)
+                    .model(&choices)
+                    .build();
+                let visibility = moderation::labeler_label_visibility(&preferences, definition);
+                let index = Visibility::ALL
+                    .iter()
+                    .position(|v| *v == visibility)
+                    .unwrap_or(1);
+                combo.set_selected(index as u32);
+                let weak = Rc::downgrade(self);
+                let (did, value) = (did.clone(), definition.value.clone());
+                combo.connect_selected_notify(move |combo| {
+                    if let (Some(this), Some(visibility)) = (
+                        weak.upgrade(),
+                        Visibility::ALL.get(combo.selected() as usize),
+                    ) {
+                        this.change(Change::LabelerLabel(
+                            did.clone(),
+                            value.clone(),
+                            *visibility,
+                        ));
+                    }
+                });
+                row.add_row(&combo);
+            }
             let drop = gtk::Button::builder()
                 .label(gettext("Se désabonner"))
                 .valign(gtk::Align::Center)

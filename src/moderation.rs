@@ -127,6 +127,114 @@ pub fn set_label_visibility(preferences: &mut Vec<Value>, label: &str, visibilit
     preferences.push(json!({"$type": LABEL, "label": label, "visibility": visibility.api_name()}));
 }
 
+/// Étiquette définie par un service tiers (`labelValueDefinitions`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LabelDefinition {
+    pub labeler: String,
+    pub value: String,
+    /// Nom dans la langue de l'interface (ou le premier donné).
+    pub name: String,
+    /// Réglage par défaut du service.
+    pub default: Visibility,
+    pub adult_only: bool,
+    /// Étiquette purement informative (rien à flouter ni masquer).
+    pub inform_only: bool,
+}
+
+/// Séparateur entre le service et la valeur d'une étiquette tierce
+/// (« did:plc:…#valeur »).
+pub const LABELER_SEPARATOR: char = '#';
+
+/// Définitions d'étiquettes d'un service, d'après sa vue détaillée
+/// (`getServices`).
+pub fn definitions_from_view(view: &Value, lang: &str) -> Vec<LabelDefinition> {
+    let Some(labeler) = view
+        .get("creator")
+        .and_then(|c| c.get("did"))
+        .and_then(Value::as_str)
+    else {
+        return Vec::new();
+    };
+    view.get("policies")
+        .and_then(|p| p.get("labelValueDefinitions"))
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|def| {
+            let value = def.get("identifier")?.as_str()?.to_owned();
+            let locales: Vec<&Value> = def
+                .get("locales")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+                .collect();
+            let locale = locales
+                .iter()
+                .find(|l| {
+                    l.get("lang")
+                        .and_then(Value::as_str)
+                        .is_some_and(|code| code.split('-').next() == Some(lang))
+                })
+                .or(locales.first());
+            let name = locale
+                .and_then(|l| l.get("name")?.as_str())
+                .unwrap_or(&value)
+                .to_owned();
+            let severity = def
+                .get("severity")
+                .and_then(Value::as_str)
+                .unwrap_or("none");
+            let blurs = def.get("blurs").and_then(Value::as_str).unwrap_or("none");
+            Some(LabelDefinition {
+                labeler: labeler.to_owned(),
+                default: def
+                    .get("defaultSetting")
+                    .and_then(Value::as_str)
+                    .and_then(Visibility::from_api)
+                    .unwrap_or(Visibility::Warn),
+                adult_only: def
+                    .get("adultOnly")
+                    .and_then(Value::as_bool)
+                    .unwrap_or(false),
+                inform_only: severity == "inform" || (severity == "none" && blurs == "none"),
+                value,
+                name,
+            })
+        })
+        .collect()
+}
+
+/// Réglage d'une étiquette d'un service tiers, ou son défaut.
+pub fn labeler_label_visibility(preferences: &[Value], definition: &LabelDefinition) -> Visibility {
+    of_type(preferences, LABEL)
+        .find(|item| {
+            item.get("label").and_then(Value::as_str) == Some(definition.value.as_str())
+                && item.get("labelerDid").and_then(Value::as_str)
+                    == Some(definition.labeler.as_str())
+        })
+        .and_then(|item| Visibility::from_api(item.get("visibility")?.as_str()?))
+        .unwrap_or(definition.default)
+}
+
+pub fn set_labeler_label_visibility(
+    preferences: &mut Vec<Value>,
+    labeler: &str,
+    label: &str,
+    visibility: Visibility,
+) {
+    preferences.retain(|item| {
+        !(item.get("$type").and_then(Value::as_str) == Some(LABEL)
+            && item.get("label").and_then(Value::as_str) == Some(label)
+            && item.get("labelerDid").and_then(Value::as_str) == Some(labeler))
+    });
+    preferences.push(json!({
+        "$type": LABEL,
+        "labelerDid": labeler,
+        "label": label,
+        "visibility": visibility.api_name(),
+    }));
+}
+
 /// Mot masqué, avec ses réglages.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MutedWord {
@@ -265,6 +373,70 @@ pub fn set_labeler(preferences: &mut Vec<Value>, did: &str, subscribed: bool) {
     }
 }
 
+/// Définitions des étiquettes des services suivis, pour les fils.
+pub fn set_definitions(definitions: Vec<LabelDefinition>) {
+    DEFINITIONS.with_borrow_mut(|current| *current = definitions);
+}
+
+/// Langue de l'interface (« fr », « en »…), pour les noms d'étiquettes.
+pub fn interface_language() -> String {
+    gtk::glib::language_names()
+        .first()
+        .and_then(|l| l.split(['_', '.', '@']).next())
+        .filter(|l| *l != "C")
+        .unwrap_or("en")
+        .to_owned()
+}
+
+/// Services d'étiquetage, avec leur nom et leurs étiquettes
+/// (`getServices` détaillé).
+pub async fn labeler_details(
+    session: Arc<Session>,
+    dids: Vec<String>,
+    lang: String,
+) -> Result<Vec<(String, String, Vec<LabelDefinition>)>, ApiError> {
+    use atrium_api::types::string::Did;
+    if dids.is_empty() {
+        return Ok(Vec::new());
+    }
+    let api = session.api().await?;
+    let output = api
+        .api
+        .app
+        .bsky
+        .labeler
+        .get_services(
+            atrium_api::app::bsky::labeler::get_services::ParametersData {
+                detailed: Some(true),
+                dids: dids
+                    .iter()
+                    .filter_map(|d| Did::new(d.clone()).ok())
+                    .collect(),
+            }
+            .into(),
+        )
+        .await
+        .map_err(request_failed)?;
+    let views = serde_json::to_value(&output.data.views).unwrap_or_default();
+    Ok(views
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|view| {
+            let creator = view.get("creator")?;
+            let did = creator.get("did")?.as_str()?.to_owned();
+            let name = api::name_or_handle(
+                creator.get("displayName").and_then(Value::as_str),
+                creator
+                    .get("handle")
+                    .and_then(Value::as_str)
+                    .unwrap_or(&did),
+            );
+            Some((did, name, definitions_from_view(view, &lang)))
+        })
+        .collect())
+}
+
 /// Services d'étiquetage du compte connecté (préférences chargées).
 pub fn subscribed_labelers() -> Vec<String> {
     PREFERENCES.with_borrow(|p| labelers(p))
@@ -345,10 +517,34 @@ pub fn post_is_muted(post: &Post, muted: &[MutedWord], now: chrono::DateTime<chr
 /// ne se règlent pas ; le contenu pour adultes désactivé masque ses
 /// étiquettes. Les étiquettes inconnues sont ignorées.
 pub fn decide(preferences: &[Value], labels: &[String]) -> Option<(Visibility, String)> {
+    DEFINITIONS.with_borrow(|definitions| decide_with(preferences, definitions, labels))
+}
+
+/// `decide`, avec les définitions des services tiers : une étiquette
+/// « service#valeur » suit son réglage ; sans définition connue, ignorée.
+pub fn decide_with(
+    preferences: &[Value],
+    definitions: &[LabelDefinition],
+    labels: &[String],
+) -> Option<(Visibility, String)> {
     let adult = adult_content(preferences);
     labels
         .iter()
         .filter_map(|label| {
+            if let Some((labeler, value)) = label.split_once(LABELER_SEPARATOR) {
+                let definition = definitions
+                    .iter()
+                    .find(|d| d.labeler == labeler && d.value == value)?;
+                if definition.inform_only {
+                    return None;
+                }
+                let visibility = if definition.adult_only && !adult {
+                    Visibility::Hide
+                } else {
+                    labeler_label_visibility(preferences, definition)
+                };
+                return Some((visibility, label.clone()));
+            }
             let visibility = match label.as_str() {
                 "!hide" => Visibility::Hide,
                 "!warn" => Visibility::Warn,
@@ -366,6 +562,15 @@ pub fn decide(preferences: &[Value], labels: &[String]) -> Option<(Visibility, S
 
 /// Titre de l'avertissement affiché sur un contenu étiqueté.
 pub fn warning_title(label: &str) -> String {
+    if let Some((labeler, value)) = label.split_once(LABELER_SEPARATOR) {
+        return DEFINITIONS.with_borrow(|definitions| {
+            definitions
+                .iter()
+                .find(|d| d.labeler == labeler && d.value == value)
+                .map(|d| d.name.clone())
+                .unwrap_or_else(|| value.to_owned())
+        });
+    }
     match label {
         "!warn" | "!hide" => gettext("Contenu signalé par la modération"),
         other => label_title(other),
@@ -378,6 +583,8 @@ thread_local! {
     static PREFERENCES: RefCell<Vec<Value>> = RefCell::default();
     /// Mots masqués tirés de ces préférences.
     static MUTED: RefCell<Vec<MutedWord>> = RefCell::default();
+    /// Étiquettes des services tiers suivis.
+    static DEFINITIONS: RefCell<Vec<LabelDefinition>> = RefCell::default();
 }
 
 /// Préférences à appliquer aux fils ; vide au départ et sans compte.
@@ -564,53 +771,6 @@ pub async fn block(session: Arc<Session>, actor: String) -> Result<String, ApiEr
     Ok(output.data.uri)
 }
 
-/// Noms des services d'étiquetage.
-pub async fn labeler_names(
-    session: Arc<Session>,
-    dids: Vec<String>,
-) -> Result<Vec<(String, String)>, ApiError> {
-    use atrium_api::types::string::Did;
-    if dids.is_empty() {
-        return Ok(Vec::new());
-    }
-    let api = session.api().await?;
-    let output = api
-        .api
-        .app
-        .bsky
-        .labeler
-        .get_services(
-            atrium_api::app::bsky::labeler::get_services::ParametersData {
-                detailed: Some(false),
-                dids: dids
-                    .iter()
-                    .filter_map(|d| Did::new(d.clone()).ok())
-                    .collect(),
-            }
-            .into(),
-        )
-        .await
-        .map_err(request_failed)?;
-    let views = serde_json::to_value(&output.data.views).unwrap_or_default();
-    Ok(views
-        .as_array()
-        .into_iter()
-        .flatten()
-        .filter_map(|view| {
-            let did = view.get("creator")?.get("did")?.as_str()?.to_owned();
-            let creator = view.get("creator")?;
-            let name = api::name_or_handle(
-                creator.get("displayName").and_then(Value::as_str),
-                creator
-                    .get("handle")
-                    .and_then(Value::as_str)
-                    .unwrap_or(&did),
-            );
-            Some((did, name))
-        })
-        .collect())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -707,6 +867,39 @@ mod tests {
         assert!(post_is_muted(&with_text("Ce soir #Finale"), &words, now));
         // Mot expiré : plus masqué.
         assert!(!post_is_muted(&with_text("Un ancien post"), &words, now));
+    }
+
+    #[test]
+    fn third_party_labels_follow_their_settings() {
+        let view = json!({
+            "creator": {"did": "did:plc:veille", "handle": "veille.example"},
+            "policies": {"labelValues": ["spoiler", "info"], "labelValueDefinitions": [
+                {"identifier": "spoiler", "severity": "alert", "blurs": "content",
+                 "defaultSetting": "warn", "adultOnly": false,
+                 "locales": [{"lang": "en", "name": "Spoiler"}, {"lang": "fr", "name": "Divulgâcheur"}]},
+                {"identifier": "info", "severity": "inform", "blurs": "none",
+                 "defaultSetting": "warn", "locales": []},
+            ]}
+        });
+        let definitions = definitions_from_view(&view, "fr");
+        assert_eq!(definitions[0].name, "Divulgâcheur");
+        assert!(definitions[1].inform_only);
+        let mut p = Vec::new();
+        let labels = vec![
+            "did:plc:veille#spoiler".to_owned(),
+            "did:plc:veille#info".to_owned(),
+        ];
+        assert_eq!(
+            decide_with(&p, &definitions, &labels),
+            Some((Visibility::Warn, "did:plc:veille#spoiler".to_owned()))
+        );
+        set_labeler_label_visibility(&mut p, "did:plc:veille", "spoiler", Visibility::Hide);
+        assert_eq!(
+            decide_with(&p, &definitions, &labels).map(|(v, _)| v),
+            Some(Visibility::Hide)
+        );
+        // Service inconnu : ignoré.
+        assert_eq!(decide_with(&p, &[], &labels), None);
     }
 
     #[test]
