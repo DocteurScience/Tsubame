@@ -29,7 +29,7 @@ else
   rust_target = 'debug'
 endif
 
-custom_target(
+tsubame_bin = custom_target(
   'cargo-build',
   build_by_default: true,
   build_always_stale: true,
@@ -50,6 +50,19 @@ custom_target(
     '@OUTPUT@',
   ],
 )
+
+# Vérification d'accessibilité (Xvfb, AT-SPI) : meson configure -Da11y-tests=true,
+# puis meson test --suite a11y. Ignorée si un outil manque.
+if get_option('a11y-tests')
+  test(
+    'Accessibilité (noms, clavier, cibles mobiles)',
+    find_program('build-aux/a11y-check.sh'),
+    args: [tsubame_bin],
+    suite: 'a11y',
+    timeout: 300,
+    is_parallel: false,
+  )
+endif
 
 gnome.post_install(
   glib_compile_schemas: true,

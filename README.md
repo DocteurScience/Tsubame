@@ -23,6 +23,16 @@ Avec `cargo run`, les réglages (GSettings) utilisent le schéma compilé dans l
 
 `meson test -C _build` valide le schéma GSettings, le fichier `.desktop` et les métadonnées AppStream.
 
+Vérification d'accessibilité, facultative : elle lance Tsubame en démonstration sous Xvfb et contrôle, comme Orca les voit, les noms des éléments, l'accès au clavier et la taille des cibles en palier mobile. Elle demande `xvfb-run`, `xdotool`, `dbus-run-session`, `at-spi2-core` et Python avec `pyatspi` (sinon le test est ignoré) :
+
+```bash
+meson configure _build -Da11y-tests=true
+```
+
+```bash
+meson test -C _build --suite a11y
+```
+
 ## Flatpak
 
 Le manifeste est dans `build-aux/`. Il utilise le runtime GNOME 51 et l'extension `rust-stable`, à installer depuis Flathub :

@@ -1,0 +1,6 @@
+option(
+  'a11y-tests',
+  type: 'boolean',
+  value: false,
+  description: 'Vérification d\'accessibilité sous Xvfb (AT-SPI, xdotool, pyatspi)',
+)
