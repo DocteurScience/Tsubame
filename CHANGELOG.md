@@ -12,6 +12,10 @@ Logiciels et Flathub).
 
 ## Non publié
 
+### Modération
+
+- Mots masqués pour une durée, ou dans les mots-clics seulement.
+
 ### Écrire
 
 - Émojis, coller une image (Ctrl+V) ou la déposer sur la boîte de rédaction.

@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: tsubame\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-23 17:30+0000\n"
+"POT-Creation-Date: 2026-11-23 17:35+0000\n"
 "PO-Revision-Date: 2026-11-22\n"
 "Last-Translator: \n"
 "Language-Team: English\n"
@@ -169,7 +169,7 @@ msgstr "reposted your repost"
 msgid "a rejoint Bluesky avec votre starter pack"
 msgstr "joined Bluesky with your starter pack"
 
-#: src/api.rs:1075 src/feeds.rs:229 src/moderation.rs:365 src/report.rs:126
+#: src/api.rs:1075 src/feeds.rs:229 src/moderation.rs:450 src/report.rs:126
 msgid "Ce compte n'existe pas."
 msgstr "This account does not exist."
 
@@ -613,7 +613,7 @@ msgstr ""
 msgid "Linux et libre"
 msgstr "Linux and free software"
 
-#: src/column.rs:113 src/preferences.rs:158 src/window.rs:2051
+#: src/column.rs:113 src/preferences.rs:165 src/window.rs:2051
 msgid "Notifications"
 msgstr "Notifications"
 
@@ -1005,7 +1005,7 @@ msgstr "Choose an avatar"
 
 #: src/edit_profile.rs:576 src/explore.rs:182 src/feeds.rs:734
 #: src/lists.rs:383 src/lists.rs:413 src/messages.rs:822
-#: src/preferences.rs:339 src/preferences.rs:451 src/profile.rs:986
+#: src/preferences.rs:346 src/preferences.rs:458 src/profile.rs:986
 #: src/profile.rs:1092 src/profile.rs:1142 src/report.rs:241
 #: src/window.rs:1105 src/window.rs:1173 src/window.rs:1228 src/window.rs:1329
 #: src/window.rs:1708
@@ -1095,8 +1095,8 @@ msgstr "No feeds match this search."
 #: src/explore.rs:687 src/explore.rs:712 src/feed_page.rs:94
 #: src/feed_page.rs:269 src/feed_page.rs:386 src/feeds.rs:450 src/feeds.rs:571
 #: src/lists.rs:678 src/lists.rs:812 src/messages.rs:619 src/messages.rs:715
-#: src/messages.rs:861 src/messages.rs:1060 src/preferences.rs:258
-#: src/preferences.rs:387 src/profile.rs:656 src/profile.rs:829
+#: src/messages.rs:861 src/messages.rs:1060 src/preferences.rs:265
+#: src/preferences.rs:394 src/profile.rs:656 src/profile.rs:829
 #: src/profile.rs:952 src/starter_packs.rs:404
 msgid "Chargement interrompu."
 msgstr "Loading interrupted."
@@ -1570,11 +1570,11 @@ msgctxt "réglage d'une étiquette de contenu"
 msgid "Masquer"
 msgstr "Hide"
 
-#: src/moderation.rs:235
+#: src/moderation.rs:320
 msgid "Contenu signalé par la modération"
 msgstr "Content flagged by moderation"
 
-#: src/moderation.rs:304
+#: src/moderation.rs:389
 msgid "Préférences illisibles."
 msgstr "Unreadable preferences."
 
@@ -1586,108 +1586,144 @@ msgstr "Nothing to show yet"
 msgid "Pas encore disponible"
 msgstr "Not available yet"
 
-#: src/preferences.rs:92 src/window.rs:2119
+#: src/preferences.rs:99 src/window.rs:2119
 msgid "Préférences"
 msgstr "Preferences"
 
-#: src/preferences.rs:96
+#: src/preferences.rs:103
 msgid "Modération"
 msgstr "Moderation"
 
-#: src/preferences.rs:102
+#: src/preferences.rs:109
 msgid "Listes et comptes"
 msgstr "Lists and accounts"
 
-#: src/preferences.rs:105 src/preferences.rs:363
+#: src/preferences.rs:112 src/preferences.rs:370
 msgid "Comptes masqués"
 msgstr "Muted accounts"
 
-#: src/preferences.rs:106 src/preferences.rs:361
+#: src/preferences.rs:113 src/preferences.rs:368
 msgid "Comptes bloqués"
 msgstr "Blocked accounts"
 
-#: src/preferences.rs:107 src/preferences.rs:491
+#: src/preferences.rs:114 src/preferences.rs:519
 msgid "Mots et mots-clics masqués"
 msgstr "Muted words and tags"
 
-#: src/preferences.rs:115
+#: src/preferences.rs:122
 msgid "Contenu sensible"
 msgstr "Sensitive content"
 
-#: src/preferences.rs:117
+#: src/preferences.rs:124
 msgid ""
 "Chaque étiquette peut être affichée, floutée avec un avertissement, ou "
 "masquée."
 msgstr "Each label can be shown, blurred with a warning, or hidden."
 
-#: src/preferences.rs:121
+#: src/preferences.rs:128
 msgid "Activer le contenu pour adultes"
 msgstr "Enable adult content"
 
-#: src/preferences.rs:143
+#: src/preferences.rs:150
 msgid "Services d'étiquetage"
 msgstr "Labeling services"
 
-#: src/preferences.rs:145
+#: src/preferences.rs:152
 msgid ""
 "Des services tiers ajoutent leurs propres étiquettes à vos fils et profils."
 msgstr "Third-party services add their own labels to your feeds and profiles."
 
-#: src/preferences.rs:149
+#: src/preferences.rs:156
 msgid "Modération Bluesky"
 msgstr "Bluesky Moderation"
 
-#: src/preferences.rs:150
+#: src/preferences.rs:157
 msgid "Service par défaut · activé"
 msgstr "Default service · enabled"
 
-#: src/preferences.rs:163
+#: src/preferences.rs:170
 msgid ""
 "Tsubame vérifie les notifications toutes les minutes tant qu'il est ouvert."
 msgstr "Tsubame checks notifications every minute while it is open."
 
-#: src/preferences.rs:167
+#: src/preferences.rs:174
 msgid "Notifications du bureau"
 msgstr "Desktop notifications"
 
-#: src/preferences.rs:169
+#: src/preferences.rs:176
 msgid ""
 "Prévenir des nouvelles notifications quand la fenêtre n'est pas au premier "
 "plan"
 msgstr "Notify about new notifications when the window is in the background"
 
-#: src/preferences.rs:295
+#: src/preferences.rs:302
 msgid "Abonnement actif"
 msgstr "Active subscription"
 
-#: src/preferences.rs:348
+#: src/preferences.rs:355
 msgid "La préférence n'a pas été enregistrée."
 msgstr "The preference was not saved."
 
-#: src/preferences.rs:415 src/profile.rs:1030
+#: src/preferences.rs:422 src/profile.rs:1030
 msgid "Débloquer"
 msgstr "Unblock"
 
-#: src/preferences.rs:417 src/profile.rs:1024
+#: src/preferences.rs:424 src/profile.rs:1024
 msgid "Ne plus masquer"
 msgstr "Unmute"
 
-#: src/preferences.rs:477
+#: src/preferences.rs:484
 msgid "Ajouter un mot ou un mot-clic"
 msgstr "Add a word or tag"
 
-#: src/preferences.rs:482
+#: src/preferences.rs:489
 msgid ""
 "Les posts qui contiennent ces mots sont cachés dans vos fils, de tous les "
 "comptes."
 msgstr ""
 "Posts that contain these words are hidden from your feeds, for all accounts."
 
-#: src/preferences.rs:509 src/preferences.rs:513
+#: src/preferences.rs:498
+msgid "Toujours"
+msgstr "Forever"
+
+#: src/preferences.rs:499
+msgid "24 heures"
+msgstr "24 hours"
+
+#: src/preferences.rs:500
+msgid "7 jours"
+msgstr "7 days"
+
+#: src/preferences.rs:501
+msgid "30 jours"
+msgstr "30 days"
+
+#: src/preferences.rs:505
+msgid "Durée"
+msgstr "Duration"
+
+#: src/preferences.rs:509 src/preferences.rs:535
+msgid "Mots-clics seulement"
+msgstr "Hashtags only"
+
+#: src/preferences.rs:510
+msgid "Ne pas chercher le mot dans le texte des posts."
+msgstr "Do not look for the word in the text of posts."
+
+#: src/preferences.rs:538
+msgid "Expiré"
+msgstr "Expired"
+
+#: src/preferences.rs:541
+msgid "Jusqu'au {}"
+msgstr "Until {}"
+
+#: src/preferences.rs:556 src/preferences.rs:560
 msgid "Retirer « {} »"
 msgstr "Remove “{}”"
 
-#: src/preferences.rs:548
+#: src/preferences.rs:600
 msgid "Aucun compte"
 msgstr "No accounts"
 

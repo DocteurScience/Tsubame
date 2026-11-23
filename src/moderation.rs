@@ -127,13 +127,54 @@ pub fn set_label_visibility(preferences: &mut Vec<Value>, label: &str, visibilit
     preferences.push(json!({"$type": LABEL, "label": label, "visibility": visibility.api_name()}));
 }
 
-pub fn muted_words(preferences: &[Value]) -> Vec<String> {
+/// Mot masqué, avec ses réglages.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MutedWord {
+    pub value: String,
+    /// Seulement dans les mots-clics (pas dans le texte).
+    pub tags_only: bool,
+    /// Fin du masquage, s'il est temporaire.
+    pub expires: Option<chrono::DateTime<chrono::Utc>>,
+}
+
+impl MutedWord {
+    pub fn active(&self, now: chrono::DateTime<chrono::Utc>) -> bool {
+        self.expires.is_none_or(|end| end > now)
+    }
+}
+
+/// Mots masqués, tels qu'enregistrés (y compris ceux qui ont expiré).
+pub fn muted_word_items(preferences: &[Value]) -> Vec<MutedWord> {
     of_type(preferences, MUTED_WORDS)
         .next()
         .and_then(|item| item.get("items")?.as_array().cloned())
         .into_iter()
         .flatten()
-        .filter_map(|word| word.get("value")?.as_str().map(str::to_owned))
+        .filter_map(|word| {
+            let targets: Vec<&str> = word
+                .get("targets")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+                .filter_map(Value::as_str)
+                .collect();
+            Some(MutedWord {
+                value: word.get("value")?.as_str()?.to_owned(),
+                tags_only: !targets.is_empty() && !targets.contains(&"content"),
+                expires: word
+                    .get("expiresAt")
+                    .and_then(Value::as_str)
+                    .and_then(crate::api::parse_datetime)
+                    .map(|t| t.with_timezone(&chrono::Utc)),
+            })
+        })
+        .collect()
+}
+
+pub fn muted_words(preferences: &[Value]) -> Vec<String> {
+    muted_word_items(preferences)
+        .into_iter()
+        .map(|w| w.value)
         .collect()
 }
 
@@ -153,7 +194,19 @@ fn muted_words_item(preferences: &mut Vec<Value>) -> &mut Value {
 
 /// Ajoute un mot (ou un mot-clic « #… ») masqué partout : textes et
 /// mots-clics, de tous les comptes. Sans effet s'il l'est déjà.
+#[cfg(test)]
 pub fn add_muted_word(preferences: &mut Vec<Value>, word: &str) {
+    add_muted_word_with(preferences, word, false, None);
+}
+
+/// Ajoute un mot masqué : dans les mots-clics seulement (`tags_only`), et
+/// jusqu'à `expires` s'il est temporaire.
+pub fn add_muted_word_with(
+    preferences: &mut Vec<Value>,
+    word: &str,
+    tags_only: bool,
+    expires: Option<chrono::DateTime<chrono::Utc>>,
+) {
     let word = word.trim().trim_start_matches(['#', '＃']).trim();
     if word.is_empty()
         || muted_words(preferences)
@@ -164,7 +217,16 @@ pub fn add_muted_word(preferences: &mut Vec<Value>, word: &str) {
     }
     let item = muted_words_item(preferences);
     if let Some(items) = item.get_mut("items").and_then(Value::as_array_mut) {
-        items.push(json!({"value": word, "targets": ["content", "tag"], "actorTarget": "all"}));
+        let targets = if tags_only {
+            json!(["tag"])
+        } else {
+            json!(["content", "tag"])
+        };
+        let mut entry = json!({"value": word, "targets": targets, "actorTarget": "all"});
+        if let Some(end) = expires {
+            entry["expiresAt"] = json!(end.to_rfc3339_opts(chrono::SecondsFormat::Millis, true));
+        }
+        items.push(entry);
     }
 }
 
@@ -205,6 +267,29 @@ pub fn contains_muted_word(text: &str, muted: &[String]) -> bool {
     })
 }
 
+/// Le post contient-il un mot masqué encore actif ? Un mot « mots-clics
+/// seulement » ne se compare qu'aux mots-clics du post.
+pub fn post_is_muted(post: &Post, muted: &[MutedWord], now: chrono::DateTime<chrono::Utc>) -> bool {
+    let active = muted.iter().filter(|w| w.active(now));
+    let (tags_only, anywhere): (Vec<&MutedWord>, Vec<&MutedWord>) =
+        active.partition(|w| w.tags_only);
+    let anywhere: Vec<String> = anywhere.iter().map(|w| w.value.clone()).collect();
+    if !anywhere.is_empty() && contains_muted_word(&post.text, &anywhere) {
+        return true;
+    }
+    let tags: Vec<String> = post
+        .facets
+        .iter()
+        .filter_map(|f| match &f.feature {
+            crate::richtext::Feature::Tag(tag) => Some(tag.to_lowercase()),
+            _ => None,
+        })
+        .collect();
+    tags_only
+        .iter()
+        .any(|w| tags.contains(&w.value.to_lowercase()))
+}
+
 /// Ce que demandent les étiquettes d'un contenu, avec l'étiquette qui
 /// décide. « !hide » et « !warn » viennent de la modération de Bluesky et
 /// ne se règlent pas ; le contenu pour adultes désactivé masque ses
@@ -242,18 +327,18 @@ thread_local! {
     /// l'affichage des posts.
     static PREFERENCES: RefCell<Vec<Value>> = RefCell::default();
     /// Mots masqués tirés de ces préférences.
-    static MUTED: RefCell<Vec<String>> = RefCell::default();
+    static MUTED: RefCell<Vec<MutedWord>> = RefCell::default();
 }
 
 /// Préférences à appliquer aux fils ; vide au départ et sans compte.
 pub fn set_preferences(preferences: Vec<Value>) {
-    MUTED.with_borrow_mut(|muted| *muted = muted_words(&preferences));
+    MUTED.with_borrow_mut(|muted| *muted = muted_word_items(&preferences));
     PREFERENCES.with_borrow_mut(|current| *current = preferences);
 }
 
 /// Post à cacher : il contient un mot masqué, ou une étiquette le masque.
 pub fn is_hidden(post: &Post) -> bool {
-    MUTED.with_borrow(|muted| !muted.is_empty() && contains_muted_word(&post.text, muted))
+    MUTED.with_borrow(|muted| post_is_muted(post, muted, chrono::Utc::now()))
         || matches!(media_warning_visibility(post), Some((Visibility::Hide, _)))
 }
 
@@ -538,6 +623,40 @@ mod tests {
         assert_eq!(muted_words(&p), vec!["spoiler"]);
         assert_eq!(labelers(&p), vec!["did:plc:veille"]);
         assert!(!adult_content(&[]));
+    }
+
+    #[test]
+    fn temporary_and_tag_words() {
+        let mut p = Vec::new();
+        let now = chrono::Utc::now();
+        add_muted_word_with(
+            &mut p,
+            "#finale",
+            true,
+            Some(now + chrono::Duration::hours(24)),
+        );
+        add_muted_word_with(
+            &mut p,
+            "ancien",
+            false,
+            Some(now - chrono::Duration::hours(1)),
+        );
+        let words = muted_word_items(&p);
+        assert!(words[0].tags_only && words[0].active(now));
+        assert!(!words[1].active(now));
+        let post = |text: &str| crate::data::Post {
+            facets: crate::richtext::detect(text),
+            ..crate::data::posts(crate::data::Feed::Following)[0].clone()
+        };
+        let with_text = |text: &str| crate::data::Post {
+            text: text.into(),
+            ..post(text)
+        };
+        // « finale » dans le texte : pas un mot-clic, pas masqué.
+        assert!(!post_is_muted(&with_text("La finale ce soir"), &words, now));
+        assert!(post_is_muted(&with_text("Ce soir #Finale"), &words, now));
+        // Mot expiré : plus masqué.
+        assert!(!post_is_muted(&with_text("Un ancien post"), &words, now));
     }
 
     #[test]

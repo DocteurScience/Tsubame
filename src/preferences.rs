@@ -2,6 +2,7 @@
 //! « Modération » : comptes masqués et bloqués, mots masqués, contenu
 //! sensible, services d'étiquetage.
 
+use chrono::Datelike;
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
@@ -22,7 +23,8 @@ use crate::runtime::runtime;
 enum Change {
     Adult(bool),
     Label(&'static str, Visibility),
-    AddWord(String),
+    /// Mot, mots-clics seulement, durée en heures (`None` : toujours).
+    AddWord(String, bool, Option<i64>),
     RemoveWord(String),
 }
 
@@ -33,7 +35,12 @@ impl Change {
             Change::Label(label, visibility) => {
                 moderation::set_label_visibility(preferences, label, *visibility)
             }
-            Change::AddWord(word) => moderation::add_muted_word(preferences, word),
+            Change::AddWord(word, tags_only, hours) => moderation::add_muted_word_with(
+                preferences,
+                word,
+                *tags_only,
+                hours.map(|h| chrono::Utc::now() + chrono::Duration::hours(h)),
+            ),
             Change::RemoveWord(word) => moderation::remove_muted_word(preferences, word),
         }
     }
@@ -483,6 +490,27 @@ impl Dialog {
             ))
             .build();
         adding.add(&add);
+        // Durées proposées, en heures (0 : toujours).
+        const DURATIONS: [i64; 4] = [0, 24, 24 * 7, 24 * 30];
+        let durations = gtk::StringList::new(&[]);
+        for hours in DURATIONS {
+            durations.append(&match hours {
+                0 => gettext("Toujours"),
+                24 => gettext("24 heures"),
+                168 => gettext("7 jours"),
+                _ => gettext("30 jours"),
+            });
+        }
+        let duration = adw::ComboRow::builder()
+            .title(gettext("Durée"))
+            .model(&durations)
+            .build();
+        let tags_only = adw::SwitchRow::builder()
+            .title(gettext("Mots-clics seulement"))
+            .subtitle(gettext("Ne pas chercher le mot dans le texte des posts."))
+            .build();
+        adding.add(&duration);
+        adding.add(&tags_only);
         let words = adw::PreferencesGroup::new();
         let page = adw::PreferencesPage::new();
         page.add(&adding);
@@ -491,51 +519,75 @@ impl Dialog {
             .push_subpage(&subpage(&gettext("Mots et mots-clics masqués"), &page));
 
         let rows: Rc<RefCell<Vec<adw::ActionRow>>> = Rc::default();
-        let refill: Rc<dyn Fn()> = {
-            let (weak, words, rows) = (Rc::downgrade(self), words.clone(), rows.clone());
-            Rc::new(move || {
-                let Some(this) = weak.upgrade() else { return };
-                for row in rows.borrow_mut().drain(..) {
-                    words.remove(&row);
-                }
-                for word in moderation::muted_words(&this.preferences.borrow()) {
-                    let row = adw::ActionRow::builder()
-                        .title(&word)
-                        .use_markup(false)
-                        .build();
-                    let remove = gtk::Button::builder()
-                        .icon_name("user-trash-symbolic")
-                        .valign(gtk::Align::Center)
-                        .tooltip_text(gettext("Retirer « {} »").replace("{}", &word))
-                        .css_classes(["flat"])
-                        .build();
-                    remove.update_property(&[gtk::accessible::Property::Label(
-                        &gettext("Retirer « {} »").replace("{}", &word),
-                    )]);
-                    row.add_suffix(&remove);
-                    let weak = Rc::downgrade(&this);
-                    let word = word.clone();
-                    remove.connect_clicked(move |button| {
-                        if let Some(this) = weak.upgrade() {
-                            this.change(Change::RemoveWord(word.clone()));
-                            if let Some(row) = button.ancestor(adw::ActionRow::static_type()) {
-                                row.set_visible(false);
-                            }
+        let refill: Rc<dyn Fn()> =
+            {
+                let (weak, words, rows) = (Rc::downgrade(self), words.clone(), rows.clone());
+                Rc::new(move || {
+                    let Some(this) = weak.upgrade() else { return };
+                    for row in rows.borrow_mut().drain(..) {
+                        words.remove(&row);
+                    }
+                    let now = chrono::Utc::now();
+                    for item in moderation::muted_word_items(&this.preferences.borrow()) {
+                        let word = item.value.clone();
+                        let mut details = Vec::new();
+                        if item.tags_only {
+                            details.push(gettext("Mots-clics seulement"));
                         }
-                    });
-                    words.add(&row);
-                    rows.borrow_mut().push(row);
-                }
-            })
-        };
+                        match item.expires {
+                            Some(end) if end <= now => details.push(gettext("Expiré")),
+                            Some(end) => {
+                                let local = end.with_timezone(&chrono::Local);
+                                details.push(gettext("Jusqu'au {}").replace(
+                                    "{}",
+                                    &crate::api::day_month(local.day(), local.month()),
+                                ));
+                            }
+                            None => {}
+                        }
+                        let row = adw::ActionRow::builder()
+                            .title(&word)
+                            .subtitle(details.join(" · "))
+                            .use_markup(false)
+                            .build();
+                        let remove = gtk::Button::builder()
+                            .icon_name("user-trash-symbolic")
+                            .valign(gtk::Align::Center)
+                            .tooltip_text(gettext("Retirer « {} »").replace("{}", &word))
+                            .css_classes(["flat"])
+                            .build();
+                        remove.update_property(&[gtk::accessible::Property::Label(
+                            &gettext("Retirer « {} »").replace("{}", &word),
+                        )]);
+                        row.add_suffix(&remove);
+                        let weak = Rc::downgrade(&this);
+                        let word = word.clone();
+                        remove.connect_clicked(move |button| {
+                            if let Some(this) = weak.upgrade() {
+                                this.change(Change::RemoveWord(word.clone()));
+                                if let Some(row) = button.ancestor(adw::ActionRow::static_type()) {
+                                    row.set_visible(false);
+                                }
+                            }
+                        });
+                        words.add(&row);
+                        rows.borrow_mut().push(row);
+                    }
+                })
+            };
         refill();
         let weak = Rc::downgrade(self);
+        let (duration, tags_only) = (duration.clone(), tags_only.clone());
         add.connect_apply(move |entry| {
             let word = entry.text().trim().to_owned();
             if let Some(this) = weak.upgrade()
                 && !word.is_empty()
             {
-                this.change(Change::AddWord(word));
+                let hours = DURATIONS
+                    .get(duration.selected() as usize)
+                    .copied()
+                    .filter(|h| *h > 0);
+                this.change(Change::AddWord(word, tags_only.is_active(), hours));
                 entry.set_text("");
                 refill();
             }
