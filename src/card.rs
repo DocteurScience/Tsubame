@@ -5,7 +5,7 @@ use adw::prelude::*;
 use gettextrs::{gettext, ngettext, pgettext};
 use gtk::{gio, glib};
 
-use crate::data::{Media, Post, Reply};
+use crate::data::{Image, Media, Post, Reply};
 use crate::images;
 use crate::interactions::{self, Interaction, Interactions, Toggle};
 use std::rc::Rc;
@@ -99,7 +99,11 @@ fn media(media: &Media, warning: Option<String>) -> gtk::Widget {
         media.alt.clone()
     };
 
+    // Plusieurs images : une grille (2, 3 ou 4 vignettes), chacune avec sa
+    // pastille ALT ; les pastilles de l'ensemble ne servent plus.
+    let grid = media.images.len() > 1 && media.video.is_none();
     let content: gtk::Widget = match &media.thumb {
+        Some(_) if grid => image_grid(&media.images),
         Some(url) => {
             let picture = gtk::Picture::builder()
                 .content_fit(gtk::ContentFit::Cover)
@@ -117,21 +121,7 @@ fn media(media: &Media, warning: Option<String>) -> gtk::Widget {
             if media.images.is_empty() {
                 picture.upcast()
             } else {
-                // Un clic ouvre la visionneuse, sans ouvrir la discussion.
-                let button = gtk::Button::builder()
-                    .child(&picture)
-                    .tooltip_text(gettext("Agrandir l'image"))
-                    .css_classes(["flat", "media-button"])
-                    .build();
-                button.update_property(&[gtk::accessible::Property::Label(&fill(
-                    gettext("Agrandir l'image : {}"),
-                    &[&description],
-                ))]);
-                let images = media.images.clone();
-                button.connect_clicked(move |button| {
-                    crate::viewer::present(button, images.clone(), 0);
-                });
-                button.upcast()
+                viewer_button(&picture, &media.images, 0, &description).upcast()
             }
         }
         None => {
@@ -150,7 +140,7 @@ fn media(media: &Media, warning: Option<String>) -> gtk::Widget {
         .overflow(gtk::Overflow::Hidden)
         .css_classes(["post-media-frame"])
         .build();
-    if !media.alt.is_empty() {
+    if !media.alt.is_empty() && !grid {
         let alt = badge(
             &gettext("ALT"),
             &fill(gettext("Texte alternatif : {}"), &[&media.alt]),
@@ -160,7 +150,7 @@ fn media(media: &Media, warning: Option<String>) -> gtk::Widget {
         alt.set_tooltip_text(Some(&media.alt));
         overlay.add_overlay(&alt);
     }
-    if media.more > 0 {
+    if media.more > 0 && !grid {
         overlay.add_overlay(&badge(
             &format!("+{}", media.more),
             &ngettext("{} autre image", "{} autres images", media.more)
@@ -176,6 +166,95 @@ fn media(media: &Media, warning: Option<String>) -> gtk::Widget {
         add_warning(&overlay, &content, &warning);
     }
     overlay.upcast()
+}
+
+/// Bouton autour d'une image : un clic ouvre la visionneuse sur l'image
+/// `index`, sans ouvrir la discussion.
+fn viewer_button(
+    child: &impl IsA<gtk::Widget>,
+    images: &[Image],
+    index: usize,
+    description: &str,
+) -> gtk::Button {
+    let button = gtk::Button::builder()
+        .child(child)
+        .tooltip_text(gettext("Agrandir l'image"))
+        .css_classes(["flat", "media-button"])
+        .build();
+    button.update_property(&[gtk::accessible::Property::Label(&fill(
+        gettext("Agrandir l'image : {}"),
+        &[description],
+    ))]);
+    let images = images.to_vec();
+    button.connect_clicked(move |button| {
+        crate::viewer::present(button, images.clone(), index);
+    });
+    button
+}
+
+/// Place des vignettes dans la grille : (colonne, ligne, lignes occupées).
+/// Deux images côte à côte ; trois : une grande à gauche, deux à droite ;
+/// quatre : deux sur deux.
+pub fn grid_cells(count: usize) -> Vec<(i32, i32, i32)> {
+    match count {
+        0 | 1 => vec![(0, 0, 2)],
+        2 => vec![(0, 0, 2), (1, 0, 2)],
+        3 => vec![(0, 0, 2), (1, 0, 1), (1, 1, 1)],
+        _ => vec![(0, 0, 1), (1, 0, 1), (0, 1, 1), (1, 1, 1)],
+    }
+}
+
+/// Hauteur de la grille d'images, en pixels.
+const GRID_HEIGHT: i32 = 240;
+const GRID_SPACING: i32 = 4;
+
+fn image_grid(images: &[Image]) -> gtk::Widget {
+    let grid = gtk::Grid::builder()
+        .column_spacing(GRID_SPACING)
+        .row_spacing(GRID_SPACING)
+        .column_homogeneous(true)
+        .build();
+    let count = images.len().min(4);
+    for (index, (column, row, rows)) in grid_cells(count).into_iter().enumerate() {
+        let image = &images[index];
+        let height = if rows == 2 {
+            GRID_HEIGHT
+        } else {
+            (GRID_HEIGHT - GRID_SPACING) / 2
+        };
+        let description = if image.alt.is_empty() {
+            gettext("Image sans texte alternatif")
+        } else {
+            image.alt.clone()
+        };
+        let picture = gtk::Picture::builder()
+            .content_fit(gtk::ContentFit::Cover)
+            .can_shrink(true)
+            .height_request(height)
+            .alternative_text(&description)
+            .css_classes(["post-media"])
+            .build();
+        let weak = picture.downgrade();
+        images::load(&image.thumb, move |texture| {
+            if let Some(picture) = weak.upgrade() {
+                picture.set_paintable(Some(texture));
+            }
+        });
+        let tile = gtk::Overlay::builder().child(&picture).build();
+        if !image.alt.is_empty() {
+            let alt = badge(
+                &gettext("ALT"),
+                &fill(gettext("Texte alternatif : {}"), &[&image.alt]),
+                gtk::Align::End,
+                gtk::Align::End,
+            );
+            alt.set_tooltip_text(Some(&image.alt));
+            tile.add_overlay(&alt);
+        }
+        let button = viewer_button(&tile, images, index, &description);
+        grid.attach(&button, column, row, 1, rows);
+    }
+    grid.upcast()
 }
 
 /// Vidéo : la vignette porte « Lire la vidéo » ; un clic la remplace par le
@@ -813,4 +892,26 @@ pub fn post_detail(post: &Post) -> gtk::Box {
     }
     body.append(&actions);
     card
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn image_grids_fill_two_rows() {
+        for count in 1..=4 {
+            let cells = grid_cells(count);
+            assert_eq!(cells.len(), count.max(1));
+            // Chaque colonne occupe exactement deux lignes.
+            for column in 0..2 {
+                let rows: i32 = cells
+                    .iter()
+                    .filter(|(c, _, _)| *c == column)
+                    .map(|(_, _, r)| r)
+                    .sum();
+                assert!(rows == 2 || (count == 1 && column == 1 && rows == 0));
+            }
+        }
+    }
 }
