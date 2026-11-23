@@ -977,6 +977,19 @@ impl State {
     }
 
     /// Empile le profil de `actor` (DID ou identifiant).
+    /// Posts d'un mot-dièse (recherche « #mot »), en page empilée.
+    fn open_tag(self: &Rc<Self>, tag: &str) {
+        let title = format!("#{tag}");
+        let page = crate::feed_page::FeedPage::new(
+            &title,
+            api::Source::Search(title.clone()),
+            crate::explore::demo_search_posts(&title),
+            self.profile_host(),
+        );
+        let page = page.navigation_page(&title);
+        (self.profile_host().push)(page);
+    }
+
     fn open_profile(self: &Rc<Self>, actor: &str) {
         let page = ProfilePage::new(actor, self.profile_host());
         self.nav.push(&page.navigation_page());
@@ -1802,6 +1815,14 @@ fn install_actions(window: &adw::ApplicationWindow, state: &Rc<State>) {
         }
     });
     window.add_action(&open_profile);
+    let open_tag = gio::SimpleAction::new("open-tag", Some(glib::VariantTy::STRING));
+    let weak = Rc::downgrade(state);
+    open_tag.connect_activate(move |_, param| {
+        if let (Some(state), Some(tag)) = (weak.upgrade(), param.and_then(|p| p.str())) {
+            state.open_tag(tag);
+        }
+    });
+    window.add_action(&open_tag);
 
     let preferences = gio::SimpleAction::new("preferences", None);
     let weak = Rc::downgrade(state);

@@ -552,7 +552,7 @@ fn matches(text: &str, query: &str) -> bool {
 }
 
 /// Recherche dans les faux posts : texte ou auteur.
-fn demo_search_posts(query: &str) -> Vec<Post> {
+pub fn demo_search_posts(query: &str) -> Vec<Post> {
     let mut seen = std::collections::HashSet::new();
     [
         data::Feed::Following,

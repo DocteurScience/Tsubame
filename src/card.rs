@@ -32,6 +32,31 @@ fn label(text: &str, classes: &[&str]) -> gtk::Label {
     label
 }
 
+/// Texte d'un post, avec ses liens, mentions et mots-dièse cliquables. Les
+/// adresses web s'ouvrent dans le navigateur ; mentions et mots-dièse
+/// passent par les actions `win.open-profile` et `win.open-tag`.
+fn rich_text(text: &str, facets: &[crate::richtext::Facet], classes: &[&str]) -> gtk::Label {
+    use crate::richtext::{PROFILE_LINK, TAG_LINK, markup};
+
+    let label = label(text, classes);
+    if facets.is_empty() {
+        return label;
+    }
+    label.set_markup(&markup(text, facets));
+    label.connect_activate_link(|label, uri| {
+        let (action, value) = if let Some(tag) = uri.strip_prefix(TAG_LINK) {
+            ("win.open-tag", tag)
+        } else if let Some(actor) = uri.strip_prefix(PROFILE_LINK) {
+            ("win.open-profile", actor)
+        } else {
+            return glib::Propagation::Proceed;
+        };
+        let _ = label.activate_action(action, Some(&value.to_variant()));
+        glib::Propagation::Stop
+    });
+    label
+}
+
 /// Ligne « nom · heure » en haut d'une carte.
 /// Ouvre le profil de `handle` au clic.
 fn link_to_profile(button: &gtk::Button, name: &str, handle: &str) {
@@ -721,7 +746,7 @@ pub fn post_card(post: &Post) -> gtk::Box {
     }
     body.append(&meta(&post.name, &post.handle, &post.time));
     if !post.text.is_empty() {
-        body.append(&label(&post.text, &[]));
+        body.append(&rich_text(&post.text, &post.facets, &[]));
     }
     if let Some(m) = &post.media {
         body.append(&media(m, crate::moderation::media_warning(post)));
@@ -980,7 +1005,7 @@ pub fn post_detail(post: &Post) -> gtk::Box {
         &format!("@{} · {}", post.handle, post.date),
         &["dim-label", "caption"],
     ));
-    body.append(&label(&post.text, &["post-detail-text"]));
+    body.append(&rich_text(&post.text, &post.facets, &["post-detail-text"]));
     if let Some(m) = &post.media {
         body.append(&media(m, crate::moderation::media_warning(post)));
     }

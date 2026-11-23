@@ -36,6 +36,8 @@ pub struct Post {
     /// Date complète affichée dans le volet de discussion.
     pub date: String,
     pub text: String,
+    /// Liens, mentions et mots-dièse du texte.
+    pub facets: Vec<crate::richtext::Facet>,
     /// Adresse de l'avatar de l'auteur (miniature).
     pub avatar: Option<String>,
     /// Image ou vidéo jointe.
@@ -96,6 +98,7 @@ impl Post {
             time: String::new(),
             date: String::new(),
             text: String::new(),
+            facets: Vec::new(),
             avatar: None,
             media: None,
             replies: 0,
@@ -307,6 +310,8 @@ fn post(
         time: time.into(),
         date: date.into(),
         text: text.into(),
+        // Les mentions de démonstration ouvrent le profil par identifiant.
+        facets: crate::richtext::detect(text),
         avatar: None,
         media: None,
         replies,
@@ -337,11 +342,12 @@ fn reply(
 }
 
 fn lucie_gnome_49() -> Post {
+    const TEXT: &str = "Notes de version de GNOME 49 : le nouveau sélecteur de fichiers est \
+                        enfin utilisable au clavier de bout en bout. Merci à celles et ceux \
+                        qui ont testé la bêta, dont @aya.example.social. #GNOME49";
     Post {
-        text: "Notes de version de GNOME 49 : le nouveau sélecteur de fichiers est enfin \
-               utilisable au clavier de bout en bout. Merci à celles et ceux qui ont testé \
-               la bêta."
-            .into(),
+        text: TEXT.into(),
+        facets: crate::richtext::detect(TEXT),
         thread: vec![
             reply(
                 "Aya Koné",
