@@ -31,9 +31,18 @@
     <control>touch</control>
   </supports>
   <releases>
-    <release version="0.1.0" date="2026-11-20" type="development">
+    <release version="0.1.0" date="2026-11-23" type="development">
       <description>
-        <p>Squelette de l’interface, sans connexion au réseau.</p>
+        <p>Première version.</p>
+        <ul>
+          <li>Colonnes de cartes côte à côte, volet de discussion, une colonne en mobile</li>
+          <li>Images, vidéos, citations et cartes de liens dans les posts</li>
+          <li>Rédaction avec images, fils, brouillons, mentions et aperçu des liens</li>
+          <li>Notifications regroupées et notifications du bureau</li>
+          <li>Messagerie, recherche, signets, listes et profils</li>
+          <li>Modération : masquer, bloquer, signaler, étiquettes de contenu</li>
+          <li>Connexion dans le navigateur, session gardée dans le trousseau</li>
+        </ul>
       </description>
     </release>
   </releases>

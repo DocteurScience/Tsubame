@@ -35,3 +35,9 @@ Lire d'abord `docs/design.md` : il décrit les écrans, les widgets à utiliser,
 
 - Format avec `cargo fmt`, lints avec `cargo clippy`.
 - Les jetons et mots de passe vont dans le trousseau système (libsecret), jamais dans un fichier.
+
+## Suivi des changements
+
+- Chaque modification suit le skill `changement` (`.claude/skills/changement/SKILL.md`) : vérifications, traduction, accessibilité, documentation, `CHANGELOG.md`.
+- Une publication suit le skill `nouvelle-version` (`.claude/skills/nouvelle-version/SKILL.md`).
+- `CHANGELOG.md` résume les évolutions visibles ; `docs/design.md` décrit l'état de chaque fonction.
