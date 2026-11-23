@@ -332,6 +332,32 @@ pub async fn send(
         .ok_or_else(|| ApiError::new(gettext("Réponse illisible du service de messages.")))
 }
 
+/// Conversation avec un compte (créée au besoin, `getConvoForMembers`).
+pub async fn convo_for(session: Arc<Session>, did: String) -> Result<Convo, ApiError> {
+    use atrium_api::chat::bsky::convo::get_convo_for_members;
+    let api = session.api().await?;
+    let chat = api.api_with_proxy(chat_did(), CHAT_SERVICE_TYPE);
+    let member = Did::new(did).map_err(|_| api::invalid_actor())?;
+    let output = chat
+        .chat
+        .bsky
+        .convo
+        .get_convo_for_members(
+            get_convo_for_members::ParametersData {
+                members: vec![member],
+            }
+            .into(),
+        )
+        .await
+        .map_err(chat_failed)?;
+    convo_from_json(
+        &to_json(&output.data.convo),
+        &session.account.did,
+        Utc::now(),
+    )
+    .ok_or_else(|| ApiError::new(gettext("Réponse illisible du service de messages.")))
+}
+
 /// Marque la conversation comme lue.
 pub async fn mark_read(session: Arc<Session>, convo_id: String) -> Result<(), ApiError> {
     use atrium_api::chat::bsky::convo::update_read;

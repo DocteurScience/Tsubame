@@ -199,6 +199,14 @@ impl MessagesPage {
             .title_widget(&adw::WindowTitle::new(&gettext("Messages"), ""))
             .build();
         list_header.pack_start(&refresh);
+        let new_message = gtk::Button::builder()
+            .icon_name("document-edit-symbolic")
+            .tooltip_text(gettext("Nouveau message"))
+            .build();
+        new_message.update_property(&[gtk::accessible::Property::Label(&gettext(
+            "Nouveau message",
+        ))]);
+        list_header.pack_end(&new_message);
         let accepted_tab = gtk::ToggleButton::builder()
             .label(gettext("Conversations"))
             .active(true)
@@ -381,6 +389,12 @@ impl MessagesPage {
             older_button,
             sent: Cell::new(0),
             generation: Cell::new(0),
+        });
+        let weak = Rc::downgrade(&page);
+        new_message.connect_clicked(move |button| {
+            if let Some(page) = weak.upgrade() {
+                page.new_message_dialog(button);
+            }
         });
         let weak = Rc::downgrade(&page);
         page.older_button.connect_clicked(move |_| {
@@ -803,6 +817,179 @@ impl MessagesPage {
                 }
             }
         });
+    }
+
+    /// Ouvre la conversation avec un compte (DID), créée au besoin ;
+    /// `name` sert au titre en démonstration.
+    pub fn start_with(self: &Rc<Self>, did: &str, name: &str) {
+        let Some(session) = self.host.session.clone() else {
+            let convo = Convo {
+                id: format!("demo:{did}"),
+                title: name.to_owned(),
+                handle: None,
+                avatar: None,
+                last_text: String::new(),
+                last_time: String::new(),
+                unread: 0,
+                request: false,
+            };
+            self.add_and_open(convo);
+            return;
+        };
+        let task = runtime().spawn(chat::convo_for(session, did.to_owned()));
+        let weak = Rc::downgrade(self);
+        glib::spawn_future_local(async move {
+            let result = task
+                .await
+                .unwrap_or_else(|_| Err(ApiError::new(gettext("Chargement interrompu."))));
+            let Some(page) = weak.upgrade() else { return };
+            match result {
+                Ok(convo) => page.add_and_open(convo),
+                Err(error) if error.expired => (page.host.expired)(error.message),
+                Err(error) => page.host.toasts.add_toast(adw::Toast::new(&error.message)),
+            }
+        });
+    }
+
+    fn add_and_open(self: &Rc<Self>, convo: Convo) {
+        let known = self
+            .accepted
+            .borrow()
+            .iter()
+            .chain(self.requests.borrow().iter())
+            .any(|c| c.id == convo.id);
+        if !known {
+            self.accepted.borrow_mut().insert(0, convo.clone());
+        }
+        if convo.request {
+            self.requests_tab.set_active(true);
+        }
+        self.open(convo);
+        // Après `open` : la rangée de la conversation ouverte est choisie.
+        self.fill_list();
+    }
+
+    /// Boîte « Nouveau message » : chercher un compte, puis ouvrir la
+    /// conversation avec lui.
+    fn new_message_dialog(self: &Rc<Self>, parent: &gtk::Button) {
+        let dialog = adw::Dialog::builder()
+            .title(gettext("Nouveau message"))
+            .content_width(420)
+            .content_height(480)
+            .build();
+        let entry = gtk::SearchEntry::builder()
+            .placeholder_text(gettext("Rechercher un compte"))
+            .search_delay(300)
+            .hexpand(true)
+            .build();
+        entry.update_property(&[gtk::accessible::Property::Label(&gettext(
+            "Rechercher un compte",
+        ))]);
+        let results = gtk::ListBox::builder()
+            .selection_mode(gtk::SelectionMode::None)
+            .valign(gtk::Align::Start)
+            .css_classes(["boxed-list"])
+            .visible(false)
+            .build();
+        results.update_property(&[gtk::accessible::Property::Label(&gettext("Comptes"))]);
+        let content = gtk::Box::builder()
+            .orientation(gtk::Orientation::Vertical)
+            .spacing(12)
+            .margin_top(12)
+            .margin_bottom(12)
+            .margin_start(12)
+            .margin_end(12)
+            .build();
+        content.append(&entry);
+        content.append(&results);
+        let view = adw::ToolbarView::builder()
+            .content(
+                &gtk::ScrolledWindow::builder()
+                    .hscrollbar_policy(gtk::PolicyType::Never)
+                    .child(&content)
+                    .build(),
+            )
+            .build();
+        view.add_top_bar(&adw::HeaderBar::new());
+        dialog.set_child(Some(&view));
+
+        let found: Rc<RefCell<Vec<crate::data::Actor>>> = Rc::default();
+        let show = {
+            let (results, found) = (results.clone(), found.clone());
+            move |actors: Vec<crate::data::Actor>| {
+                results.remove_all();
+                for actor in &actors {
+                    let row = adw::ActionRow::builder()
+                        .title(&actor.name)
+                        .subtitle(format!("@{}", actor.handle))
+                        .use_markup(false)
+                        .activatable(true)
+                        .build();
+                    let avatar = adw::Avatar::builder()
+                        .size(32)
+                        .text(&actor.name)
+                        .show_initials(true)
+                        .accessible_role(gtk::AccessibleRole::Presentation)
+                        .build();
+                    if let Some(url) = &actor.avatar {
+                        let weak = avatar.downgrade();
+                        images::load(url, move |texture| {
+                            if let Some(avatar) = weak.upgrade() {
+                                avatar.set_custom_image(Some(texture));
+                            }
+                        });
+                    }
+                    row.add_prefix(&avatar);
+                    results.append(&row);
+                }
+                results.set_visible(!actors.is_empty());
+                found.replace(actors);
+            }
+        };
+        let show = Rc::new(show);
+        let session = self.host.session.clone();
+        entry.connect_search_changed(move |entry| {
+            let query = entry.text().trim().to_owned();
+            if query.is_empty() {
+                show(Vec::new());
+                return;
+            }
+            let Some(session) = session.clone() else {
+                let lower = query.to_lowercase();
+                show(
+                    crate::data::demo_actors()
+                        .into_iter()
+                        .filter(|a| {
+                            a.name.to_lowercase().contains(&lower) || a.handle.contains(&lower)
+                        })
+                        .collect(),
+                );
+                return;
+            };
+            let task = runtime().spawn(crate::api::typeahead(session, query.clone()));
+            let (show, entry) = (show.clone(), entry.downgrade());
+            glib::spawn_future_local(async move {
+                let Ok(Ok(actors)) = task.await else { return };
+                // Une frappe plus récente l'emporte.
+                if entry.upgrade().map(|e| e.text().trim() == query) == Some(true) {
+                    show(actors);
+                }
+            });
+        });
+        let weak = Rc::downgrade(self);
+        let closing = dialog.downgrade();
+        results.connect_row_activated(move |_, row| {
+            let actor = found.borrow().get(row.index() as usize).cloned();
+            let (Some(page), Some(actor)) = (weak.upgrade(), actor) else {
+                return;
+            };
+            if let Some(dialog) = closing.upgrade() {
+                dialog.close();
+            }
+            page.start_with(&actor.did, &actor.name);
+        });
+        dialog.present(Some(parent));
+        entry.grab_focus();
     }
 
     /// Accepter une demande : elle rejoint les conversations.

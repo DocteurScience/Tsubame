@@ -101,6 +101,8 @@ pub struct ProfilePage {
     follows: gtk::Button,
     post_count: gtk::Label,
     follow: gtk::Button,
+    /// « Envoyer un message ».
+    message: gtk::Button,
     /// « Modifier le profil », sur son propre profil.
     edit: gtk::Button,
     /// Menu ⋮ : lien, masquer, bloquer, signaler.
@@ -169,7 +171,18 @@ impl ProfilePage {
             .visible(false)
             .css_classes(["pill"])
             .build();
+        let message = gtk::Button::builder()
+            .icon_name("mail-unread-symbolic")
+            .tooltip_text(gettext("Envoyer un message"))
+            .valign(gtk::Align::Center)
+            .visible(false)
+            .css_classes(["circular", "avatar-button"])
+            .build();
+        message.update_property(&[gtk::accessible::Property::Label(&gettext(
+            "Envoyer un message",
+        ))]);
         top.append(&follow);
+        top.append(&message);
         top.append(&edit);
         let name = label(&["title-1"]);
         let handle = label(&["dim-label"]);
@@ -312,6 +325,7 @@ impl ProfilePage {
             follows,
             post_count,
             follow,
+            message,
             edit,
             more,
             likes_tab,
@@ -384,6 +398,16 @@ impl ProfilePage {
             );
         });
         let weak = Rc::downgrade(&page);
+        {
+            let weak = Rc::downgrade(&page);
+            page.message.connect_clicked(move |button| {
+                let Some(page) = weak.upgrade() else { return };
+                let did = page.profile.borrow().as_ref().map(|p| p.did.clone());
+                if let Some(did) = did {
+                    let _ = button.activate_action("win.message", Some(&did.to_variant()));
+                }
+            });
+        }
         page.follow.connect_clicked(move |_| {
             if let Some(page) = weak.upgrade() {
                 page.toggle_follow();
@@ -500,6 +524,12 @@ impl ProfilePage {
         self.follow
             .set_visible(!is_me && self.host.session.is_some() && !profile.did.is_empty());
         self.more.set_visible(!is_me && !profile.handle.is_empty());
+        self.message.set_visible(
+            !is_me
+                && !profile.did.is_empty()
+                && profile.blocking.is_none()
+                && self.host.session.is_some(),
+        );
         if let Some(url) = &profile.avatar {
             let weak = self.avatar.downgrade();
             images::load(url, move |texture| {

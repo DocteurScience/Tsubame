@@ -1391,6 +1391,14 @@ impl State {
         self.explore.replace(Some(page));
     }
 
+    /// Ouvre la page Messages sur la conversation avec ce compte.
+    fn message(&self, did: &str) {
+        self.stack.set_visible_child_name("messages");
+        if let Some(page) = self.messages.borrow().as_ref() {
+            page.start_with(did, did);
+        }
+    }
+
     /// Rechercher (Ctrl+K) : ouvre Explorer, le champ de recherche prêt.
     fn focus_search(&self) {
         self.stack.set_visible_child_name("explore");
@@ -1823,6 +1831,14 @@ fn install_actions(window: &adw::ApplicationWindow, state: &Rc<State>) {
         }
     });
     window.add_action(&open_tag);
+    let message = gio::SimpleAction::new("message", Some(glib::VariantTy::STRING));
+    let weak = Rc::downgrade(state);
+    message.connect_activate(move |_, param| {
+        if let (Some(state), Some(did)) = (weak.upgrade(), param.and_then(|p| p.str())) {
+            state.message(did);
+        }
+    });
+    window.add_action(&message);
 
     let preferences = gio::SimpleAction::new("preferences", None);
     let weak = Rc::downgrade(state);
