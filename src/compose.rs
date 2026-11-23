@@ -414,7 +414,7 @@ pub fn present(
     images_area.append(
         &gtk::Label::builder()
             .label(gettext(
-                "Décrivez chaque image pour les personnes qui utilisent un lecteur d'écran.",
+                "Décrivez chaque image ou vidéo pour les personnes qui utilisent un lecteur d'écran.",
             ))
             .wrap(true)
             .xalign(0.0)
@@ -487,11 +487,11 @@ pub fn present(
         .build();
     let add_image = gtk::Button::builder()
         .icon_name("image-x-generic-symbolic")
-        .tooltip_text(gettext("Ajouter une image"))
+        .tooltip_text(gettext("Ajouter des images ou une vidéo"))
         .css_classes(["flat"])
         .build();
     add_image.update_property(&[gtk::accessible::Property::Label(&gettext(
-        "Ajouter une image",
+        "Ajouter des images ou une vidéo",
     ))]);
     // Qui peut répondre, et citations : pour un nouveau post seulement (une
     // réponse suit les réglages du début de la discussion).
@@ -690,7 +690,7 @@ pub fn present(
             images_area.set_visible(images > 0);
             // Les images passent avant la carte du lien.
             link_box.set_visible(images == 0 && link_box.first_child().is_some());
-            add_image.set_sensitive(images < MAX_IMAGES && !busy.get());
+            add_image.set_sensitive(images < MAX_IMAGES && !has_video(&attachments) && !busy.get());
             // Une citation suffit, sans texte ni image.
             let result = validate(&value, images + quoting);
             let count = match result {
@@ -713,9 +713,9 @@ pub fn present(
                 let count = grapheme_count(&value);
                 let pictures = followup.attachments.borrow().len();
                 followup.tiles.set_visible(pictures > 0);
-                followup
-                    .add_image
-                    .set_sensitive(pictures < MAX_IMAGES && !busy.get());
+                followup.add_image.set_sensitive(
+                    pictures < MAX_IMAGES && !has_video(&followup.attachments) && !busy.get(),
+                );
                 followup
                     .counter
                     .set_label(&format!("{count} / {MAX_GRAPHEMES}"));
@@ -1182,15 +1182,22 @@ pub fn present(
         let followups = followups.clone();
         let link_state = link_state.clone();
         move || {
-            let more: Vec<(String, Vec<RawImage>)> = followups
+            let more: Vec<ThreadPost> = followups
                 .borrow()
                 .iter()
-                .map(|f| (f.text().trim().to_owned(), images_of(&f.attachments)))
+                .map(|f| ThreadPost {
+                    text: f.text().trim().to_owned(),
+                    images: images_of(&f.attachments),
+                    video: video_of(&f.attachments),
+                })
                 .collect();
-            if more
-                .iter()
-                .any(|(text, images)| validate(text, images.len()).is_err())
-            {
+            if more.iter().any(|post| {
+                validate(
+                    &post.text,
+                    post.images.len() + usize::from(post.video.is_some()),
+                )
+                .is_err()
+            }) {
                 return;
             }
             let buffer = text.buffer();
@@ -1199,7 +1206,9 @@ pub fn present(
                 .trim()
                 .to_owned();
             let images = images_of(&attachments);
-            if validate(&value, images.len() + quoting).is_err() || busy.get() {
+            let video = video_of(&attachments);
+            let media = images.len() + usize::from(video.is_some());
+            if validate(&value, media + quoting).is_err() || busy.get() {
                 return;
             }
             let Some(session) = session.clone() else {
@@ -1225,6 +1234,7 @@ pub fn present(
                 reply_rule: reply_rule.get(),
                 no_quotes: no_quotes.get(),
                 self_label: *self_label.borrow(),
+                video,
             };
             let task = runtime().spawn(async move {
                 // Images réduites et réencodées hors de la boucle GTK.
@@ -1241,7 +1251,12 @@ pub fn present(
                 let mut parent = published.post.clone();
                 let mut failure = None;
                 let mut done = 0;
-                for (text, images) in more {
+                for ThreadPost {
+                    text,
+                    images,
+                    video,
+                } in more
+                {
                     let images = match prepare_images(images).await {
                         Ok(images) => images,
                         Err(error) => {
@@ -1249,7 +1264,7 @@ pub fn present(
                             break;
                         }
                     };
-                    let has_images = !images.is_empty();
+                    let has_images = !images.is_empty() || video.is_some();
                     let next = NewPost {
                         text,
                         langs: langs.clone(),
@@ -1259,6 +1274,7 @@ pub fn present(
                         reply_rule: api::ReplyRule::Everyone,
                         no_quotes: false,
                         self_label: label.filter(|_| has_images),
+                        video,
                         link: None,
                     };
                     match Box::pin(api::publish(session.clone(), next)).await {
@@ -1356,12 +1372,18 @@ const THUMBNAIL: i32 = 96;
 const MAX_IMAGES: usize = 4;
 /// Longueur maximale d'un texte alternatif sur Bluesky.
 const MAX_ALT: usize = 2000;
+/// Longueur maximale du texte alternatif d'une vidéo.
+const MAX_VIDEO_ALT: usize = 1000;
+/// Taille maximale d'une vidéo, en octets.
+const MAX_VIDEO_BYTES: usize = 100 * 1024 * 1024;
 
-/// Image jointe : le fichier tel quel (préparé à la publication), son
-/// aperçu et son texte alternatif.
+/// Image ou vidéo jointe : le fichier tel quel (préparé à la publication),
+/// son aperçu et son texte alternatif.
 struct Attachment {
     bytes: glib::Bytes,
-    texture: gdk::Texture,
+    paintable: gdk::Paintable,
+    /// Pour une vidéo : son type MIME et son lecteur.
+    video: Option<(String, gtk::MediaFile)>,
     alt: RefCell<String>,
     tile: gtk::Overlay,
     alt_button: gtk::Button,
@@ -1385,7 +1407,11 @@ impl Attachment {
         } else {
             (
                 gettext("Ajouter un texte alternatif"),
-                gettext("Image sans texte alternatif"),
+                if self.video.is_some() {
+                    gettext("Vidéo sans texte alternatif")
+                } else {
+                    gettext("Image sans texte alternatif")
+                },
             )
         };
         self.alt_button
@@ -1412,6 +1438,13 @@ fn thumbnail_frame(picture: &gtk::Picture) -> adw::Clamp {
         .build()
 }
 
+/// Post suivant d'un fil, prêt à partir.
+struct ThreadPost {
+    text: String,
+    images: Vec<RawImage>,
+    video: Option<api::NewVideo>,
+}
+
 /// Image jointe telle quelle, avec son texte alternatif.
 type RawImage = (Vec<u8>, String);
 
@@ -1420,8 +1453,28 @@ fn images_of(attachments: &Rc<RefCell<Vec<Rc<Attachment>>>>) -> Vec<RawImage> {
     attachments
         .borrow()
         .iter()
+        .filter(|a| a.video.is_none())
         .map(|a| (a.bytes.to_vec(), a.alt.borrow().trim().to_owned()))
         .collect()
+}
+
+/// La vidéo jointe, avec sa taille si le lecteur l'a lue.
+fn video_of(attachments: &Rc<RefCell<Vec<Rc<Attachment>>>>) -> Option<api::NewVideo> {
+    attachments.borrow().iter().find_map(|a| {
+        let (mime, media) = a.video.as_ref()?;
+        let (width, height) = (media.intrinsic_width(), media.intrinsic_height());
+        Some(api::NewVideo {
+            bytes: a.bytes.to_vec(),
+            mime: mime.clone(),
+            alt: a.alt.borrow().trim().to_owned(),
+            size: (width > 0 && height > 0).then_some((width as u32, height as u32)),
+            blob: None,
+        })
+    })
+}
+
+fn has_video(attachments: &Rc<RefCell<Vec<Rc<Attachment>>>>) -> bool {
+    attachments.borrow().iter().any(|a| a.video.is_some())
 }
 
 /// Réduit et réencode les images hors de la boucle GTK.
@@ -1461,17 +1514,46 @@ fn load_images(
             if attachments.borrow().len() >= MAX_IMAGES {
                 break;
             }
-            let loaded = file
-                .load_bytes_future()
-                .await
-                .map_err(|e| e.to_string())
-                .and_then(|(bytes, _)| {
-                    gdk::Texture::from_bytes(&bytes)
-                        .map(|texture| (bytes, texture))
-                        .map_err(|e| e.to_string())
-                });
-            match loaded {
-                Ok((bytes, texture)) => attach(&attachments, &tiles, &update, bytes, texture),
+            let Ok((bytes, _)) = file.load_bytes_future().await else {
+                error.set_label(&gettext("Ce fichier n'a pas pu être lu."));
+                error.set_visible(true);
+                continue;
+            };
+            let name = file.basename();
+            let (content_type, _) = gio::content_type_guess(name.as_deref(), &bytes[..]);
+            let mime = gio::content_type_get_mime_type(&content_type)
+                .map(|m| m.to_string())
+                .unwrap_or_default();
+            // Une vidéo se publie seule ; des images, jusqu'à quatre.
+            let refusal = if mime.starts_with("video/") && !attachments.borrow().is_empty() {
+                Some(gettext("Une vidéo se publie seule, sans images."))
+            } else if mime.starts_with("video/") && bytes.len() > MAX_VIDEO_BYTES {
+                Some(gettext("Cette vidéo dépasse 100 Mo."))
+            } else if !mime.starts_with("video/") && has_video(&attachments) {
+                Some(gettext("Une vidéo se publie seule, sans images."))
+            } else {
+                None
+            };
+            if let Some(refusal) = refusal {
+                error.set_label(&refusal);
+                error.set_visible(true);
+                continue;
+            }
+            if mime.starts_with("video/") {
+                let media = gtk::MediaFile::for_file(&file);
+                let paintable = media.clone().upcast();
+                attach(
+                    &attachments,
+                    &tiles,
+                    &update,
+                    bytes,
+                    paintable,
+                    Some((mime, media)),
+                );
+                continue;
+            }
+            match gdk::Texture::from_bytes(&bytes) {
+                Ok(texture) => attach(&attachments, &tiles, &update, bytes, texture.upcast(), None),
                 Err(_) => {
                     error.set_label(&gettext("Ce fichier n'est pas une image lisible."));
                     error.set_visible(true);
@@ -1491,14 +1573,22 @@ fn choose_images(
     error: &gtk::Label,
 ) {
     let filter = gtk::FileFilter::new();
-    filter.set_name(Some(&gettext("Images")));
-    for mime in ["image/png", "image/jpeg", "image/webp"] {
+    filter.set_name(Some(&gettext("Images et vidéos")));
+    for mime in [
+        "image/png",
+        "image/jpeg",
+        "image/webp",
+        "video/mp4",
+        "video/quicktime",
+        "video/webm",
+        "video/mpeg",
+    ] {
         filter.add_mime_type(mime);
     }
     let filters = gio::ListStore::new::<gtk::FileFilter>();
     filters.append(&filter);
     let chooser = gtk::FileDialog::builder()
-        .title(gettext("Ajouter des images"))
+        .title(gettext("Ajouter des images ou une vidéo"))
         .modal(true)
         .filters(&filters)
         .default_filter(&filter)
@@ -1542,8 +1632,11 @@ fn paste_images(
             if attachments.borrow().len() >= MAX_IMAGES {
                 return;
             }
+            if has_video(&attachments) {
+                return;
+            }
             let bytes = texture.save_to_png_bytes();
-            attach(&attachments, &tiles, &update, bytes, texture);
+            attach(&attachments, &tiles, &update, bytes, texture.upcast(), None);
             update();
         });
     });
@@ -1581,10 +1674,11 @@ fn attach(
     tiles: &gtk::Box,
     update: &Rc<dyn Fn()>,
     bytes: glib::Bytes,
-    texture: gdk::Texture,
+    paintable: gdk::Paintable,
+    video: Option<(String, gtk::MediaFile)>,
 ) {
     let picture = gtk::Picture::builder()
-        .paintable(&texture)
+        .paintable(&paintable)
         .content_fit(gtk::ContentFit::Cover)
         .width_request(THUMBNAIL)
         .height_request(THUMBNAIL)
@@ -1611,13 +1705,41 @@ fn attach(
         .accessible_role(gtk::AccessibleRole::Group)
         .css_classes(["compose-tile"])
         .build();
+    if let Some((_, media)) = &video {
+        // Marque « vidéo » au centre de la vignette.
+        let badge = gtk::Box::builder()
+            .halign(gtk::Align::Center)
+            .valign(gtk::Align::Center)
+            .css_classes(["osd", "compose-play"])
+            .build();
+        badge.append(&crate::card::decorative_icon(
+            "media-playback-start-symbolic",
+        ));
+        tile.add_overlay(&badge);
+        // GtkMediaFile ne dessine rien avant la lecture : on lit sans son
+        // jusqu'à la première image, puis on s'arrête.
+        media.set_muted(true);
+        let handler: Rc<RefCell<Option<glib::SignalHandlerId>>> = Rc::default();
+        let id = {
+            let handler = handler.clone();
+            media.connect_invalidate_contents(move |media| {
+                media.pause();
+                if let Some(id) = handler.take() {
+                    media.disconnect(id);
+                }
+            })
+        };
+        handler.replace(Some(id));
+        media.play();
+    }
     tile.add_overlay(&remove);
     tile.add_overlay(&alt_button);
     tiles.append(&tile);
 
     let attachment = Rc::new(Attachment {
         bytes,
-        texture,
+        paintable,
+        video,
         alt: RefCell::default(),
         tile: tile.clone(),
         alt_button: alt_button.clone(),
@@ -1670,13 +1792,17 @@ fn edit_alt(parent: &gtk::Button, attachment: &Rc<Attachment>) {
     header.pack_end(&save);
 
     let preview = gtk::Picture::builder()
-        .paintable(&attachment.texture)
+        .paintable(&attachment.paintable)
         .content_fit(gtk::ContentFit::Contain)
         .height_request(200)
         .build();
-    preview.update_property(&[gtk::accessible::Property::Label(&gettext(
-        "Image à décrire",
-    ))]);
+    let is_video = attachment.video.is_some();
+    let limit = if is_video { MAX_VIDEO_ALT } else { MAX_ALT };
+    preview.update_property(&[gtk::accessible::Property::Label(&if is_video {
+        gettext("Vidéo à décrire")
+    } else {
+        gettext("Image à décrire")
+    })]);
     let text = gtk::TextView::builder()
         .wrap_mode(gtk::WrapMode::WordChar)
         .accepts_tab(false)
@@ -1692,9 +1818,11 @@ fn edit_alt(parent: &gtk::Button, attachment: &Rc<Attachment>) {
         "Texte alternatif",
     ))]);
     let help = gtk::Label::builder()
-        .label(gettext(
-            "Décrivez ce que montre l'image pour les personnes qui ne la voient pas.",
-        ))
+        .label(if is_video {
+            gettext("Décrivez ce que montre la vidéo pour les personnes qui ne la voient pas.")
+        } else {
+            gettext("Décrivez ce que montre l'image pour les personnes qui ne la voient pas.")
+        })
         .wrap(true)
         .xalign(0.0)
         .css_classes(["dim-label", "caption"])
@@ -1724,9 +1852,9 @@ fn edit_alt(parent: &gtk::Button, attachment: &Rc<Attachment>) {
         move |buffer: &gtk::TextBuffer| {
             let value = buffer.text(&buffer.start_iter(), &buffer.end_iter(), false);
             let count = grapheme_count(&value);
-            counter.set_label(&format!("{count} / {MAX_ALT}"));
-            save.set_sensitive(count <= MAX_ALT);
-            if count > MAX_ALT {
+            counter.set_label(&format!("{count} / {limit}"));
+            save.set_sensitive(count <= limit);
+            if count > limit {
                 counter.add_css_class("error");
             } else {
                 counter.remove_css_class("error");

@@ -17,6 +17,7 @@ Logiciels et Flathub).
 - Émojis, coller une image (Ctrl+V) ou la déposer sur la boîte de rédaction.
 - Étiquette de contenu sur les images (nudité, contenu sexuel, violence).
 - Images dans les posts suivants d'un fil.
+- Publier une vidéo (100 Mo au plus), avec son texte alternatif.
 
 ### Lire
 

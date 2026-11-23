@@ -164,6 +164,8 @@ columnsview > .column headerbar {
 /* Vignettes des images jointes dans la boîte de rédaction. */
 .compose-tile {
   border-radius: 8px;
+  /* Visible derrière une vidéo dont la première image n'est pas lue. */
+  background-color: alpha(currentColor, 0.1);
 }
 
 .compose-thumb-button {
@@ -171,6 +173,11 @@ columnsview > .column headerbar {
   min-height: 24px;
   min-width: 24px;
   padding: 2px 8px;
+}
+
+.compose-play {
+  border-radius: 999px;
+  padding: 10px;
 }
 
 .compose-alt {

@@ -1614,7 +1614,25 @@ pub struct NewPost {
     pub self_label: Option<&'static str>,
     /// Lien joint, avec son aperçu (sans effet avec des images).
     pub link: Option<NewLink>,
+    /// Vidéo jointe (seule, sans images).
+    pub video: Option<NewVideo>,
 }
+
+/// Vidéo jointe à un nouveau post.
+#[derive(Debug, Clone, Default)]
+pub struct NewVideo {
+    pub bytes: Vec<u8>,
+    /// Type MIME du fichier (« video/mp4 »…).
+    pub mime: String,
+    pub alt: String,
+    /// Largeur et hauteur, si le lecteur a pu les lire.
+    pub size: Option<(u32, u32)>,
+    /// Blob de la vidéo, une fois traitée par le service vidéo.
+    pub blob: Option<serde_json::Value>,
+}
+
+/// Service qui reçoit et convertit les vidéos de Bluesky.
+const VIDEO_SERVICE: &str = "https://video.bsky.app";
 
 /// Lien joint à un nouveau post.
 #[derive(Debug, Clone, Default)]
@@ -1679,7 +1697,18 @@ pub fn post_record(
     if !facets.is_empty() {
         record["facets"] = json!(facets);
     }
-    if !blobs.is_empty() {
+    if let Some(video) = &post.video
+        && let Some(blob) = &video.blob
+    {
+        let mut embed = json!({"$type": "app.bsky.embed.video", "video": blob});
+        if !video.alt.is_empty() {
+            embed["alt"] = json!(video.alt);
+        }
+        if let Some((width, height)) = video.size {
+            embed["aspectRatio"] = json!({"width": width, "height": height});
+        }
+        record["embed"] = embed;
+    } else if !blobs.is_empty() {
         let images: Vec<_> = post
             .images
             .iter()
@@ -1775,8 +1804,15 @@ pub async fn publish(session: Arc<Session>, mut post: NewPost) -> Result<Publish
             })?;
         blobs.push(serde_json::to_value(&output.data.blob).map_err(|_| invalid_post())?);
     }
+    // Vidéo : envoyée au service vidéo, qui la convertit et rend son blob.
+    if let Some(video) = post.video.as_mut()
+        && video.blob.is_none()
+    {
+        video.blob = Some(upload_video(&api, &session.account.did, video).await?);
+    }
     // Image de l'aperçu du lien : sans elle, la carte reste valable.
     if post.images.is_empty()
+        && post.video.is_none()
         && let Some(link) = post.link.as_mut()
         && let Some(thumb) = &link.thumb
     {
@@ -1863,6 +1899,105 @@ pub async fn publish(session: Arc<Session>, mut post: NewPost) -> Result<Publish
         post: published,
         gates_failed,
     })
+}
+
+/// Envoie une vidéo au service vidéo avec un jeton de service du PDS, puis
+/// attend la fin de sa conversion. Rend le blob à citer dans le post.
+async fn upload_video(
+    api: &crate::auth::Api,
+    did: &str,
+    video: &NewVideo,
+) -> Result<serde_json::Value, ApiError> {
+    use atrium_api::com::atproto::server::get_service_auth;
+    use atrium_api::types::string::Nsid;
+
+    let failed = |detail: String| {
+        glib_debug(&format!("vidéo : {detail}"));
+        ApiError::new(gettext("La vidéo n'a pas pu être envoyée."))
+    };
+    // Le jeton est destiné au PDS du compte : le service vidéo y dépose
+    // le blob en son nom.
+    let server = api
+        .api
+        .com
+        .atproto
+        .server
+        .describe_server()
+        .await
+        .map_err(|e| failed(e.to_string()))?;
+    let token = api
+        .api
+        .com
+        .atproto
+        .server
+        .get_service_auth(
+            get_service_auth::ParametersData {
+                aud: server.data.did.as_str().to_owned(),
+                exp: Some(chrono::Utc::now().timestamp() + 30 * 60),
+                lxm: Nsid::new("com.atproto.repo.uploadBlob".to_owned()).ok(),
+            }
+            .into(),
+        )
+        .await
+        .map_err(|e| failed(e.to_string()))?
+        .data
+        .token;
+    let client = reqwest::Client::new();
+    let name = format!("{}.mp4", chrono::Utc::now().timestamp_millis());
+    let response = client
+        .post(format!(
+            "{VIDEO_SERVICE}/xrpc/app.bsky.video.uploadVideo?did={did}&name={name}"
+        ))
+        .bearer_auth(token)
+        .header("Content-Type", &video.mime)
+        .body(video.bytes.clone())
+        .send()
+        .await
+        .map_err(|e| failed(e.to_string()))?;
+    let status = response.status();
+    let body = response.bytes().await.map_err(|e| failed(e.to_string()))?;
+    let body: serde_json::Value = serde_json::from_slice(&body).unwrap_or_default();
+    // Une vidéo déjà envoyée renvoie une erreur avec la tâche existante.
+    let mut job = job_status(&body);
+    let Some(job_id) = job["jobId"].as_str().map(str::to_owned) else {
+        return Err(failed(format!("{status} {body}")));
+    };
+    for _ in 0..300 {
+        if let Some(blob) = job.get("blob") {
+            return Ok(blob.clone());
+        }
+        match job["state"].as_str() {
+            Some("JOB_STATE_FAILED") => {
+                let detail = job["error"].as_str().or(job["message"].as_str());
+                glib_debug(&format!("vidéo : {job}"));
+                return Err(ApiError::new(match detail {
+                    Some(detail) => gettext("La vidéo a été refusée : {}").replace("{}", detail),
+                    None => gettext("La vidéo n'a pas pu être convertie."),
+                }));
+            }
+            _ => tokio::time::sleep(std::time::Duration::from_secs(2)).await,
+        }
+        let body = client
+            .get(format!(
+                "{VIDEO_SERVICE}/xrpc/app.bsky.video.getJobStatus?jobId={job_id}"
+            ))
+            .send()
+            .await
+            .map_err(|e| failed(e.to_string()))?
+            .bytes()
+            .await
+            .map_err(|e| failed(e.to_string()))?;
+        let body: serde_json::Value = serde_json::from_slice(&body).unwrap_or_default();
+        job = job_status(&body);
+    }
+    Err(ApiError::new(gettext(
+        "La conversion de la vidéo prend trop de temps.",
+    )))
+}
+
+/// L'état d'une tâche du service vidéo, sous `jobStatus` ou à la racine.
+fn job_status(body: &serde_json::Value) -> serde_json::Value {
+    body.get("jobStatus").unwrap_or(body).clone()
 }
 
 fn glib_debug(message: &str) {
@@ -2375,12 +2510,49 @@ mod tests {
             reply_rule: ReplyRule::Everyone,
             no_quotes: false,
             self_label: Some("graphic-media"),
+            video: None,
             link: None,
             images: Vec::new(),
         };
         let record = post_record(&post, &HashMap::new(), "2026-11-20T15:00:00.000Z", &[]);
         assert_eq!(record["labels"]["values"][0]["val"], "graphic-media");
         let _: atrium_api::app::bsky::feed::post::Record = serde_json::from_value(record).unwrap();
+    }
+
+    #[test]
+    fn videos_become_video_embeds() {
+        let post = NewPost {
+            text: String::new(),
+            langs: Vec::new(),
+            reply: None,
+            quote: None,
+            reply_rule: ReplyRule::Everyone,
+            no_quotes: false,
+            self_label: None,
+            video: Some(NewVideo {
+                alt: "Un train".into(),
+                size: Some((1920, 1080)),
+                blob: Some(serde_json::json!({
+                    "$type": "blob", "ref": {"$link": CID}, "mimeType": "video/mp4", "size": 1
+                })),
+                ..NewVideo::default()
+            }),
+            link: None,
+            images: Vec::new(),
+        };
+        let record = post_record(&post, &HashMap::new(), "2026-11-20T15:00:00.000Z", &[]);
+        assert_eq!(record["embed"]["$type"], "app.bsky.embed.video");
+        assert_eq!(record["embed"]["alt"], "Un train");
+        assert_eq!(record["embed"]["aspectRatio"]["width"], 1920);
+        let _: atrium_api::app::bsky::feed::post::Record = serde_json::from_value(record).unwrap();
+    }
+
+    #[test]
+    fn video_jobs_are_read_at_both_levels() {
+        let nested = serde_json::json!({"jobStatus": {"jobId": "a", "state": "JOB_STATE_CREATED"}});
+        assert_eq!(job_status(&nested)["jobId"], "a");
+        let flat = serde_json::json!({"jobId": "b", "error": "already_exists"});
+        assert_eq!(job_status(&flat)["jobId"], "b");
     }
 
     #[test]
@@ -2402,6 +2574,7 @@ mod tests {
             reply_rule: ReplyRule::Everyone,
             no_quotes: false,
             self_label: None,
+            video: None,
             link: None,
             images: Vec::new(),
         };
@@ -2447,6 +2620,7 @@ mod tests {
             reply_rule: ReplyRule::Everyone,
             no_quotes: false,
             self_label: None,
+            video: None,
             link: None,
             images: vec![image("Lever de soleil sur le Vercors"), image("")],
         };
@@ -2519,6 +2693,7 @@ mod tests {
             reply_rule: ReplyRule::Everyone,
             no_quotes: false,
             self_label: None,
+            video: None,
             images: Vec::new(),
             link: Some(NewLink {
                 uri: "https://example.org/billet".into(),
@@ -2560,6 +2735,7 @@ mod tests {
             reply_rule: ReplyRule::Everyone,
             no_quotes: false,
             self_label: None,
+            video: None,
             link: None,
             images: Vec::new(),
         };
@@ -2680,6 +2856,7 @@ mod tests {
             reply_rule: ReplyRule::Everyone,
             no_quotes: false,
             self_label: None,
+            video: None,
             link: None,
             images: Vec::new(),
         };

@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: tsubame\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-23 16:39+0000\n"
+"POT-Creation-Date: 2026-11-23 16:48+0000\n"
 "PO-Revision-Date: 2026-11-22\n"
 "Last-Translator: \n"
 "Language-Team: English\n"
@@ -230,87 +230,103 @@ msgstr "Mentioned accounts"
 msgid "Personne"
 msgstr "No one"
 
-#: src/api.rs:1773 src/edit_profile.rs:198
+#: src/api.rs:1802 src/edit_profile.rs:198
 msgid "Une image n'a pas pu être envoyée : {}"
 msgstr "An image could not be uploaded: {}"
 
-#: src/api.rs:1874
+#: src/api.rs:1916
+msgid "La vidéo n'a pas pu être envoyée."
+msgstr "The video could not be uploaded."
+
+#: src/api.rs:1974
+msgid "La vidéo a été refusée : {}"
+msgstr "The video was rejected: {}"
+
+#: src/api.rs:1975
+msgid "La vidéo n'a pas pu être convertie."
+msgstr "The video could not be processed."
+
+#: src/api.rs:1994
+msgid "La conversion de la vidéo prend trop de temps."
+msgstr "Processing the video is taking too long."
+
+#: src/api.rs:2009
 msgid "janv."
 msgstr "Jan"
 
-#: src/api.rs:1875
+#: src/api.rs:2010
 msgid "févr."
 msgstr "Feb"
 
-#: src/api.rs:1876
+#: src/api.rs:2011
 msgid "mars"
 msgstr "Mar"
 
-#: src/api.rs:1877
+#: src/api.rs:2012
 msgid "avr."
 msgstr "Apr"
 
-#: src/api.rs:1878
+#: src/api.rs:2013
 msgid "mai"
 msgstr "May"
 
-#: src/api.rs:1879
+#: src/api.rs:2014
 msgid "juin"
 msgstr "Jun"
 
-#: src/api.rs:1880
+#: src/api.rs:2015
 msgid "juil."
 msgstr "Jul"
 
-#: src/api.rs:1881
+#: src/api.rs:2016
 msgid "août"
 msgstr "Aug"
 
-#: src/api.rs:1882
+#: src/api.rs:2017
 msgid "sept."
 msgstr "Sep"
 
-#: src/api.rs:1883
+#: src/api.rs:2018
 msgid "oct."
 msgstr "Oct"
 
-#: src/api.rs:1884
+#: src/api.rs:2019
 msgid "nov."
 msgstr "Nov"
 
-#: src/api.rs:1885
+#: src/api.rs:2020
 msgid "déc."
 msgstr "Dec"
 
-#: src/api.rs:1895
+#: src/api.rs:2030
 msgid "à l'instant"
 msgstr "now"
 
-#: src/api.rs:1897
+#: src/api.rs:2032
 msgid "{} min"
 msgstr "{} min"
 
-#: src/api.rs:1899
+#: src/api.rs:2034
 msgid "{} h"
 msgstr "{} h"
 
-#: src/api.rs:1902
+#: src/api.rs:2037
 msgid "{} j"
 msgid_plural "{} j"
 msgstr[0] "{} d"
 msgstr[1] "{} d"
 
-#: src/api.rs:1909
+#: src/api.rs:2044
 msgctxt "jour, mois abrégé et année"
 msgid "{day} {month} {year}"
 msgstr "{month} {day}, {year}"
 
-#: src/api.rs:1920
+#: src/api.rs:2055
 msgctxt "date et heure d'un post"
 msgid "{day} {month} {year}, {time}"
 msgstr "{month} {day}, {year}, {time}"
 
-#: src/api.rs:1932
+#: src/api.rs:2067
 msgctxt "jour et mois abrégé"
 msgid "{day} {month}"
 msgstr "{month} {day}"
@@ -368,7 +384,7 @@ msgstr "unknown account identity"
 msgid "Voir le profil de {}"
 msgstr "View the profile of {}"
 
-#: src/card.rs:97 src/card.rs:238 src/compose.rs:1388
+#: src/card.rs:97 src/card.rs:238 src/compose.rs:1413
 msgid "Image sans texte alternatif"
 msgstr "Image without alternative text"
 
@@ -673,13 +689,13 @@ msgid "Nouveau post"
 msgstr "New post"
 
 #. En-tête : Annuler, titre, Publier.
-#: src/compose.rs:257 src/compose.rs:1660 src/edit_profile.rs:234
+#: src/compose.rs:257 src/compose.rs:1782 src/edit_profile.rs:234
 #: src/login.rs:150 src/profile.rs:801 src/report.rs:150 src/window.rs:572
 #: src/window.rs:1143 src/window.rs:1283
 msgid "Annuler"
 msgstr "Cancel"
 
-#: src/compose.rs:259 src/compose.rs:1325
+#: src/compose.rs:259 src/compose.rs:1341
 msgid "Publier"
 msgstr "Post"
 
@@ -701,8 +717,9 @@ msgstr "What's up?"
 
 #: src/compose.rs:417
 msgid ""
-"Décrivez chaque image pour les personnes qui utilisent un lecteur d'écran."
-msgstr "Describe each image for people who use a screen reader."
+"Décrivez chaque image ou vidéo pour les personnes qui utilisent un lecteur "
+"d'écran."
+msgstr "Describe each image or video for people who use a screen reader."
 
 #: src/compose.rs:436
 msgid "Ajouter un post au fil"
@@ -712,9 +729,9 @@ msgstr "Add a post to the thread"
 msgid "Langue du post"
 msgstr "Post language"
 
-#: src/compose.rs:490 src/compose.rs:494
-msgid "Ajouter une image"
-msgstr "Add an image"
+#: src/compose.rs:490 src/compose.rs:494 src/compose.rs:1591
+msgid "Ajouter des images ou une vidéo"
+msgstr "Add images or a video"
 
 #: src/compose.rs:508
 msgid "Qui peut répondre"
@@ -784,89 +801,110 @@ msgstr "Keep as draft"
 msgid "Le brouillon n'a pas pu être enregistré."
 msgstr "The draft could not be saved."
 
-#: src/compose.rs:1208
+#: src/compose.rs:1217
 msgid "Mode démonstration : rien n'est publié."
 msgstr "Demo mode: nothing is posted."
 
-#: src/compose.rs:1215
+#: src/compose.rs:1224
 msgid "Publication…"
 msgstr "Posting…"
 
-#: src/compose.rs:1292
+#: src/compose.rs:1308
 msgid "La publication a été interrompue."
 msgstr "Posting was interrupted."
 
-#: src/compose.rs:1300
+#: src/compose.rs:1316
 msgid "Fil publié en partie : {} posts sur {}."
 msgstr "Thread partly posted: {} posts out of {}."
 
-#: src/compose.rs:1305
+#: src/compose.rs:1321
 msgid ""
 "Post publié, mais ses réglages de réponse et de citation n'ont pas été "
 "enregistrés."
 msgstr "Post published, but its reply and quote settings were not saved."
 
-#: src/compose.rs:1308
+#: src/compose.rs:1324
 msgid "Fil publié."
 msgstr "Thread posted."
 
-#: src/compose.rs:1310
+#: src/compose.rs:1326
 msgid "Réponse publiée."
 msgstr "Reply posted."
 
-#: src/compose.rs:1312
+#: src/compose.rs:1328
 msgid "Post publié."
 msgstr "Post published."
 
-#: src/compose.rs:1376
+#: src/compose.rs:1398
 msgid "ALT ✓"
 msgstr "ALT ✓"
 
-#: src/compose.rs:1378
+#: src/compose.rs:1400
 msgid "+ ALT"
 msgstr "+ ALT"
 
-#: src/compose.rs:1382
+#: src/compose.rs:1404
 msgid "Modifier le texte alternatif"
 msgstr "Edit alternative text"
 
-#: src/compose.rs:1387
+#: src/compose.rs:1409
 msgid "Ajouter un texte alternatif"
 msgstr "Add alternative text"
 
-#: src/compose.rs:1437
+#: src/compose.rs:1411
+msgid "Vidéo sans texte alternatif"
+msgstr "Video without alternative text"
+
+#: src/compose.rs:1490
 msgid "Une image n'a pas pu être préparée : {}"
 msgstr "An image could not be prepared: {}"
 
-#: src/compose.rs:1476 src/edit_profile.rs:491
+#: src/compose.rs:1518
+msgid "Ce fichier n'a pas pu être lu."
+msgstr "This file could not be read."
+
+#: src/compose.rs:1529 src/compose.rs:1533
+msgid "Une vidéo se publie seule, sans images."
+msgstr "A video is posted on its own, without images."
+
+#: src/compose.rs:1531
+msgid "Cette vidéo dépasse 100 Mo."
+msgstr "This video is larger than 100 MB."
+
+#: src/compose.rs:1558 src/edit_profile.rs:491
 msgid "Ce fichier n'est pas une image lisible."
 msgstr "This file is not a readable image."
 
-#: src/compose.rs:1494 src/edit_profile.rs:447
-msgid "Images"
-msgstr "Images"
+#: src/compose.rs:1576
+msgid "Images et vidéos"
+msgstr "Images and videos"
 
-#: src/compose.rs:1501
-msgid "Ajouter des images"
-msgstr "Add images"
-
-#: src/compose.rs:1597 src/compose.rs:1601
+#: src/compose.rs:1691 src/compose.rs:1695
 msgid "Retirer l'image"
 msgstr "Remove image"
 
-#: src/compose.rs:1657 src/compose.rs:1692
+#: src/compose.rs:1779 src/compose.rs:1818
 msgid "Texte alternatif"
 msgstr "Alternative text"
 
-#: src/compose.rs:1662 src/edit_profile.rs:236
+#: src/compose.rs:1784 src/edit_profile.rs:236
 msgid "Enregistrer"
 msgstr "Save"
 
-#: src/compose.rs:1678
+#: src/compose.rs:1802
+msgid "Vidéo à décrire"
+msgstr "Video to describe"
+
+#: src/compose.rs:1804
 msgid "Image à décrire"
 msgstr "Image to describe"
 
-#: src/compose.rs:1696
+#: src/compose.rs:1822
+msgid ""
+"Décrivez ce que montre la vidéo pour les personnes qui ne la voient pas."
+msgstr "Describe what the video shows for people who cannot see it."
+
+#: src/compose.rs:1824
 msgid ""
 "Décrivez ce que montre l'image pour les personnes qui ne la voient pas."
 msgstr "Describe what the image shows for people who cannot see it."
@@ -930,6 +968,10 @@ msgstr "Loading…"
 #: src/edit_profile.rs:401 src/profile.rs:165
 msgid "Modifier le profil"
 msgstr "Edit profile"
+
+#: src/edit_profile.rs:447
+msgid "Images"
+msgstr "Images"
 
 #: src/edit_profile.rs:455
 msgid "Choisir une bannière"
