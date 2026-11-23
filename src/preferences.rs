@@ -26,6 +26,8 @@ enum Change {
     /// Mot, mots-clics seulement, durée en heures (`None` : toujours).
     AddWord(String, bool, Option<i64>),
     RemoveWord(String),
+    /// Se désabonner d'un service d'étiquetage.
+    DropLabeler(String),
 }
 
 impl Change {
@@ -42,6 +44,7 @@ impl Change {
                 hours.map(|h| chrono::Utc::now() + chrono::Duration::hours(h)),
             ),
             Change::RemoveWord(word) => moderation::remove_muted_word(preferences, word),
+            Change::DropLabeler(did) => moderation::set_labeler(preferences, did, false),
         }
     }
 }
@@ -274,7 +277,7 @@ impl Dialog {
     }
 
     fn fill(
-        &self,
+        self: &Rc<Self>,
         preferences: Vec<Value>,
         mutes: usize,
         blocks: usize,
@@ -295,14 +298,30 @@ impl Dialog {
         self.blocked_count.set_label(&blocks.to_string());
         self.words_count
             .set_label(&moderation::muted_words(&preferences).len().to_string());
-        for (_, name) in labelers {
-            self.labelers.add(
-                &adw::ActionRow::builder()
-                    .title(&name)
-                    .subtitle(gettext("Abonnement actif"))
-                    .use_markup(false)
-                    .build(),
-            );
+        for (did, name) in labelers {
+            let row = adw::ActionRow::builder()
+                .title(&name)
+                .subtitle(gettext("Abonnement actif"))
+                .use_markup(false)
+                .build();
+            let drop = gtk::Button::builder()
+                .label(gettext("Se désabonner"))
+                .valign(gtk::Align::Center)
+                .build();
+            drop.update_property(&[gtk::accessible::Property::Label(
+                &gettext("Se désabonner de {}").replace("{}", &name),
+            )]);
+            let weak = Rc::downgrade(self);
+            drop.connect_clicked(move |button| {
+                if let Some(this) = weak.upgrade() {
+                    this.change(Change::DropLabeler(did.clone()));
+                    if let Some(row) = button.ancestor(adw::ActionRow::static_type()) {
+                        row.set_visible(false);
+                    }
+                }
+            });
+            row.add_suffix(&drop);
+            self.labelers.add(&row);
         }
         self.preferences.replace(preferences);
         self.adult.set_sensitive(true);
@@ -336,8 +355,13 @@ impl Dialog {
             return;
         };
         let task = runtime().spawn(async move {
-            moderation::update_preferences(session, move |preferences| change.apply(preferences))
-                .await
+            let preferences = moderation::update_preferences(session.clone(), move |preferences| {
+                change.apply(preferences)
+            })
+            .await?;
+            // Les étiquettes suivent les services encore choisis.
+            moderation::configure_labelers(session, moderation::labelers(&preferences)).await;
+            Ok::<_, ApiError>(preferences)
         });
         let weak = Rc::downgrade(self);
         glib::spawn_future_local(async move {

@@ -606,6 +606,7 @@ impl ProfilePage {
             ("block", Self::toggle_block),
             ("report", Self::report),
             ("add-to-list", Self::add_to_list),
+            ("labeler", Self::toggle_labeler),
         ] {
             let action = gio::SimpleAction::new(name, None);
             let weak = Rc::downgrade(&page);
@@ -1019,6 +1020,19 @@ fn profile_menu(profile: &Profile) -> gio::Menu {
         Some("profile.add-to-list"),
     );
     menu.append_section(None, &sharing);
+    if profile.labeler && profile.did != crate::moderation::BLUESKY_LABELER {
+        let labeling = gio::Menu::new();
+        let subscribed = crate::moderation::subscribed_labelers().contains(&profile.did);
+        labeling.append(
+            Some(&if subscribed {
+                gettext("Se désabonner du service d'étiquetage")
+            } else {
+                gettext("S'abonner au service d'étiquetage")
+            }),
+            Some("profile.labeler"),
+        );
+        menu.append_section(None, &labeling);
+    }
     let moderation = gio::Menu::new();
     let mute = if profile.muted {
         gettext("Ne plus masquer")
@@ -1102,6 +1116,59 @@ impl ProfilePage {
                     page.show_activity(profile.activity);
                     page.host.toasts.add_toast(adw::Toast::new(&error.message));
                 }
+            }
+        });
+    }
+
+    /// S'abonne au service d'étiquetage (ou s'en désabonne) : préférences
+    /// du compte, puis en-tête des requêtes pour recevoir ses étiquettes.
+    fn toggle_labeler(self: &Rc<Self>) {
+        use crate::moderation;
+        let Some(profile) = self.profile.borrow().clone() else {
+            return;
+        };
+        let Some(session) = self.host.session.clone() else {
+            return;
+        };
+        let subscribed = moderation::subscribed_labelers().contains(&profile.did);
+        if !subscribed && moderation::subscribed_labelers().len() >= moderation::MAX_LABELERS {
+            self.host.toasts.add_toast(adw::Toast::new(&gettext(
+                "Le nombre maximal de services d'étiquetage est atteint.",
+            )));
+            return;
+        }
+        let did = profile.did.clone();
+        let task = runtime().spawn(async move {
+            let preferences = moderation::update_preferences(session.clone(), {
+                let did = did.clone();
+                move |p| moderation::set_labeler(p, &did, !subscribed)
+            })
+            .await?;
+            moderation::configure_labelers(session, moderation::labelers(&preferences)).await;
+            Ok::<_, ApiError>(preferences)
+        });
+        let weak = Rc::downgrade(self);
+        glib::spawn_future_local(async move {
+            let result = task
+                .await
+                .unwrap_or_else(|_| Err(ApiError::new(gettext("Requête interrompue."))));
+            let Some(page) = weak.upgrade() else { return };
+            match result {
+                Ok(preferences) => {
+                    moderation::set_preferences(preferences);
+                    page.host.toasts.add_toast(adw::Toast::new(&if subscribed {
+                        gettext("Désabonné du service d'étiquetage.")
+                    } else {
+                        gettext(
+                            "Abonné : ses étiquettes s'afficheront à la prochaine actualisation.",
+                        )
+                    }));
+                    if let Some(profile) = page.profile.borrow().as_ref() {
+                        page.more.set_menu_model(Some(&profile_menu(profile)));
+                    }
+                }
+                Err(error) if error.expired => (page.host.expired)(error.message),
+                Err(error) => page.host.toasts.add_toast(adw::Toast::new(&error.message)),
             }
         });
     }
@@ -1280,6 +1347,7 @@ fn demo_profile(handle: &str) -> Profile {
         known_count: 5,
         activity: (false, false),
         associated: (1, 2, 1),
+        labeler: false,
     }
 }
 

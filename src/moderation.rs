@@ -237,6 +237,56 @@ pub fn remove_muted_word(preferences: &mut Vec<Value>, word: &str) {
     }
 }
 
+/// Service de modération de Bluesky, toujours actif.
+pub const BLUESKY_LABELER: &str = "did:plc:ar7c4by46qjdydhdevvrndac";
+/// Abonnements à des services d'étiquetage acceptés par Bluesky, au plus.
+pub const MAX_LABELERS: usize = 20;
+
+/// Abonne (ou désabonne) le compte au service d'étiquetage `did`.
+pub fn set_labeler(preferences: &mut Vec<Value>, did: &str, subscribed: bool) {
+    let index = match preferences
+        .iter()
+        .position(|item| item.get("$type").and_then(Value::as_str) == Some(LABELERS))
+    {
+        Some(index) => index,
+        None => {
+            preferences.push(json!({"$type": LABELERS, "labelers": []}));
+            preferences.len() - 1
+        }
+    };
+    let item = &mut preferences[index];
+    if !item.get("labelers").is_some_and(Value::is_array) {
+        item["labelers"] = json!([]);
+    }
+    let list = item["labelers"].as_array_mut().expect("tableau");
+    list.retain(|l| l.get("did").and_then(Value::as_str) != Some(did));
+    if subscribed {
+        list.push(json!({"did": did}));
+    }
+}
+
+/// Services d'étiquetage du compte connecté (préférences chargées).
+pub fn subscribed_labelers() -> Vec<String> {
+    PREFERENCES.with_borrow(|p| labelers(p))
+}
+
+/// Demande à Bluesky les étiquettes de ces services en plus des siennes
+/// (en-tête `atproto-accept-labelers`) pour les requêtes de cette session.
+pub async fn configure_labelers(session: Arc<Session>, labelers: Vec<String>) {
+    use atrium_api::agent::Configure;
+    use atrium_api::types::string::Did;
+    let Ok(api) = session.api().await else { return };
+    let mut dids = vec![(Did::new(BLUESKY_LABELER.to_owned()).expect("DID"), true)];
+    dids.extend(
+        labelers
+            .into_iter()
+            .filter(|d| d != BLUESKY_LABELER)
+            .filter_map(|d| Did::new(d).ok())
+            .map(|d| (d, false)),
+    );
+    api.configure_labelers_header(Some(dids));
+}
+
 /// Services d'étiquetage auxquels le compte est abonné (DID).
 pub fn labelers(preferences: &[Value]) -> Vec<String> {
     of_type(preferences, LABELERS)
@@ -657,6 +707,19 @@ mod tests {
         assert!(post_is_muted(&with_text("Ce soir #Finale"), &words, now));
         // Mot expiré : plus masqué.
         assert!(!post_is_muted(&with_text("Un ancien post"), &words, now));
+    }
+
+    #[test]
+    fn labelers_are_subscribed_once() {
+        let mut p = prefs();
+        set_labeler(&mut p, "did:plc:autre", true);
+        set_labeler(&mut p, "did:plc:autre", true);
+        assert_eq!(labelers(&p), ["did:plc:veille", "did:plc:autre"]);
+        set_labeler(&mut p, "did:plc:veille", false);
+        assert_eq!(labelers(&p), ["did:plc:autre"]);
+        let mut empty = Vec::new();
+        set_labeler(&mut empty, "did:plc:x", true);
+        assert_eq!(labelers(&empty), ["did:plc:x"]);
     }
 
     #[test]

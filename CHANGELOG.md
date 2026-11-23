@@ -16,6 +16,7 @@ Logiciels et Flathub).
 
 - Mots masqués pour une durée, ou dans les mots-clics seulement.
 - Signaler un message.
+- S'abonner à des services d'étiquetage tiers, ou s'en désabonner.
 
 ### Écrire
 

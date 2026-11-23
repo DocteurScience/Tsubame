@@ -1117,6 +1117,11 @@ pub fn profile_from_view(
             .as_ref()
             .map(|a| (count(a.feedgens), count(a.lists), count(a.starter_packs)))
             .unwrap_or_default(),
+        labeler: profile
+            .associated
+            .as_ref()
+            .and_then(|a| a.labeler)
+            .unwrap_or(false),
     }
 }
 

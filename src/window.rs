@@ -1060,6 +1060,14 @@ impl State {
             if let Ok(Ok(preferences)) = task.await
                 && let Some(state) = weak.upgrade()
             {
+                // Étiquettes des services choisis, avant de recharger.
+                let session = state.session.borrow().clone();
+                if let Some(session) = session {
+                    let labelers = moderation::labelers(&preferences);
+                    let _ = runtime()
+                        .spawn(moderation::configure_labelers(session, labelers))
+                        .await;
+                }
                 moderation::set_preferences(preferences);
                 state.load_all();
             }
