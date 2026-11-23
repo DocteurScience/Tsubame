@@ -27,6 +27,12 @@ done
 
 CONFIG=$(mktemp -d)
 trap 'rm -rf "$CONFIG"' EXIT
+# Police d'interface fixée, pour des mesures identiques partout : Inter,
+# base d'Adwaita Sans, la police de GNOME. Sans bureau, GTK demanderait
+# Cantarell, que fontconfig remplace selon la machine (DejaVu Sans, plus
+# large, sur les runners GitHub).
+mkdir -p "$CONFIG/gtk-4.0"
+printf '[Settings]\ngtk-font-name=Inter 11\n' > "$CONFIG/gtk-4.0/settings.ini"
 export LAUNCHER BIN PYTHON HERE CONFIG
 exec dbus-run-session -- xvfb-run -a -s "-screen 0 1400x900x24" sh -c '
     "$LAUNCHER" --launch-immediately &

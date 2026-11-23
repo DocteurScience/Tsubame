@@ -27,21 +27,19 @@ jobs:
           key: flatpak-builder-${{ hashFiles('build-aux/io.github.DocteurScience.Tsubame.json', 'build-aux/cargo-sources.json') }}
           restore-keys: flatpak-builder-
       - name: Construction
+        # Sur le runner, la composition AppStream ne peut pas lire l'icône :
+        # glycin isole son chargeur par le portail Flatpak, qui refuse le bac
+        # à sable de construction. Elle est désactivée ici seulement, sur une
+        # copie du manifeste ; Flathub la fait sur sa propre infrastructure.
         run: |
+          jq '. + {"appstream-compose": false}' build-aux/io.github.DocteurScience.Tsubame.json \
+            > build-aux/ci.json
           # Bus de session : la composition AppStream lit l'icône SVG avec
           # glycin, dont le chargeur isolé en a besoin.
           dbus-run-session -- flatpak-builder --user --install-deps-from=flathub --disable-rofiles-fuse \
-            --repo=repo --force-clean --default-branch=master --keep-build-dirs \
-            build-dir build-aux/io.github.DocteurScience.Tsubame.json
+            --repo=repo --force-clean --default-branch=master \
+            build-dir build-aux/ci.json
           flatpak build-bundle repo tsubame.flatpak io.github.DocteurScience.Tsubame master
-      - name: Diagnostic AppStream (en cas d'échec)
-        if: failure()
-        run: |
-          dbus-run-session -- flatpak run --user --filesystem=host --command=appstreamcli org.gnome.Sdk//51 \
-            compose --verbose --prefix=/ --origin=diagnostic \
-            --result-root=/tmp/compose --hints-dir=/tmp/hints \
-            --components=io.github.DocteurScience.Tsubame "$PWD/build-dir/files" || true
-          find /tmp/hints -type f -exec cat {} + || true
       - uses: actions/upload-artifact@v4
         with:
           name: tsubame-flatpak
