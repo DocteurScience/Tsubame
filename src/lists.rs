@@ -245,6 +245,42 @@ pub async fn block(session: Arc<Session>, uri: String) -> Result<String, ApiErro
     create_record(&session, LIST_BLOCK, record).await
 }
 
+/// Listes de modération suivies : celles dont je masque ou bloque les
+/// comptes (`getListMutes`, `getListBlocks`).
+pub async fn subscribed(session: Arc<Session>) -> Result<Vec<List>, ApiError> {
+    use atrium_api::app::bsky::graph::{get_list_blocks, get_list_mutes};
+    let api = session.api().await?;
+    let graph = &api.api.app.bsky.graph;
+    let mutes = graph
+        .get_list_mutes(
+            get_list_mutes::ParametersData {
+                cursor: None,
+                limit: 100.try_into().ok(),
+            }
+            .into(),
+        )
+        .await
+        .map_err(request_failed)?;
+    let blocks = graph
+        .get_list_blocks(
+            get_list_blocks::ParametersData {
+                cursor: None,
+                limit: 100.try_into().ok(),
+            }
+            .into(),
+        )
+        .await
+        .map_err(request_failed)?;
+    let mut lists: Vec<List> = Vec::new();
+    for list in mutes.data.lists.iter().chain(blocks.data.lists.iter()) {
+        let list = api::list_from_view(list);
+        if !lists.iter().any(|l| l.uri == list.uri) {
+            lists.push(list);
+        }
+    }
+    Ok(lists)
+}
+
 fn grapheme_count(text: &str) -> usize {
     crate::richtext::grapheme_count(text)
 }

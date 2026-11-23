@@ -120,9 +120,14 @@ pub fn present(
     let muted_row = link_row(&gettext("Comptes masqués"), &muted_count);
     let blocked_row = link_row(&gettext("Comptes bloqués"), &blocked_count);
     let words_row = link_row(&gettext("Mots et mots-clics masqués"), &words_count);
+    let lists_row = link_row(
+        &gettext("Listes de modération suivies"),
+        &gtk::Label::new(None),
+    );
     accounts.add(&muted_row);
     accounts.add(&blocked_row);
     accounts.add(&words_row);
+    accounts.add(&lists_row);
     page.add(&accounts);
 
     // Contenu sensible.
@@ -202,7 +207,12 @@ pub fn present(
         adult,
         labels,
         labelers,
-        rows: vec![muted_row.clone(), blocked_row.clone(), words_row.clone()],
+        rows: vec![
+            muted_row.clone(),
+            blocked_row.clone(),
+            words_row.clone(),
+            lists_row.clone(),
+        ],
         filling: std::cell::Cell::new(false),
     });
 
@@ -233,6 +243,12 @@ pub fn present(
     blocked_row.connect_activated(move |_| {
         if let Some(this) = weak.upgrade() {
             this.show_accounts(true);
+        }
+    });
+    let weak = Rc::downgrade(&this);
+    lists_row.connect_activated(move |_| {
+        if let Some(this) = weak.upgrade() {
+            this.show_lists();
         }
     });
     let weak = Rc::downgrade(&this);
@@ -422,6 +438,100 @@ impl Dialog {
                         "La préférence n'a pas été enregistrée.",
                     )));
                 }
+            }
+        });
+    }
+
+    /// Listes de modération suivies, avec « Ne plus masquer » ou « Ne plus
+    /// bloquer ».
+    fn show_lists(self: &Rc<Self>) {
+        let group = adw::PreferencesGroup::builder()
+            .description(gettext(
+                "Les comptes de ces listes sont masqués ou bloqués pour vous.",
+            ))
+            .build();
+        let page = adw::PreferencesPage::new();
+        page.add(&group);
+        self.dialog
+            .push_subpage(&subpage(&gettext("Listes de modération suivies"), &page));
+        let Some(session) = self.session.clone() else {
+            group.add(&empty_list_row());
+            return;
+        };
+        let task = runtime().spawn(crate::lists::subscribed(session.clone()));
+        let weak = Rc::downgrade(self);
+        glib::spawn_future_local(async move {
+            let result = task
+                .await
+                .unwrap_or_else(|_| Err(ApiError::new(gettext("Chargement interrompu."))));
+            let Some(this) = weak.upgrade() else { return };
+            let lists = match result {
+                Ok(lists) => lists,
+                Err(error) => {
+                    this.dialog.add_toast(adw::Toast::new(&error.message));
+                    return;
+                }
+            };
+            if lists.is_empty() {
+                group.add(&empty_list_row());
+            }
+            for list in lists {
+                let mut state = Vec::new();
+                if list.muted {
+                    state.push(gettext("Comptes masqués"));
+                }
+                if list.blocked.is_some() {
+                    state.push(gettext("Comptes bloqués"));
+                }
+                let row = adw::ActionRow::builder()
+                    .title(&list.name)
+                    .subtitle(state.join(" · "))
+                    .use_markup(false)
+                    .build();
+                let undo = gtk::Button::builder()
+                    .label(if list.blocked.is_some() {
+                        gettext("Ne plus bloquer")
+                    } else {
+                        gettext("Ne plus masquer")
+                    })
+                    .valign(gtk::Align::Center)
+                    .build();
+                undo.update_property(&[gtk::accessible::Property::Label(
+                    &gettext("Ne plus suivre la liste {}").replace("{}", &list.name),
+                )]);
+                let (session, weak) = (session.clone(), Rc::downgrade(&this));
+                undo.connect_clicked(move |button| {
+                    let (session, list) = (session.clone(), list.clone());
+                    // Ne plus masquer, ni bloquer : la liste n'agit plus.
+                    let task = runtime().spawn(async move {
+                        if list.muted {
+                            crate::lists::set_muted(session.clone(), list.uri.clone(), false)
+                                .await?;
+                        }
+                        if let Some(record) = list.blocked {
+                            api::delete(session, record).await?;
+                        }
+                        Ok::<_, ApiError>(())
+                    });
+                    let (weak, row) =
+                        (weak.clone(), button.ancestor(adw::ActionRow::static_type()));
+                    glib::spawn_future_local(async move {
+                        let result = task.await.unwrap_or_else(|_| {
+                            Err(ApiError::new(gettext("Requête interrompue.")))
+                        });
+                        let Some(this) = weak.upgrade() else { return };
+                        match result {
+                            Ok(()) => {
+                                if let Some(row) = row {
+                                    row.set_visible(false);
+                                }
+                            }
+                            Err(error) => this.dialog.add_toast(adw::Toast::new(&error.message)),
+                        }
+                    });
+                });
+                row.add_suffix(&undo);
+                group.add(&row);
             }
         });
     }
@@ -660,6 +770,13 @@ impl Dialog {
             }
         });
     }
+}
+
+fn empty_list_row() -> adw::ActionRow {
+    adw::ActionRow::builder()
+        .title(gettext("Aucune liste"))
+        .css_classes(["dim-label"])
+        .build()
 }
 
 fn empty_row() -> adw::ActionRow {

@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: tsubame\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-23 17:44+0000\n"
+"POT-Creation-Date: 2026-11-23 17:47+0000\n"
 "PO-Revision-Date: 2026-11-22\n"
 "Last-Translator: \n"
 "Language-Team: English\n"
@@ -23,7 +23,8 @@ msgstr "Tsubame"
 msgid "Client Bluesky pour GNOME"
 msgstr "Bluesky client for GNOME"
 
-#. Traducteurs : mots-clés séparés par des points-virgules, sans traduire « Tsubame ».
+#. Traducteurs : mots-clés séparés par des points-virgules, sans traduire «
+#. Tsubame ».
 #: data/io.github.DocteurScience.Tsubame.desktop.in:6
 msgid "Bluesky;réseau social;AT Protocol;microblog;"
 msgstr "Bluesky;social network;AT Protocol;microblog;"
@@ -33,8 +34,8 @@ msgid ""
 "Tsubame est un client Bluesky natif pour le bureau GNOME. Les posts "
 "s’affichent en cartes et la discussion s’ouvre dans un volet à côté du fil."
 msgstr ""
-"Tsubame is a native Bluesky client for the GNOME desktop. Posts are shown as "
-"cards and the conversation opens in a pane next to the feed."
+"Tsubame is a native Bluesky client for the GNOME desktop. Posts are shown as"
+" cards and the conversation opens in a pane next to the feed."
 
 #: data/io.github.DocteurScience.Tsubame.metainfo.xml.in:16
 msgid "DocteurScience"
@@ -366,8 +367,8 @@ msgstr "Your session has expired. Please sign in again."
 
 #: src/auth/mod.rs:68
 msgid ""
-"Impossible de trouver ce compte. Vérifiez l'identifiant et votre connexion à "
-"Internet."
+"Impossible de trouver ce compte. Vérifiez l'identifiant et votre connexion à"
+" Internet."
 msgstr ""
 "Could not find this account. Check the handle and your Internet connection."
 
@@ -612,7 +613,7 @@ msgstr ""
 msgid "Linux et libre"
 msgstr "Linux and free software"
 
-#: src/column.rs:113 src/preferences.rs:173 src/window.rs:2066
+#: src/column.rs:113 src/preferences.rs:178 src/window.rs:2066
 msgid "Notifications"
 msgstr "Notifications"
 
@@ -701,7 +702,7 @@ msgstr "New post"
 
 #. En-tête : Annuler, titre, Publier.
 #: src/compose.rs:257 src/compose.rs:1805 src/edit_profile.rs:234
-#: src/lists.rs:269 src/lists.rs:548 src/login.rs:150 src/profile.rs:1280
+#: src/lists.rs:305 src/lists.rs:584 src/login.rs:150 src/profile.rs:1280
 #: src/report.rs:180 src/window.rs:572 src/window.rs:1171 src/window.rs:1324
 msgid "Annuler"
 msgstr "Cancel"
@@ -812,7 +813,7 @@ msgstr "Keep as draft"
 msgid "Le brouillon n'a pas pu être enregistré."
 msgstr "The draft could not be saved."
 
-#: src/compose.rs:1217 src/lists.rs:352 src/lists.rs:558 src/messages.rs:1360
+#: src/compose.rs:1217 src/lists.rs:388 src/lists.rs:594 src/messages.rs:1360
 #: src/starter_packs.rs:420
 msgid "Mode démonstration : rien n'est publié."
 msgstr "Demo mode: nothing is posted."
@@ -907,7 +908,7 @@ msgstr "GIF"
 msgid "Texte alternatif"
 msgstr "Alternative text"
 
-#: src/compose.rs:1807 src/edit_profile.rs:236 src/lists.rs:274
+#: src/compose.rs:1807 src/edit_profile.rs:236 src/lists.rs:310
 msgid "Enregistrer"
 msgstr "Save"
 
@@ -925,7 +926,8 @@ msgid ""
 msgstr "Describe what the video shows for people who cannot see it."
 
 #: src/compose.rs:1847
-msgid "Décrivez ce que montre l'image pour les personnes qui ne la voient pas."
+msgid ""
+"Décrivez ce que montre l'image pour les personnes qui ne la voient pas."
 msgstr "Describe what the image shows for people who cannot see it."
 
 #: src/desktop.rs:16
@@ -980,8 +982,8 @@ msgstr "Display name"
 msgid "Bio"
 msgstr "Bio"
 
-#: src/edit_profile.rs:393 src/feed_page.rs:332 src/lists.rs:590
-#: src/lists.rs:701 src/profile.rs:811
+#: src/edit_profile.rs:393 src/feed_page.rs:332 src/lists.rs:626
+#: src/lists.rs:737 src/profile.rs:811
 msgid "Chargement…"
 msgstr "Loading…"
 
@@ -1001,11 +1003,12 @@ msgstr "Choose a banner"
 msgid "Choisir un avatar"
 msgstr "Choose an avatar"
 
-#: src/edit_profile.rs:576 src/explore.rs:182 src/feeds.rs:734 src/lists.rs:383
-#: src/lists.rs:413 src/messages.rs:882 src/preferences.rs:413
-#: src/preferences.rs:525 src/profile.rs:987 src/profile.rs:1106
-#: src/profile.rs:1154 src/profile.rs:1209 src/report.rs:271 src/window.rs:1120
-#: src/window.rs:1188 src/window.rs:1243 src/window.rs:1344 src/window.rs:1723
+#: src/edit_profile.rs:576 src/explore.rs:182 src/feeds.rs:734
+#: src/lists.rs:419 src/lists.rs:449 src/messages.rs:882
+#: src/preferences.rs:429 src/preferences.rs:520 src/preferences.rs:635
+#: src/profile.rs:987 src/profile.rs:1106 src/profile.rs:1154
+#: src/profile.rs:1209 src/report.rs:271 src/window.rs:1120 src/window.rs:1188
+#: src/window.rs:1243 src/window.rs:1344 src/window.rs:1723
 msgid "Requête interrompue."
 msgstr "Request interrupted."
 
@@ -1091,10 +1094,10 @@ msgstr "No feeds match this search."
 #: src/explore.rs:506 src/explore.rs:560 src/explore.rs:583 src/explore.rs:592
 #: src/explore.rs:687 src/explore.rs:712 src/feed_page.rs:94
 #: src/feed_page.rs:269 src/feed_page.rs:386 src/feeds.rs:450 src/feeds.rs:571
-#: src/lists.rs:678 src/lists.rs:812 src/messages.rs:657 src/messages.rs:753
-#: src/messages.rs:921 src/messages.rs:1120 src/preferences.rs:277
-#: src/preferences.rs:461 src/profile.rs:657 src/profile.rs:830
-#: src/profile.rs:953 src/starter_packs.rs:404
+#: src/lists.rs:714 src/lists.rs:848 src/messages.rs:657 src/messages.rs:753
+#: src/messages.rs:921 src/messages.rs:1120 src/preferences.rs:293
+#: src/preferences.rs:466 src/preferences.rs:571 src/profile.rs:657
+#: src/profile.rs:830 src/profile.rs:953 src/starter_packs.rs:404
 msgid "Chargement interrompu."
 msgstr "Loading interrupted."
 
@@ -1120,7 +1123,7 @@ msgid_plural "{} membres"
 msgstr[0] "{} member"
 msgstr[1] "{} members"
 
-#: src/feed_page.rs:180 src/lists.rs:290 src/lists.rs:752
+#: src/feed_page.rs:180 src/lists.rs:326 src/lists.rs:788
 msgid "Liste de modération"
 msgstr "Moderation list"
 
@@ -1128,15 +1131,15 @@ msgstr "Moderation list"
 msgid "Mes listes"
 msgstr "My lists"
 
-#: src/feed_page.rs:219 src/lists.rs:688 src/profile.rs:54 src/window.rs:88
+#: src/feed_page.rs:219 src/lists.rs:724 src/profile.rs:54 src/window.rs:88
 msgid "Listes"
 msgstr "Lists"
 
-#: src/feed_page.rs:223 src/feed_page.rs:225 src/lists.rs:263
+#: src/feed_page.rs:223 src/feed_page.rs:225 src/lists.rs:299
 msgid "Nouvelle liste"
 msgstr "New list"
 
-#: src/feed_page.rs:290 src/lists.rs:797
+#: src/feed_page.rs:290 src/lists.rs:833
 msgid "Vous n'avez pas encore de liste."
 msgstr "You have no lists yet."
 
@@ -1212,127 +1215,127 @@ msgstr "Add {} to your feeds"
 msgid "La liste des flux n'a pas été enregistrée."
 msgstr "The feed list was not saved."
 
-#: src/lists.rs:265
+#: src/lists.rs:301
 msgid "Modifier la liste"
 msgstr "Edit list"
 
-#: src/lists.rs:272
+#: src/lists.rs:308
 msgid "Créer"
 msgstr "Create"
 
-#: src/lists.rs:285
+#: src/lists.rs:321
 msgid "Nom"
 msgstr "Name"
 
-#: src/lists.rs:287
+#: src/lists.rs:323
 msgid "Description"
 msgstr "Description"
 
-#: src/lists.rs:292
+#: src/lists.rs:328
 msgid "Pour masquer ou bloquer ses comptes, sans fil de posts."
 msgstr "To mute or block its accounts, with no post feed."
 
-#: src/lists.rs:386
+#: src/lists.rs:422
 msgid "Liste enregistrée."
 msgstr "List saved."
 
-#: src/lists.rs:435 src/lists.rs:439
+#: src/lists.rs:471 src/lists.rs:475
 msgid "Options de la liste"
 msgstr "List options"
 
-#: src/lists.rs:449 src/lists.rs:614
+#: src/lists.rs:485 src/lists.rs:650
 msgid "Membres"
 msgstr "Members"
 
-#: src/lists.rs:457
+#: src/lists.rs:493
 msgid "Modifier la liste…"
 msgstr "Edit list…"
 
-#: src/lists.rs:458
+#: src/lists.rs:494
 msgid "Supprimer la liste…"
 msgstr "Delete list…"
 
-#: src/lists.rs:478
+#: src/lists.rs:514
 msgid "Ne plus masquer ces comptes"
 msgstr "Unmute these accounts"
 
-#: src/lists.rs:480
+#: src/lists.rs:516
 msgid "Masquer ces comptes"
 msgstr "Mute these accounts"
 
-#: src/lists.rs:484
+#: src/lists.rs:520
 msgid "Ne plus bloquer ces comptes"
 msgstr "Unblock these accounts"
 
-#: src/lists.rs:486
+#: src/lists.rs:522
 msgid "Bloquer ces comptes"
 msgstr "Block these accounts"
 
-#: src/lists.rs:503
+#: src/lists.rs:539
 msgid "Les comptes de cette liste sont masqués."
 msgstr "Accounts in this list are muted."
 
-#: src/lists.rs:505
+#: src/lists.rs:541
 msgid "Les comptes de cette liste ne sont plus masqués."
 msgstr "Accounts in this list are no longer muted."
 
-#: src/lists.rs:524
+#: src/lists.rs:560
 msgid "Les comptes de cette liste ne sont plus bloqués."
 msgstr "Accounts in this list are no longer blocked."
 
-#: src/lists.rs:530
+#: src/lists.rs:566
 msgid "Les comptes de cette liste sont bloqués."
 msgstr "Accounts in this list are blocked."
 
-#: src/lists.rs:542
+#: src/lists.rs:578
 msgid "Supprimer cette liste ?"
 msgstr "Delete this list?"
 
-#: src/lists.rs:544
+#: src/lists.rs:580
 msgid "Elle disparaîtra pour tout le monde. Ses comptes ne sont pas prévenus."
 msgstr "It will disappear for everyone. Its accounts are not notified."
 
-#: src/lists.rs:549 src/window.rs:1172
+#: src/lists.rs:585 src/window.rs:1172
 msgid "Supprimer"
 msgstr "Delete"
 
-#: src/lists.rs:566
+#: src/lists.rs:602
 msgid "Liste supprimée."
 msgstr "List deleted."
 
-#: src/lists.rs:636
+#: src/lists.rs:672
 msgid "Retirer de la liste"
 msgstr "Remove from list"
 
-#: src/lists.rs:641
+#: src/lists.rs:677
 msgid "Retirer {} de la liste"
 msgstr "Remove {} from the list"
 
-#: src/lists.rs:649
+#: src/lists.rs:685
 msgid "Compte retiré de la liste."
 msgstr "Account removed from the list."
 
-#: src/lists.rs:663
+#: src/lists.rs:699
 msgid "Cette liste est vide."
 msgstr "This list is empty."
 
-#: src/lists.rs:698
+#: src/lists.rs:734
 msgid "Listes de {}"
 msgstr "Lists for {}"
 
-#: src/lists.rs:725
+#: src/lists.rs:761
 msgid "Ajouter à une liste"
 msgstr "Add to a list"
 
-#: src/lists.rs:754
+#: src/lists.rs:790
 msgid "Liste de comptes"
 msgstr "List of accounts"
 
-#: src/lists.rs:773
+#: src/lists.rs:809
 msgid "Ajouté à « {} »."
 msgstr "Added to “{}”."
 
-#: src/lists.rs:784
+#: src/lists.rs:820
 msgid "Retiré de « {} »."
 msgstr "Removed from “{}”."
 
@@ -1350,11 +1353,11 @@ msgstr "Handle"
 
 #: src/login.rs:92
 msgid ""
-"Par exemple : vous.bsky.social. Votre navigateur s'ouvrira pour confirmer la "
-"connexion ; Tsubame ne voit jamais votre mot de passe."
+"Par exemple : vous.bsky.social. Votre navigateur s'ouvrira pour confirmer la"
+" connexion ; Tsubame ne voit jamais votre mot de passe."
 msgstr ""
-"For example: you.bsky.social. Your browser will open to confirm the sign-in; "
-"Tsubame never sees your password."
+"For example: you.bsky.social. Your browser will open to confirm the sign-in;"
+" Tsubame never sees your password."
 
 #: src/login.rs:106
 msgid "Se connecter"
@@ -1484,7 +1487,8 @@ msgid "Messages plus anciens"
 msgstr "Older messages"
 
 #: src/messages.rs:464
-msgid "Demande de message : cette personne ne fait pas partie de vos contacts."
+msgid ""
+"Demande de message : cette personne ne fait pas partie de vos contacts."
 msgstr "Message request: this person is not one of your contacts."
 
 #: src/messages.rs:466
@@ -1602,140 +1606,160 @@ msgstr "Moderation"
 msgid "Listes et comptes"
 msgstr "Lists and accounts"
 
-#: src/preferences.rs:120 src/preferences.rs:437
+#: src/preferences.rs:120 src/preferences.rs:481 src/preferences.rs:547
 msgid "Comptes masqués"
 msgstr "Muted accounts"
 
-#: src/preferences.rs:121 src/preferences.rs:435
+#: src/preferences.rs:121 src/preferences.rs:484 src/preferences.rs:545
 msgid "Comptes bloqués"
 msgstr "Blocked accounts"
 
-#: src/preferences.rs:122 src/preferences.rs:586
+#: src/preferences.rs:122 src/preferences.rs:696
 msgid "Mots et mots-clics masqués"
 msgstr "Muted words and tags"
 
-#: src/preferences.rs:130
+#: src/preferences.rs:124 src/preferences.rs:456
+msgid "Listes de modération suivies"
+msgstr "Subscribed moderation lists"
+
+#: src/preferences.rs:135
 msgid "Contenu sensible"
 msgstr "Sensitive content"
 
-#: src/preferences.rs:132
+#: src/preferences.rs:137
 msgid ""
 "Chaque étiquette peut être affichée, floutée avec un avertissement, ou "
 "masquée."
 msgstr "Each label can be shown, blurred with a warning, or hidden."
 
-#: src/preferences.rs:136
+#: src/preferences.rs:141
 msgid "Activer le contenu pour adultes"
 msgstr "Enable adult content"
 
-#: src/preferences.rs:158
+#: src/preferences.rs:163
 msgid "Services d'étiquetage"
 msgstr "Labeling services"
 
-#: src/preferences.rs:160
+#: src/preferences.rs:165
 msgid ""
 "Des services tiers ajoutent leurs propres étiquettes à vos fils et profils."
 msgstr "Third-party services add their own labels to your feeds and profiles."
 
-#: src/preferences.rs:164
+#: src/preferences.rs:169
 msgid "Modération Bluesky"
 msgstr "Bluesky Moderation"
 
-#: src/preferences.rs:165
+#: src/preferences.rs:170
 msgid "Service par défaut · activé"
 msgstr "Default service · enabled"
 
-#: src/preferences.rs:178
+#: src/preferences.rs:183
 msgid ""
 "Tsubame vérifie les notifications toutes les minutes tant qu'il est ouvert."
 msgstr "Tsubame checks notifications every minute while it is open."
 
-#: src/preferences.rs:182
+#: src/preferences.rs:187
 msgid "Notifications du bureau"
 msgstr "Desktop notifications"
 
-#: src/preferences.rs:184
+#: src/preferences.rs:189
 msgid ""
 "Prévenir des nouvelles notifications quand la fenêtre n'est pas au premier "
 "plan"
 msgstr "Notify about new notifications when the window is in the background"
 
-#: src/preferences.rs:319
+#: src/preferences.rs:335
 msgid "Abonnement actif"
 msgstr "Active subscription"
 
-#: src/preferences.rs:351
+#: src/preferences.rs:367
 msgid "Se désabonner"
 msgstr "Unsubscribe"
 
-#: src/preferences.rs:355
+#: src/preferences.rs:371
 msgid "Se désabonner de {}"
 msgstr "Unsubscribe from {}"
 
-#: src/preferences.rs:422
+#: src/preferences.rs:438
 msgid "La préférence n'a pas été enregistrée."
 msgstr "The preference was not saved."
 
-#: src/preferences.rs:489 src/profile.rs:1044
-msgid "Débloquer"
+#: src/preferences.rs:450
+msgid "Les comptes de ces listes sont masqués ou bloqués pour vous."
+msgstr "Accounts in these lists are muted or blocked for you."
+
+#: src/preferences.rs:493
+msgid "Ne plus bloquer"
 msgstr "Unblock"
 
-#: src/preferences.rs:491 src/profile.rs:1038
+#: src/preferences.rs:495 src/preferences.rs:601 src/profile.rs:1038
 msgid "Ne plus masquer"
 msgstr "Unmute"
 
-#: src/preferences.rs:551
+#: src/preferences.rs:500
+msgid "Ne plus suivre la liste {}"
+msgstr "Unsubscribe from the list {}"
+
+#: src/preferences.rs:599 src/profile.rs:1044
+msgid "Débloquer"
+msgstr "Unblock"
+
+#: src/preferences.rs:661
 msgid "Ajouter un mot ou un mot-clic"
 msgstr "Add a word or tag"
 
-#: src/preferences.rs:556
+#: src/preferences.rs:666
 msgid ""
 "Les posts qui contiennent ces mots sont cachés dans vos fils, de tous les "
 "comptes."
 msgstr ""
 "Posts that contain these words are hidden from your feeds, for all accounts."
 
-#: src/preferences.rs:565
+#: src/preferences.rs:675
 msgid "Toujours"
 msgstr "Forever"
 
-#: src/preferences.rs:566
+#: src/preferences.rs:676
 msgid "24 heures"
 msgstr "24 hours"
 
-#: src/preferences.rs:567
+#: src/preferences.rs:677
 msgid "7 jours"
 msgstr "7 days"
 
-#: src/preferences.rs:568
+#: src/preferences.rs:678
 msgid "30 jours"
 msgstr "30 days"
 
-#: src/preferences.rs:572
+#: src/preferences.rs:682
 msgid "Durée"
 msgstr "Duration"
 
-#: src/preferences.rs:576 src/preferences.rs:602
+#: src/preferences.rs:686 src/preferences.rs:712
 msgid "Mots-clics seulement"
 msgstr "Hashtags only"
 
-#: src/preferences.rs:577
+#: src/preferences.rs:687
 msgid "Ne pas chercher le mot dans le texte des posts."
 msgstr "Do not look for the word in the text of posts."
 
-#: src/preferences.rs:605
+#: src/preferences.rs:715
 msgid "Expiré"
 msgstr "Expired"
 
-#: src/preferences.rs:608
+#: src/preferences.rs:718
 msgid "Jusqu'au {}"
 msgstr "Until {}"
 
-#: src/preferences.rs:623 src/preferences.rs:627
+#: src/preferences.rs:733 src/preferences.rs:737
 msgid "Retirer « {} »"
 msgstr "Remove “{}”"
 
-#: src/preferences.rs:667
+#: src/preferences.rs:777
+msgid "Aucune liste"
+msgstr "No lists"
+
+#: src/preferences.rs:784
 msgid "Aucun compte"
 msgstr "No accounts"
 
@@ -1804,7 +1828,8 @@ msgstr "Profile not found"
 msgid "Profil enregistré."
 msgstr "Profile saved."
 
-#: src/profile.rs:529 src/profile.rs:1231 src/window.rs:1110 src/window.rs:1335
+#: src/profile.rs:529 src/profile.rs:1231 src/window.rs:1110
+#: src/window.rs:1335
 msgid "Mode démonstration : rien n'est enregistré."
 msgstr "Demo mode: nothing is saved."
 
@@ -2032,8 +2057,8 @@ msgid ""
 "Le signalement est envoyé au service de modération de Bluesky. La personne "
 "signalée n'en est pas informée."
 msgstr ""
-"The report is sent to the Bluesky moderation service. The reported person is "
-"not told."
+"The report is sent to the Bluesky moderation service. The reported person is"
+" not told."
 
 #: src/report.rs:229
 msgid "Précisions (facultatif)"

@@ -16,6 +16,7 @@ Logiciels et Flathub).
 
 - Mots masqués pour une durée, ou dans les mots-clics seulement.
 - Signaler un message.
+- Préférences : listes de modération suivies.
 - S'abonner à des services d'étiquetage tiers, ou s'en désabonner ; régler chacune de leurs étiquettes.
 
 ### Écrire
