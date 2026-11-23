@@ -20,6 +20,7 @@ mod i18n;
 mod images;
 mod interactions;
 mod link_preview;
+mod lists;
 mod login;
 mod mentions;
 mod messages;

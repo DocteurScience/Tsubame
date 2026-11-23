@@ -16,6 +16,7 @@ src/explore.rs
 src/feed_page.rs
 src/feeds.rs
 src/link_preview.rs
+src/lists.rs
 src/login.rs
 src/main.rs
 src/mentions.rs

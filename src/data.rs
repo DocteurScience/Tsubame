@@ -115,7 +115,7 @@ impl Post {
 }
 
 /// Liste de comptes (curation ou modération).
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct List {
     pub uri: String,
     pub name: String,
@@ -124,6 +124,12 @@ pub struct List {
     pub members: u64,
     /// Liste de modération (comptes masqués ou bloqués), sans fil de posts.
     pub moderation: bool,
+    /// DID de la personne qui l'a créée.
+    pub creator: String,
+    /// Je masque les comptes de cette liste de modération.
+    pub muted: bool,
+    /// Mon blocage par cette liste (adresse de l'enregistrement), s'il existe.
+    pub blocked: Option<String>,
 }
 
 pub fn demo_lists() -> Vec<List> {
@@ -135,6 +141,7 @@ pub fn demo_lists() -> Vec<List> {
             avatar: None,
             members: 24,
             moderation: false,
+            ..List::default()
         },
         List {
             uri: "demo:indesirables".into(),
@@ -143,6 +150,7 @@ pub fn demo_lists() -> Vec<List> {
             avatar: None,
             members: 3,
             moderation: true,
+            ..List::default()
         },
     ]
 }

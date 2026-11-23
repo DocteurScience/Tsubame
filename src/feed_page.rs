@@ -8,7 +8,7 @@ use gettextrs::{gettext, ngettext};
 use gtk::glib;
 
 use crate::api::{self, ApiError, Page, Source};
-use crate::data::{self, Actor, List, Post};
+use crate::data::{self, List, Post};
 use crate::explore::actor_row;
 use crate::post_list::PostList;
 use crate::profile::Host;
@@ -18,6 +18,8 @@ use crate::runtime::runtime;
 /// défilement. Sans compte, `demo` est affiché.
 pub struct FeedPage {
     pub root: adw::ToolbarView,
+    /// En-tête, pour y ajouter des boutons.
+    pub header: adw::HeaderBar,
     host: Host,
     source: Source,
     demo: Vec<Post>,
@@ -40,6 +42,7 @@ impl FeedPage {
         root.add_top_bar(&header);
         let page = Rc::new(Self {
             root,
+            header,
             host,
             source,
             demo,
@@ -155,65 +158,6 @@ fn status(title: &str) -> adw::StatusPage {
         .build()
 }
 
-/// Membres d'une liste de modération (qui n'a pas de fil).
-pub fn members_page(list: &List, host: &Host) -> adw::NavigationPage {
-    let rows = boxed_list(&list.name);
-    let stack = gtk::Stack::new();
-    stack.add_named(&scrolled(&rows), Some("list"));
-    stack.add_named(&status(&gettext("Chargement…")), Some("loading"));
-    let error = status("");
-    stack.add_named(&error, Some("error"));
-    let root = adw::ToolbarView::builder().content(&stack).build();
-    root.add_top_bar(
-        &adw::HeaderBar::builder()
-            .title_widget(&adw::WindowTitle::new(&list.name, &gettext("Membres")))
-            .build(),
-    );
-    let page = adw::NavigationPage::builder()
-        .title(&list.name)
-        .child(&root)
-        .build();
-
-    let fill = {
-        let (rows, stack, error, session, toasts) = (
-            rows.clone(),
-            stack.clone(),
-            error.clone(),
-            host.session.clone(),
-            host.toasts.clone(),
-        );
-        move |members: Result<Vec<Actor>, ApiError>| match members {
-            Ok(members) if !members.is_empty() => {
-                for actor in &members {
-                    rows.append(&actor_row(actor, session.clone(), &toasts));
-                }
-                stack.set_visible_child_name("list");
-            }
-            Ok(_) => {
-                error.set_title(&gettext("Cette liste est vide."));
-                stack.set_visible_child_name("error");
-            }
-            Err(failure) => {
-                error.set_title(&failure.message);
-                stack.set_visible_child_name("error");
-            }
-        }
-    };
-    let Some(session) = host.session.clone() else {
-        fill(Ok(data::demo_actors()));
-        return page;
-    };
-    stack.set_visible_child_name("loading");
-    let task = runtime().spawn(api::list_members(session, list.uri.clone()));
-    glib::spawn_future_local(async move {
-        fill(
-            task.await
-                .unwrap_or_else(|_| Err(ApiError::new(gettext("Chargement interrompu.")))),
-        );
-    });
-    page
-}
-
 /// Page « Listes » : mes listes. Une liste de curation ouvre son fil, une
 /// liste de modération ses membres.
 pub struct ListsPage {
@@ -271,11 +215,16 @@ impl ListsPage {
         stack.add_named(&scrolled(&rows), Some("list"));
         stack.add_named(&error, Some("error"));
         let root = adw::ToolbarView::builder().content(&stack).build();
-        root.add_top_bar(
-            &adw::HeaderBar::builder()
-                .title_widget(&adw::WindowTitle::new(&gettext("Listes"), ""))
-                .build(),
-        );
+        let header = adw::HeaderBar::builder()
+            .title_widget(&adw::WindowTitle::new(&gettext("Listes"), ""))
+            .build();
+        let new_list = gtk::Button::builder()
+            .icon_name("list-add-symbolic")
+            .tooltip_text(gettext("Nouvelle liste"))
+            .build();
+        new_list.update_property(&[gtk::accessible::Property::Label(&gettext("Nouvelle liste"))]);
+        header.pack_start(&new_list);
+        root.add_top_bar(&header);
         let page = Rc::new(Self {
             root,
             host,
@@ -291,6 +240,16 @@ impl ListsPage {
             if let Some(list) = list {
                 page.open(&list);
             }
+        });
+        let weak = Rc::downgrade(&page);
+        new_list.connect_clicked(move |button| {
+            let Some(page) = weak.upgrade() else { return };
+            let reload = Rc::downgrade(&page);
+            crate::lists::edit_dialog(button, None, &page.host, move || {
+                if let Some(page) = reload.upgrade() {
+                    page.load();
+                }
+            });
         });
         page.load();
         page
@@ -338,9 +297,15 @@ impl ListsPage {
         }
     }
 
-    fn open(&self, list: &List) {
+    fn open(self: &Rc<Self>, list: &List) {
+        let weak = Rc::downgrade(self);
+        let changed: Rc<dyn Fn()> = Rc::new(move || {
+            if let Some(page) = weak.upgrade() {
+                page.load();
+            }
+        });
         let page = if list.moderation {
-            members_page(list, &self.host)
+            crate::lists::members_page(list, &self.host, changed)
         } else {
             let feed = FeedPage::new(
                 &list.name,
@@ -348,6 +313,8 @@ impl ListsPage {
                 data::posts(data::Feed::LinuxEtLibre),
                 self.host.clone(),
             );
+            feed.header
+                .pack_end(&crate::lists::menu_button(list, &self.host, changed));
             feed.navigation_page(&list.name)
         };
         (self.host.push)(page);

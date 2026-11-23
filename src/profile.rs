@@ -421,6 +421,7 @@ impl ProfilePage {
             ("mute", Self::toggle_mute),
             ("block", Self::toggle_block),
             ("report", Self::report),
+            ("add-to-list", Self::add_to_list),
         ] {
             let action = gio::SimpleAction::new(name, None);
             let weak = Rc::downgrade(&page);
@@ -674,6 +675,10 @@ fn profile_menu(profile: &Profile) -> gio::Menu {
     let menu = gio::Menu::new();
     let sharing = gio::Menu::new();
     sharing.append(Some(&gettext("Copier le lien")), Some("profile.copy-link"));
+    sharing.append(
+        Some(&gettext("Ajouter à une liste…")),
+        Some("profile.add-to-list"),
+    );
     menu.append_section(None, &sharing);
     let moderation = gio::Menu::new();
     let mute = if profile.muted {
@@ -704,6 +709,18 @@ impl ProfilePage {
         self.host
             .toasts
             .add_toast(adw::Toast::new(&gettext("Lien copié.")));
+    }
+
+    fn add_to_list(self: &Rc<Self>) {
+        let Some((did, handle)) = self
+            .profile
+            .borrow()
+            .as_ref()
+            .map(|p| (p.did.clone(), p.handle.clone()))
+        else {
+            return;
+        };
+        crate::lists::memberships_dialog(&self.root, &did, &handle, &self.host);
     }
 
     fn report(self: &Rc<Self>) {

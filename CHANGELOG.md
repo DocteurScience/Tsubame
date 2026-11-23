@@ -21,6 +21,7 @@ Logiciels et Flathub).
 
 ### Lire
 
+- Listes : créer, modifier, supprimer, ajouter ou retirer des comptes ; masquer ou bloquer les comptes d'une liste de modération.
 - Starter packs dans Explorer : voir leurs comptes et leurs flux, tout suivre.
 - Recherche de flux dans Explorer.
 - Liens, mentions et mots-dièse cliquables dans les posts ; page d'un mot-dièse.

@@ -1068,7 +1068,7 @@ pub async fn pinned_feeds(session: Arc<Session>) -> Result<Vec<PinnedFeed>, ApiE
         .collect())
 }
 
-fn invalid_actor() -> ApiError {
+pub(crate) fn invalid_actor() -> ApiError {
     ApiError::new(gettext("Ce compte n'existe pas."))
 }
 
@@ -1198,7 +1198,7 @@ pub async fn unbookmark(session: Arc<Session>, uri: String) -> Result<(), ApiErr
         .map_err(request_failed)
 }
 
-fn list_from_view(list: &atrium_api::app::bsky::graph::defs::ListView) -> List {
+pub(crate) fn list_from_view(list: &atrium_api::app::bsky::graph::defs::ListView) -> List {
     let purpose = serde_json::to_value(&list.purpose).unwrap_or_default();
     List {
         uri: list.uri.clone(),
@@ -1207,6 +1207,9 @@ fn list_from_view(list: &atrium_api::app::bsky::graph::defs::ListView) -> List {
         avatar: list.avatar.clone(),
         members: list.list_item_count.unwrap_or(0) as u64,
         moderation: purpose.as_str() == Some("app.bsky.graph.defs#modlist"),
+        creator: list.creator.did.as_str().to_owned(),
+        muted: list.viewer.as_ref().and_then(|v| v.muted).unwrap_or(false),
+        blocked: list.viewer.as_ref().and_then(|v| v.blocked.clone()),
     }
 }
 
