@@ -382,6 +382,7 @@ fn media(post: &PostView) -> Option<Media> {
             thumb: Some(first.thumb.clone()),
             aspect_ratio: ratio(&first.aspect_ratio),
             more: view.images.len().saturating_sub(1) as u32,
+            video: None,
         })
     };
     let video = |view: &video::View| {
@@ -390,6 +391,7 @@ fn media(post: &PostView) -> Option<Media> {
             thumb: view.thumbnail.clone(),
             aspect_ratio: ratio(&view.aspect_ratio),
             more: 0,
+            video: Some(view.playlist.clone()),
         })
     };
     match post.embed.as_ref()? {
@@ -1943,6 +1945,7 @@ mod tests {
                 thumb: Some("https://cdn.example/thumb.jpg".into()),
                 aspect_ratio: Some((1600, 900)),
                 more: 1,
+                video: None,
             })
         );
         assert_eq!((post.replies, post.reposts, post.likes), (8, 12, 48));
@@ -2431,6 +2434,30 @@ mod tests {
         assert_eq!(embed["record"]["record"]["cid"], CID);
         assert_eq!(embed["media"]["$type"], "app.bsky.embed.images");
         let _: atrium_api::app::bsky::feed::post::Record = serde_json::from_value(record).unwrap();
+    }
+
+    #[test]
+    fn videos_keep_their_playlist() {
+        let mut item: serde_json::Value = serde_json::from_str(FEED_ITEM).unwrap();
+        item["post"]["embed"] = serde_json::json!({
+            "$type": "app.bsky.embed.video#view",
+            "cid": CID,
+            "playlist": "https://video.example/watch/playlist.m3u8",
+            "thumbnail": "https://video.example/watch/thumbnail.jpg",
+            "alt": "Démonstration",
+            "aspectRatio": {"width": 1920, "height": 1080}
+        });
+        let item: FeedViewPost = serde_json::from_value(item).unwrap();
+        let media = post_from_feed(&item, now()).media.unwrap();
+        assert_eq!(
+            media.video.as_deref(),
+            Some("https://video.example/watch/playlist.m3u8")
+        );
+        assert_eq!(
+            media.thumb.as_deref(),
+            Some("https://video.example/watch/thumbnail.jpg")
+        );
+        assert_eq!(media.aspect_ratio, Some((1920, 1080)));
     }
 
     #[test]

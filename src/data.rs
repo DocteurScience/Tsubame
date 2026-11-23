@@ -226,6 +226,8 @@ pub struct Media {
     pub aspect_ratio: Option<(u32, u32)>,
     /// Autres images du même post, non affichées.
     pub more: u32,
+    /// Vidéo : adresse de sa liste de lecture (HLS), lue dans la carte.
+    pub video: Option<String>,
 }
 
 impl Media {

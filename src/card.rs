@@ -3,7 +3,7 @@
 
 use adw::prelude::*;
 use gettextrs::{gettext, ngettext, pgettext};
-use gtk::gio;
+use gtk::{gio, glib};
 
 use crate::data::{Media, Post, Reply};
 use crate::images;
@@ -151,10 +151,76 @@ fn media(media: &Media, warning: Option<String>) -> gtk::Widget {
             gtk::Align::Start,
         ));
     }
+    if let Some(playlist) = &media.video {
+        add_play_button(&overlay, playlist, &description, height);
+    }
     if let Some(warning) = warning {
         add_warning(&overlay, &content, &warning);
     }
     overlay.upcast()
+}
+
+/// Vidéo : la vignette porte « Lire la vidéo » ; un clic la remplace par le
+/// lecteur de GTK (GStreamer), qui lit la liste de lecture HLS.
+fn add_play_button(overlay: &gtk::Overlay, playlist: &str, description: &str, height: i32) {
+    let play = gtk::Button::builder()
+        .icon_name("media-playback-start-symbolic")
+        .tooltip_text(gettext("Lire la vidéo"))
+        .halign(gtk::Align::Center)
+        .valign(gtk::Align::Center)
+        .css_classes(["circular", "osd", "video-play"])
+        .build();
+    play.update_property(&[gtk::accessible::Property::Label(&gettext("Lire la vidéo"))]);
+    overlay.add_overlay(&play);
+    let (playlist, description) = (playlist.to_owned(), description.to_owned());
+    let weak = overlay.downgrade();
+    play.connect_clicked(move |play| {
+        let Some(overlay) = weak.upgrade() else {
+            return;
+        };
+        let video = gtk::Video::builder()
+            .autoplay(true)
+            .height_request(height)
+            .build();
+        video.update_property(&[gtk::accessible::Property::Label(&description)]);
+        video.set_file(Some(&gio::File::for_uri(&playlist)));
+        // Lecture impossible (format, réseau) : le dire à la place.
+        if let Some(stream) = video.media_stream() {
+            let weak = overlay.downgrade();
+            stream.connect_error_notify(move |stream| {
+                let (Some(overlay), Some(error)) = (weak.upgrade(), stream.error()) else {
+                    return;
+                };
+                glib::g_debug!("tsubame", "vidéo : {error}");
+                let message = gtk::Box::builder()
+                    .orientation(gtk::Orientation::Vertical)
+                    .spacing(8)
+                    .height_request(height)
+                    .css_classes(["post-media", "dim-label"])
+                    .build();
+                message.append(
+                    &gtk::Image::builder()
+                        .icon_name("video-x-generic-symbolic")
+                        .pixel_size(32)
+                        .vexpand(true)
+                        .valign(gtk::Align::End)
+                        .build(),
+                );
+                message.append(
+                    &gtk::Label::builder()
+                        .label(gettext("Cette vidéo ne peut pas être lue."))
+                        .wrap(true)
+                        .vexpand(true)
+                        .valign(gtk::Align::Start)
+                        .build(),
+                );
+                overlay.set_child(Some(&message));
+            });
+        }
+        overlay.set_child(Some(&video));
+        play.set_visible(false);
+        video.grab_focus();
+    });
 }
 
 /// Image floutée sous un avertissement, avec « Afficher » pour la voir.

@@ -227,3 +227,9 @@ columnsview > .column headerbar {
 button.quote-card:hover {
   background-color: alpha(currentColor, 0.05);
 }
+
+/* Bouton de lecture sur la vignette d'une vidéo. */
+.video-play {
+  min-width: 56px;
+  min-height: 56px;
+}
