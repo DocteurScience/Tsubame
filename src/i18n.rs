@@ -13,12 +13,21 @@ const LOCALEDIR: &str = match option_env!("TSUBAME_LOCALEDIR") {
     None => "/usr/share/locale",
 };
 
+/// Dossier des traductions à l'exécution. Dans un Snap, les fichiers
+/// installés sous /usr sont dans le dossier du paquet ($SNAP/usr/…).
+fn locale_dir() -> String {
+    match std::env::var("SNAP") {
+        Ok(snap) if LOCALEDIR.starts_with('/') => format!("{snap}{LOCALEDIR}"),
+        _ => LOCALEDIR.to_owned(),
+    }
+}
+
 /// À appeler avant de créer l'application. La locale elle-même est réglée
 /// par GTK à son initialisation.
 pub fn init() {
     // Sans traduction disponible, gettext renvoie la chaîne source : on peut
     // ignorer les erreurs ici.
-    let _ = bindtextdomain(GETTEXT_PACKAGE, LOCALEDIR);
+    let _ = bindtextdomain(GETTEXT_PACKAGE, locale_dir());
     let _ = bind_textdomain_codeset(GETTEXT_PACKAGE, "UTF-8");
     let _ = textdomain(GETTEXT_PACKAGE);
 }

@@ -51,6 +51,28 @@ Le build se fait hors ligne : les crates viennent de `build-aux/cargo-sources.js
 python3 build-aux/cargo-sources.py
 ```
 
+GitHub Actions construit le paquet à chaque push (workflow `Flatpak`) et le met à disposition comme artefact `tsubame.flatpak`.
+
+## Snap
+
+La recette est `snap/snapcraft.yaml` : base core24 et extension `gnome` (GTK 4.14, libadwaita 1.5). Construction locale :
+
+```bash
+snapcraft
+```
+
+```bash
+sudo snap install --dangerous tsubame_0.1.0_amd64.snap
+```
+
+La session Bluesky est gardée dans le trousseau, auquel un Snap n'accède qu'après cette connexion :
+
+```bash
+sudo snap connect tsubame:password-manager-service
+```
+
+GitHub Actions construit aussi le Snap à chaque push (workflow `Snap`, artefact `tsubame-snap`).
+
 ## Licence
 
 GPL-3.0 ou ultérieure, voir `LICENSE`.

@@ -1,0 +1,53 @@
+name: tsubame
+title: Tsubame
+base: core24
+version: '0.1.0'
+summary: Client Bluesky pour GNOME
+description: |
+  Tsubame est un client Bluesky natif pour le bureau GNOME. Les posts
+  s'affichent en cartes et la discussion s'ouvre dans un volet à côté du fil.
+license: GPL-3.0-or-later
+website: https://github.com/DocteurScience/Tsubame
+source-code: https://github.com/DocteurScience/Tsubame
+issues: https://github.com/DocteurScience/Tsubame/issues
+icon: data/icons/hicolor/scalable/apps/io.github.DocteurScience.Tsubame.svg
+grade: devel
+confinement: strict
+platforms:
+  amd64:
+  arm64:
+
+apps:
+  tsubame:
+    command: usr/bin/tsubame
+    desktop: usr/share/applications/io.github.DocteurScience.Tsubame.desktop
+    common-id: io.github.DocteurScience.Tsubame
+    # GTK 4.14 et libadwaita 1.5 (gnome-46-2404), les versions visées.
+    extensions: [gnome]
+    plugs:
+      - network
+      # Retour de la connexion OAuth : petit serveur sur 127.0.0.1.
+      - network-bind
+      # Son des vidéos.
+      - audio-playback
+      # Session dans le trousseau (Secret Service). Pas connecté
+      # automatiquement : snap connect tsubame:password-manager-service
+      - password-manager-service
+
+parts:
+  tsubame:
+    plugin: meson
+    source: .
+    meson-parameters:
+      - --prefix=/usr
+      - -Dbuildtype=release
+    build-snaps:
+      - rustup
+    build-packages:
+      - gettext
+      - desktop-file-utils
+    override-build: |
+      # Tsubame demande Rust 1.95 au moins (édition 2024).
+      rustup toolchain install stable --profile minimal
+      rustup default stable
+      craftctl default

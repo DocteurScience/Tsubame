@@ -1,0 +1,21 @@
+name: Flatpak
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  flatpak:
+    name: Paquet Flatpak
+    runs-on: ubuntu-24.04
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-51
+      options: --privileged
+    steps:
+      - uses: actions/checkout@v4
+      - uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        with:
+          bundle: tsubame.flatpak
+          manifest-path: build-aux/io.github.DocteurScience.Tsubame.json
+          cache-key: flatpak-builder-${{ github.sha }}
