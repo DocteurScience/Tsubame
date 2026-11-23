@@ -1,0 +1,12 @@
+{
+  "client_id": "https://docteurscience.github.io/Tsubame/oauth/client-metadata.json",
+  "client_name": "Tsubame",
+  "client_uri": "https://docteurscience.github.io/Tsubame/oauth/",
+  "application_type": "native",
+  "grant_types": ["authorization_code", "refresh_token"],
+  "response_types": ["code"],
+  "scope": "atproto transition:generic transition:chat.bsky",
+  "redirect_uris": ["http://127.0.0.1/callback"],
+  "token_endpoint_auth_method": "none",
+  "dpop_bound_access_tokens": true
+}

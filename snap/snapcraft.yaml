@@ -1,0 +1,65 @@
+name: tsubame
+title: Tsubame
+base: core24
+version: '0.1.0'
+summary: Client Bluesky pour GNOME
+description: |
+  Tsubame est un client Bluesky natif pour le bureau GNOME. Les posts
+  s'affichent en cartes et la discussion s'ouvre dans un volet à côté du fil.
+license: GPL-3.0-or-later
+website: https://github.com/DocteurScience/Tsubame
+source-code: https://github.com/DocteurScience/Tsubame
+issues: https://github.com/DocteurScience/Tsubame/issues
+icon: data/icons/hicolor/scalable/apps/io.github.DocteurScience.Tsubame.svg
+grade: devel
+confinement: strict
+platforms:
+  amd64:
+  arm64:
+
+apps:
+  tsubame:
+    command: usr/bin/tsubame
+    desktop: usr/share/applications/io.github.DocteurScience.Tsubame.desktop
+    common-id: io.github.DocteurScience.Tsubame
+    # GTK 4.14 et libadwaita 1.5 (gnome-46-2404), les versions visées.
+    extensions: [gnome]
+    plugs:
+      - network
+      # Retour de la connexion OAuth : petit serveur sur 127.0.0.1.
+      - network-bind
+      # Son des vidéos.
+      - audio-playback
+      # Session dans le trousseau (Secret Service). Pas connecté
+      # automatiquement : snap connect tsubame:password-manager-service
+      - password-manager-service
+
+parts:
+  tsubame:
+    plugin: meson
+    source: .
+    meson-parameters:
+      - --prefix=/usr
+      - -Dbuildtype=release
+      # Client OAuth publié (docs/oauth/client-metadata.json, GitHub Pages).
+      - -Doauth-client-id=https://docteurscience.github.io/Tsubame/oauth/client-metadata.json
+    # Cargo, installé par rustup-init ci-dessous, pour Meson.
+    build-environment:
+      - PATH: /root/.cargo/bin:$PATH
+      # OpenSSL du système (reqwest) : pkg-config ne cherche que dans le SDK.
+      - OPENSSL_INCLUDE_DIR: /usr/include
+      - OPENSSL_LIB_DIR: /usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR
+    build-packages:
+      - curl
+      - libssl-dev
+      - gettext
+      - desktop-file-utils
+    override-build: |
+      # Tsubame demande Rust 1.95 au moins (édition 2024) : installé par
+      # rustup-init, hors de l'environnement du SDK GNOME (dont la libc ne
+      # convient pas au snap rustup).
+      if [ ! -x /root/.cargo/bin/cargo ]; then
+        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+          | env -u LD_LIBRARY_PATH sh -s -- -y --profile minimal --default-toolchain stable
+      fi
+      craftctl default

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist gettext-domain="tsubame">
+  <schema id="io.github.DocteurScience.Tsubame" path="/io/github/DocteurScience/Tsubame/">
+    <key name="columns" type="as">
+      <default>['following', 'notifications']</default>
+      <summary>Colonnes ouvertes</summary>
+      <description>Identifiants des colonnes de l’accueil, de gauche à droite : following, discover, linux-et-libre, notifications.</description>
+    </key>
+    <key name="pane-position" type="s">
+      <choices>
+        <choice value="right"/>
+        <choice value="below"/>
+        <choice value="hidden"/>
+      </choices>
+      <default>'right'</default>
+      <summary>Position du volet de lecture</summary>
+      <description>Où s’affiche la discussion sur grand écran : à droite des colonnes, en dessous, ou nulle part (elle s’ouvre alors en page).</description>
+    </key>
+    <key name="desktop-notifications" type="b">
+      <default>true</default>
+      <summary>Notifications du bureau</summary>
+      <description>Prévenir des nouvelles notifications Bluesky quand la fenêtre de Tsubame n’est pas au premier plan.</description>
+    </key>
+  </schema>
+</schemalist>

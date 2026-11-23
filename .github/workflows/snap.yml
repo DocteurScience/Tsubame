@@ -1,0 +1,22 @@
+name: Snap
+
+# Construction longue : sur la branche principale, les tags de version et
+# à la demande seulement, pas à chaque push de travail.
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  snap:
+    name: Paquet Snap
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: snapcore/action-build@v1
+        id: build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tsubame-snap
+          path: ${{ steps.build.outputs.snap }}

@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.DocteurScience.Tsubame</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+  <name>Tsubame</name>
+  <summary>Client Bluesky pour GNOME</summary>
+  <description>
+    <p>
+      Tsubame est un client Bluesky natif pour le bureau GNOME. Les posts
+      s’affichent en cartes et la discussion s’ouvre dans un volet à côté
+      du fil.
+    </p>
+  </description>
+  <developer id="io.github.docteurscience">
+    <name>DocteurScience</name>
+  </developer>
+  <launchable type="desktop-id">io.github.DocteurScience.Tsubame.desktop</launchable>
+  <url type="homepage">https://github.com/DocteurScience/Tsubame</url>
+  <url type="bugtracker">https://github.com/DocteurScience/Tsubame/issues</url>
+  <content_rating type="oars-1.1">
+    <content_attribute id="social-chat">intense</content_attribute>
+    <content_attribute id="social-info">moderate</content_attribute>
+  </content_rating>
+  <requires>
+    <display_length compare="ge">360</display_length>
+  </requires>
+  <supports>
+    <control>keyboard</control>
+    <control>pointing</control>
+    <control>touch</control>
+  </supports>
+  <releases>
+    <release version="0.1.0" date="2026-11-20" type="development">
+      <description>
+        <p>Squelette de l’interface, sans connexion au réseau.</p>
+      </description>
+    </release>
+  </releases>
+</component>

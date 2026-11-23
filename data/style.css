@@ -1,0 +1,298 @@
+/* Couleurs nommées de libadwaita uniquement : le thème clair ou sombre et la
+   couleur d'accent suivent le système. */
+
+.post-list {
+  background: none;
+}
+
+.post-list > row {
+  padding: 0;
+  margin-bottom: 12px;
+  border-radius: 12px;
+  background: none;
+}
+
+.post-list > row:selected .post-card {
+  box-shadow: 0 0 0 2px @accent_color;
+}
+
+.post-card {
+  padding: 12px 14px;
+}
+
+.post-detail {
+  padding: 16px;
+}
+
+.post-detail-text {
+  font-size: 1.15em;
+}
+
+.post-stats {
+  margin-top: 4px;
+  margin-left: -8px;
+}
+
+.post-media-frame {
+  margin-top: 6px;
+  border-radius: 8px;
+}
+
+.post-media {
+  background-color: alpha(currentColor, 0.08);
+}
+
+.alt-badge {
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: smaller;
+  font-weight: bold;
+  color: white;
+  background-color: alpha(black, 0.7);
+}
+
+.sidebar-badge {
+  min-width: 20px;
+  padding: 0 6px;
+  border-radius: 10px;
+  font-size: smaller;
+  font-weight: bold;
+  color: @accent_fg_color;
+  background-color: @accent_bg_color;
+}
+
+/* Colonne de cartes à côté d'autres colonnes (voir columns.rs). */
+columnsview > .column {
+  border-radius: 12px;
+  border: 1px solid @borders;
+  background-color: mix(@window_bg_color, @view_bg_color, 0.5);
+}
+
+columnsview > .column headerbar {
+  background: none;
+  box-shadow: none;
+}
+
+.add-column {
+  margin: 0 6px;
+}
+
+/* Glisser-déposer des colonnes dans la barre latérale. */
+.navigation-sidebar > row.dragged {
+  opacity: 0.4;
+}
+
+.navigation-sidebar > row.drop-before {
+  box-shadow: inset 0 2px @accent_color;
+}
+
+.navigation-sidebar > row.drop-after {
+  box-shadow: inset 0 -2px @accent_color;
+}
+
+/* Palier compact : cibles tactiles d'au moins 44 px (voir CLAUDE.md). */
+/* GTK compte min-width sans le rembourrage : les boutons des cartes ont
+   donc 4 px de côté et 36 px de contenu, 44 px en tout, pour que cinq
+   boutons tiennent dans une carte de 360 px de large. */
+.compact .post-stat {
+  padding-left: 4px;
+  padding-right: 4px;
+  min-height: 44px;
+  min-width: 36px;
+}
+
+/* Bouton ⋮ des cartes : GtkMenuButton porte la classe, son bouton interne
+   le rembourrage. */
+.compact menubutton.post-stat > button {
+  padding-left: 4px;
+  padding-right: 4px;
+  min-width: 36px;
+  min-height: 44px;
+}
+
+/* Autres cibles tactiles du palier mobile : onglets liés (filtres,
+   messagerie, profil), barre du bas de la rédaction, compteurs du profil,
+   avatar des cartes, ajout d'un post au fil. */
+.compact .linked > button,
+.compact .compose-bar button,
+.compact .profile-count,
+.compact .avatar-button,
+.compact .compose-add-thread {
+  min-height: 44px;
+}
+
+.compact .compose-bar button,
+.compact .avatar-button {
+  min-width: 44px;
+}
+
+.compact .post-detail button,
+.compact headerbar button:not(.minimize):not(.maximize):not(.close),
+.compact .pill {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* Notification pas encore vue : légère teinte de la couleur d'accent. */
+.post-card.unread {
+  background-color: mix(@card_bg_color, @accent_bg_color, 0.08);
+}
+
+/* Post aimé ou reposté. */
+.post-stat.active,
+.post-action.active {
+  color: @accent_color;
+}
+
+/* Boîte de rédaction. */
+.compose-text {
+  background: none;
+  font-size: 1.1em;
+}
+
+.compose-quote {
+  padding: 10px 12px;
+}
+
+/* Bouton flottant « Nouveau post » du palier compact. */
+.compose-fab {
+  min-width: 56px;
+  min-height: 56px;
+  margin: 18px;
+}
+
+/* Vignettes des images jointes dans la boîte de rédaction. */
+.compose-tile {
+  border-radius: 8px;
+}
+
+.compose-thumb-button {
+  margin: 4px;
+  min-height: 24px;
+  min-width: 24px;
+  padding: 2px 8px;
+}
+
+.compose-alt {
+  font-size: smaller;
+  font-weight: bold;
+}
+
+.compact .compose-thumb-button {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* Nom et avatar des auteurs : liens vers leur profil. */
+.author-link {
+  padding: 0 4px;
+  margin-left: -4px;
+  min-height: 0;
+}
+
+.avatar-button {
+  padding: 0;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* Profil. */
+.profile-banner-frame {
+  border-radius: 12px;
+  background-color: mix(@window_bg_color, @accent_bg_color, 0.25);
+}
+
+/* Bouton « Suivre » dans les listes de personnes. */
+.small-pill {
+  padding: 4px 14px;
+  min-height: 0;
+}
+
+/* Bulles de la messagerie. */
+.bubble {
+  padding: 8px 12px;
+  border-radius: 16px;
+}
+
+.bubble.theirs {
+  background-color: @card_bg_color;
+  box-shadow: 0 0 0 1px alpha(currentColor, 0.08);
+}
+
+.bubble.mine {
+  color: @accent_fg_color;
+  background-color: @accent_bg_color;
+}
+
+.bubble.failed {
+  opacity: 0.55;
+}
+
+/* Image d'un post étiqueté, floutée jusqu'au clic sur « Afficher ». */
+.media-blurred {
+  filter: blur(24px);
+}
+
+.media-warning {
+  background-color: alpha(@card_bg_color, 0.6);
+  padding: 12px;
+}
+
+/* Compteurs du profil cliquables. */
+.profile-count {
+  padding: 2px 6px;
+  min-height: 0;
+}
+
+.profile-count label {
+  font-weight: normal;
+}
+
+/* Post cité dans une carte. */
+.quote-card {
+  margin-top: 6px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid alpha(currentColor, 0.15);
+  background: none;
+  font-weight: normal;
+}
+
+button.quote-card:hover {
+  background-color: alpha(currentColor, 0.05);
+}
+
+/* Bouton de lecture sur la vignette d'une vidéo. */
+.video-play {
+  min-width: 56px;
+  min-height: 56px;
+}
+
+/* Image d'un post cliquable (visionneuse) : sans marge ni fond de bouton. */
+.media-button {
+  padding: 0;
+  border-radius: 0;
+}
+
+.viewer-arrow {
+  min-width: 48px;
+  min-height: 48px;
+}
+
+/* Carte d'un lien joint à un post. */
+.link-card {
+  margin-top: 6px;
+  padding: 0;
+  border-radius: 8px;
+  border: 1px solid alpha(currentColor, 0.15);
+  background: none;
+  font-weight: normal;
+}
+
+.link-card:hover {
+  background-color: alpha(currentColor, 0.05);
+}
+
+.link-card picture {
+  border-radius: 8px 8px 0 0;
+}

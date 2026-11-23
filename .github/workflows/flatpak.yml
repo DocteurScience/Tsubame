@@ -1,0 +1,50 @@
+name: Flatpak
+
+# Construction longue : sur la branche principale, les tags de version et
+# à la demande seulement, pas à chaque push de travail.
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  flatpak:
+    name: Paquet Flatpak
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Outils Flatpak
+        run: |
+          sudo apt-get update
+          # elfutils : eu-strip, pour séparer les symboles de débogage ;
+          # librsvg2-common : l'export valide les icônes SVG.
+          sudo apt-get install -y --no-install-recommends flatpak flatpak-builder elfutils librsvg2-common
+          # bubblewrap a besoin des espaces de noms utilisateur, qu'Ubuntu
+          # 24.04 restreint par défaut (AppArmor).
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+      - name: Cache de flatpak-builder
+        uses: actions/cache@v4
+        with:
+          path: .flatpak-builder
+          key: flatpak-builder-${{ hashFiles('build-aux/io.github.DocteurScience.Tsubame.json', 'build-aux/cargo-sources.json') }}
+          restore-keys: flatpak-builder-
+      - name: Construction
+        # Sur le runner, la composition AppStream ne peut pas lire l'icône :
+        # glycin isole son chargeur par le portail Flatpak, qui refuse le bac
+        # à sable de construction. Elle est désactivée ici seulement, sur une
+        # copie du manifeste ; Flathub la fait sur sa propre infrastructure.
+        run: |
+          jq '. + {"appstream-compose": false}' build-aux/io.github.DocteurScience.Tsubame.json \
+            > build-aux/ci.json
+          # Bus de session : la composition AppStream lit l'icône SVG avec
+          # glycin, dont le chargeur isolé en a besoin.
+          dbus-run-session -- flatpak-builder --user --install-deps-from=flathub --disable-rofiles-fuse \
+            --repo=repo --force-clean --default-branch=master \
+            build-dir build-aux/ci.json
+          flatpak build-bundle repo tsubame.flatpak io.github.DocteurScience.Tsubame master
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tsubame-flatpak
+          path: tsubame.flatpak

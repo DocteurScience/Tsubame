@@ -1,0 +1,13 @@
+option(
+  'oauth-client-id',
+  type: 'string',
+  value: '',
+  description: 'Adresse https des métadonnées du client OAuth publié (docs/oauth/client-metadata.json) ; vide : client de développement « localhost »',
+)
+
+option(
+  'a11y-tests',
+  type: 'boolean',
+  value: false,
+  description: 'Vérification d\'accessibilité sous Xvfb (AT-SPI, xdotool, pyatspi)',
+)
