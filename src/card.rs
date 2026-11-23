@@ -114,7 +114,25 @@ fn media(media: &Media, warning: Option<String>) -> gtk::Widget {
                     picture.set_paintable(Some(texture));
                 }
             });
-            picture.upcast()
+            if media.images.is_empty() {
+                picture.upcast()
+            } else {
+                // Un clic ouvre la visionneuse, sans ouvrir la discussion.
+                let button = gtk::Button::builder()
+                    .child(&picture)
+                    .tooltip_text(gettext("Agrandir l'image"))
+                    .css_classes(["flat", "media-button"])
+                    .build();
+                button.update_property(&[gtk::accessible::Property::Label(&fill(
+                    gettext("Agrandir l'image : {}"),
+                    &[&description],
+                ))]);
+                let images = media.images.clone();
+                button.connect_clicked(move |button| {
+                    crate::viewer::present(button, images.clone(), 0);
+                });
+                button.upcast()
+            }
         }
         None => {
             let placeholder = gtk::Image::builder()

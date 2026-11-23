@@ -228,6 +228,16 @@ pub struct Media {
     pub more: u32,
     /// Vidéo : adresse de sa liste de lecture (HLS), lue dans la carte.
     pub video: Option<String>,
+    /// Toutes les images du post, pour la visionneuse.
+    pub images: Vec<Image>,
+}
+
+/// Image d'un post : miniature, image en grand, texte alternatif.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Image {
+    pub thumb: String,
+    pub fullsize: String,
+    pub alt: String,
 }
 
 impl Media {

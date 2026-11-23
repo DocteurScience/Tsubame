@@ -233,3 +233,14 @@ button.quote-card:hover {
   min-width: 56px;
   min-height: 56px;
 }
+
+/* Image d'un post cliquable (visionneuse) : sans marge ni fond de bouton. */
+.media-button {
+  padding: 0;
+  border-radius: 0;
+}
+
+.viewer-arrow {
+  min-width: 48px;
+  min-height: 48px;
+}

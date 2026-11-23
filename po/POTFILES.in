@@ -24,4 +24,5 @@ src/preferences.rs
 src/profile.rs
 src/report.rs
 src/thread.rs
+src/viewer.rs
 src/window.rs

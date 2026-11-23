@@ -383,6 +383,15 @@ fn media(post: &PostView) -> Option<Media> {
             aspect_ratio: ratio(&first.aspect_ratio),
             more: view.images.len().saturating_sub(1) as u32,
             video: None,
+            images: view
+                .images
+                .iter()
+                .map(|image| crate::data::Image {
+                    thumb: image.thumb.clone(),
+                    fullsize: image.fullsize.clone(),
+                    alt: image.alt.clone(),
+                })
+                .collect(),
         })
     };
     let video = |view: &video::View| {
@@ -392,6 +401,7 @@ fn media(post: &PostView) -> Option<Media> {
             aspect_ratio: ratio(&view.aspect_ratio),
             more: 0,
             video: Some(view.playlist.clone()),
+            images: Vec::new(),
         })
     };
     match post.embed.as_ref()? {
@@ -1946,6 +1956,18 @@ mod tests {
                 aspect_ratio: Some((1600, 900)),
                 more: 1,
                 video: None,
+                images: vec![
+                    crate::data::Image {
+                        thumb: "https://cdn.example/thumb.jpg".into(),
+                        fullsize: "https://cdn.example/full.jpg".into(),
+                        alt: "Capture du sélecteur de fichiers".into(),
+                    },
+                    crate::data::Image {
+                        thumb: "https://cdn.example/thumb2.jpg".into(),
+                        fullsize: "https://cdn.example/full2.jpg".into(),
+                        alt: String::new(),
+                    },
+                ],
             })
         );
         assert_eq!((post.replies, post.reposts, post.likes), (8, 12, 48));

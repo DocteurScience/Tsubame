@@ -31,6 +31,7 @@ mod richtext;
 mod runtime;
 mod settings;
 mod thread;
+mod viewer;
 mod window;
 
 const APP_ID: &str = "io.github.DocteurScience.Tsubame";
