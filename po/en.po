@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: tsubame\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-23 17:55+0000\n"
+"POT-Creation-Date: 2026-11-23 17:57+0000\n"
 "PO-Revision-Date: 2026-11-22\n"
 "Last-Translator: \n"
 "Language-Team: English\n"
@@ -617,7 +617,7 @@ msgstr ""
 msgid "Linux et libre"
 msgstr "Linux and free software"
 
-#: src/column.rs:113 src/preferences.rs:181 src/window.rs:2188
+#: src/column.rs:113 src/preferences.rs:184 src/window.rs:2188
 msgid "Notifications"
 msgstr "Notifications"
 
@@ -950,7 +950,7 @@ msgid_plural "Et {} autres notifications non lues."
 msgstr[0] "And {} other unread notification."
 msgstr[1] "And {} other unread notifications."
 
-#: src/edit_profile.rs:95 src/edit_profile.rs:168
+#: src/edit_profile.rs:95 src/edit_profile.rs:168 src/preferences.rs:878
 msgid "Compte invalide."
 msgstr "Invalid account."
 
@@ -1009,10 +1009,11 @@ msgstr "Choose an avatar"
 
 #: src/edit_profile.rs:576 src/explore.rs:182 src/feeds.rs:734
 #: src/lists.rs:419 src/lists.rs:449 src/messages.rs:882
-#: src/preferences.rs:432 src/preferences.rs:523 src/preferences.rs:638
-#: src/profile.rs:987 src/profile.rs:1106 src/profile.rs:1154
-#: src/profile.rs:1209 src/report.rs:271 src/window.rs:1203 src/window.rs:1271
-#: src/window.rs:1348 src/window.rs:1449 src/window.rs:1828
+#: src/preferences.rs:435 src/preferences.rs:526 src/preferences.rs:641
+#: src/preferences.rs:893 src/profile.rs:987 src/profile.rs:1106
+#: src/profile.rs:1154 src/profile.rs:1209 src/report.rs:271
+#: src/window.rs:1203 src/window.rs:1271 src/window.rs:1348 src/window.rs:1449
+#: src/window.rs:1828
 msgid "Requête interrompue."
 msgstr "Request interrupted."
 
@@ -1099,8 +1100,8 @@ msgstr "No feeds match this search."
 #: src/explore.rs:687 src/explore.rs:712 src/feed_page.rs:94
 #: src/feed_page.rs:269 src/feed_page.rs:386 src/feeds.rs:450 src/feeds.rs:571
 #: src/lists.rs:714 src/lists.rs:848 src/messages.rs:657 src/messages.rs:753
-#: src/messages.rs:921 src/messages.rs:1120 src/preferences.rs:296
-#: src/preferences.rs:469 src/preferences.rs:574 src/profile.rs:657
+#: src/messages.rs:921 src/messages.rs:1120 src/preferences.rs:299
+#: src/preferences.rs:472 src/preferences.rs:577 src/profile.rs:657
 #: src/profile.rs:830 src/profile.rs:953 src/starter_packs.rs:404
 msgid "Chargement interrompu."
 msgstr "Loading interrupted."
@@ -1351,7 +1352,7 @@ msgstr "Welcome to Tsubame"
 msgid "Connectez-vous avec votre compte Bluesky."
 msgstr "Sign in with your Bluesky account."
 
-#: src/login.rs:85
+#: src/login.rs:85 src/preferences.rs:791
 msgid "Identifiant"
 msgstr "Handle"
 
@@ -1614,19 +1615,19 @@ msgstr "Moderation"
 msgid "Listes et comptes"
 msgstr "Lists and accounts"
 
-#: src/preferences.rs:120 src/preferences.rs:484 src/preferences.rs:550
+#: src/preferences.rs:120 src/preferences.rs:487 src/preferences.rs:553
 msgid "Comptes masqués"
 msgstr "Muted accounts"
 
-#: src/preferences.rs:121 src/preferences.rs:487 src/preferences.rs:548
+#: src/preferences.rs:121 src/preferences.rs:490 src/preferences.rs:551
 msgid "Comptes bloqués"
 msgstr "Blocked accounts"
 
-#: src/preferences.rs:122 src/preferences.rs:699
+#: src/preferences.rs:122 src/preferences.rs:702
 msgid "Mots et mots-clics masqués"
 msgstr "Muted words and tags"
 
-#: src/preferences.rs:124 src/preferences.rs:459
+#: src/preferences.rs:124 src/preferences.rs:462
 msgid "Listes de modération suivies"
 msgstr "Subscribed moderation lists"
 
@@ -1661,133 +1662,177 @@ msgstr "Bluesky Moderation"
 msgid "Service par défaut · activé"
 msgstr "Default service · enabled"
 
-#: src/preferences.rs:186
+#: src/preferences.rs:189
 msgid ""
 "Tsubame vérifie les notifications toutes les minutes tant qu'il est ouvert."
 msgstr "Tsubame checks notifications every minute while it is open."
 
-#: src/preferences.rs:190
+#: src/preferences.rs:193
 msgid "Notifications du bureau"
 msgstr "Desktop notifications"
 
-#: src/preferences.rs:192
+#: src/preferences.rs:195
 msgid ""
 "Prévenir des nouvelles notifications quand la fenêtre n'est pas au premier "
 "plan"
 msgstr "Notify about new notifications when the window is in the background"
 
-#: src/preferences.rs:338
+#: src/preferences.rs:341
 msgid "Abonnement actif"
 msgstr "Active subscription"
 
-#: src/preferences.rs:370
+#: src/preferences.rs:373
 msgid "Se désabonner"
 msgstr "Unsubscribe"
 
-#: src/preferences.rs:374
+#: src/preferences.rs:377
 msgid "Se désabonner de {}"
 msgstr "Unsubscribe from {}"
 
-#: src/preferences.rs:441
+#: src/preferences.rs:444
 msgid "La préférence n'a pas été enregistrée."
 msgstr "The preference was not saved."
 
-#: src/preferences.rs:453
+#: src/preferences.rs:456
 msgid "Les comptes de ces listes sont masqués ou bloqués pour vous."
 msgstr "Accounts in these lists are muted or blocked for you."
 
-#: src/preferences.rs:496
+#: src/preferences.rs:499
 msgid "Ne plus bloquer"
 msgstr "Unblock"
 
-#: src/preferences.rs:498 src/preferences.rs:604 src/profile.rs:1038
+#: src/preferences.rs:501 src/preferences.rs:607 src/profile.rs:1038
 msgid "Ne plus masquer"
 msgstr "Unmute"
 
-#: src/preferences.rs:503
+#: src/preferences.rs:506
 msgid "Ne plus suivre la liste {}"
 msgstr "Unsubscribe from the list {}"
 
-#: src/preferences.rs:602 src/profile.rs:1044
+#: src/preferences.rs:605 src/profile.rs:1044
 msgid "Débloquer"
 msgstr "Unblock"
 
-#: src/preferences.rs:664
+#: src/preferences.rs:667
 msgid "Ajouter un mot ou un mot-clic"
 msgstr "Add a word or tag"
 
-#: src/preferences.rs:669
+#: src/preferences.rs:672
 msgid ""
 "Les posts qui contiennent ces mots sont cachés dans vos fils, de tous les "
 "comptes."
 msgstr ""
 "Posts that contain these words are hidden from your feeds, for all accounts."
 
-#: src/preferences.rs:678
+#: src/preferences.rs:681
 msgid "Toujours"
 msgstr "Forever"
 
-#: src/preferences.rs:679
+#: src/preferences.rs:682
 msgid "24 heures"
 msgstr "24 hours"
 
-#: src/preferences.rs:680
+#: src/preferences.rs:683
 msgid "7 jours"
 msgstr "7 days"
 
-#: src/preferences.rs:681
+#: src/preferences.rs:684
 msgid "30 jours"
 msgstr "30 days"
 
-#: src/preferences.rs:685
+#: src/preferences.rs:688
 msgid "Durée"
 msgstr "Duration"
 
-#: src/preferences.rs:689 src/preferences.rs:715
+#: src/preferences.rs:692 src/preferences.rs:718
 msgid "Mots-clics seulement"
 msgstr "Hashtags only"
 
-#: src/preferences.rs:690
+#: src/preferences.rs:693
 msgid "Ne pas chercher le mot dans le texte des posts."
 msgstr "Do not look for the word in the text of posts."
 
-#: src/preferences.rs:718
+#: src/preferences.rs:721
 msgid "Expiré"
 msgstr "Expired"
 
-#: src/preferences.rs:721
+#: src/preferences.rs:724
 msgid "Jusqu'au {}"
 msgstr "Until {}"
 
-#: src/preferences.rs:736 src/preferences.rs:740
+#: src/preferences.rs:739 src/preferences.rs:743
 msgid "Retirer « {} »"
 msgstr "Remove “{}”"
 
-#: src/preferences.rs:784
+#: src/preferences.rs:785
+msgid "Compte"
+msgstr "Account"
+
+#: src/preferences.rs:799
+msgid "Identifiant permanent (DID)"
+msgstr "Permanent identifier (DID)"
+
+#: src/preferences.rs:809
+msgid ""
+"L'adresse e-mail, le mot de passe et la désactivation du compte se règlent "
+"sur le site de Bluesky."
+msgstr ""
+"Email address, password and account deactivation are managed on the Bluesky "
+"website."
+
+#: src/preferences.rs:813
+msgid "Gérer le compte sur Bluesky"
+msgstr "Manage the account on Bluesky"
+
+#: src/preferences.rs:828 src/window.rs:1308
+msgid "Le navigateur n'a pas pu être ouvert."
+msgstr "The browser could not be opened."
+
+#: src/preferences.rs:837 src/preferences.rs:862
+msgid "Exporter mes données"
+msgstr "Export my data"
+
+#: src/preferences.rs:839
+msgid "Tous vos posts, j'aime, abonnements… dans un fichier CAR."
+msgstr "All your posts, likes, follows… in a CAR file."
+
+#: src/preferences.rs:871
+msgid "Export en cours…"
+msgstr "Exporting…"
+
+#: src/preferences.rs:899
+msgid "Le fichier n'a pas pu être enregistré."
+msgstr "The file could not be saved."
+
+#: src/preferences.rs:904
+msgid "Données exportées."
+msgstr "Data exported."
+
+#: src/preferences.rs:917
 msgid "Langues"
 msgstr "Languages"
 
-#: src/preferences.rs:789
+#: src/preferences.rs:922
 msgid "Vos posts"
 msgstr "Your posts"
 
-#: src/preferences.rs:792
+#: src/preferences.rs:925
 msgid "Celle du système"
 msgstr "System language"
 
-#: src/preferences.rs:797
+#: src/preferences.rs:930
 msgid "Langue proposée"
 msgstr "Suggested language"
 
-#: src/preferences.rs:798
+#: src/preferences.rs:931
 msgid "Elle se change aussi dans chaque post."
 msgstr "It can also be changed in each post."
 
-#: src/preferences.rs:821
+#: src/preferences.rs:954
 msgid "Posts affichés"
 msgstr "Shown posts"
 
-#: src/preferences.rs:823
+#: src/preferences.rs:956
 msgid ""
 "Seuls les posts dans ces langues s'affichent dans vos fils. Aucune langue "
 "cochée : toutes."
@@ -1795,11 +1840,11 @@ msgstr ""
 "Only posts in these languages are shown in your feeds. None selected: all of"
 " them."
 
-#: src/preferences.rs:858
+#: src/preferences.rs:991
 msgid "Aucune liste"
 msgstr "No lists"
 
-#: src/preferences.rs:865
+#: src/preferences.rs:998
 msgid "Aucun compte"
 msgstr "No accounts"
 
@@ -2283,10 +2328,6 @@ msgstr ""
 #: src/window.rs:1277
 msgid "Post supprimé."
 msgstr "Post deleted."
-
-#: src/window.rs:1308
-msgid "Le navigateur n'a pas pu être ouvert."
-msgstr "The browser could not be opened."
 
 #: src/window.rs:1353
 msgid "Post épinglé sur votre profil."

@@ -9,7 +9,7 @@ use std::sync::Arc;
 
 use adw::prelude::*;
 use gettextrs::gettext;
-use gtk::glib;
+use gtk::{gio, glib};
 use serde_json::Value;
 
 use crate::api::{self, ApiError};
@@ -175,6 +175,9 @@ pub fn present(
 
     // Langues, réglages de cet ordinateur (GSettings).
     dialog.add(&languages_page());
+    if let Some(session) = &session {
+        dialog.add(&account_page(session.clone(), &dialog));
+    }
 
     // Notifications du bureau, réglage de cet ordinateur (GSettings).
     let notifications = adw::PreferencesPage::builder()
@@ -773,6 +776,136 @@ impl Dialog {
             }
         });
     }
+}
+
+/// Page « Compte » : identité, gestion sur le site de Bluesky (adresse
+/// e-mail, mot de passe, désactivation), export des données.
+fn account_page(session: Arc<Session>, dialog: &adw::PreferencesDialog) -> adw::PreferencesPage {
+    let page = adw::PreferencesPage::builder()
+        .title(gettext("Compte"))
+        .icon_name("avatar-default-symbolic")
+        .build();
+    let identity = adw::PreferencesGroup::new();
+    identity.add(
+        &adw::ActionRow::builder()
+            .title(gettext("Identifiant"))
+            .subtitle(format!("@{}", session.account.handle))
+            .subtitle_selectable(true)
+            .use_markup(false)
+            .build(),
+    );
+    identity.add(
+        &adw::ActionRow::builder()
+            .title(gettext("Identifiant permanent (DID)"))
+            .subtitle(&session.account.did)
+            .subtitle_selectable(true)
+            .use_markup(false)
+            .build(),
+    );
+    page.add(&identity);
+
+    let manage = adw::PreferencesGroup::builder()
+        .description(gettext(
+            "L'adresse e-mail, le mot de passe et la désactivation du compte se règlent sur le site de Bluesky.",
+        ))
+        .build();
+    let site = adw::ActionRow::builder()
+        .title(gettext("Gérer le compte sur Bluesky"))
+        .activatable(true)
+        .build();
+    site.add_suffix(&crate::card::decorative_icon("adw-external-link-symbolic"));
+    {
+        let dialog = dialog.downgrade();
+        site.connect_activated(move |row| {
+            let window = row.root().and_downcast::<gtk::Window>();
+            let dialog = dialog.clone();
+            gtk::UriLauncher::new("https://bsky.app/settings/account").launch(
+                window.as_ref(),
+                gio::Cancellable::NONE,
+                move |result| {
+                    if let (Err(_), Some(dialog)) = (result, dialog.upgrade()) {
+                        dialog.add_toast(adw::Toast::new(&gettext(
+                            "Le navigateur n'a pas pu être ouvert.",
+                        )));
+                    }
+                },
+            );
+        });
+    }
+    manage.add(&site);
+    let export = adw::ActionRow::builder()
+        .title(gettext("Exporter mes données"))
+        .subtitle(gettext(
+            "Tous vos posts, j'aime, abonnements… dans un fichier CAR.",
+        ))
+        .activatable(true)
+        .build();
+    export.add_suffix(&crate::card::decorative_icon("document-save-symbolic"));
+    {
+        let dialog = dialog.downgrade();
+        export.connect_activated(move |row| {
+            let Some(dialog) = dialog.upgrade() else {
+                return;
+            };
+            export_repository(row, session.clone(), dialog);
+        });
+    }
+    manage.add(&export);
+    page.add(&manage);
+    page
+}
+
+/// Télécharge le dépôt du compte (`getRepo`) et l'enregistre là où la
+/// personne le choisit.
+fn export_repository(row: &adw::ActionRow, session: Arc<Session>, dialog: adw::PreferencesDialog) {
+    let chooser = gtk::FileDialog::builder()
+        .title(gettext("Exporter mes données"))
+        .initial_name(format!("{}.car", session.account.handle))
+        .modal(true)
+        .build();
+    let window = row.root().and_downcast::<gtk::Window>();
+    let row = row.clone();
+    chooser.save(window.as_ref(), gio::Cancellable::NONE, move |result| {
+        let Ok(file) = result else { return };
+        row.set_sensitive(false);
+        dialog.add_toast(adw::Toast::new(&gettext("Export en cours…")));
+        let task = runtime().spawn(async move {
+            let api = session.api().await?;
+            let did = session
+                .account
+                .did
+                .parse()
+                .map_err(|_| ApiError::new(gettext("Compte invalide.")))?;
+            api.api
+                .com
+                .atproto
+                .sync
+                .get_repo(
+                    atrium_api::com::atproto::sync::get_repo::ParametersData { did, since: None }
+                        .into(),
+                )
+                .await
+                .map_err(api::request_failed)
+        });
+        glib::spawn_future_local(async move {
+            let result = task
+                .await
+                .unwrap_or_else(|_| Err(ApiError::new(gettext("Requête interrompue."))));
+            let saved = match result {
+                Ok(bytes) => file
+                    .replace_contents_future(bytes, None, false, gio::FileCreateFlags::NONE)
+                    .await
+                    .map(|_| ())
+                    .map_err(|_| gettext("Le fichier n'a pas pu être enregistré.")),
+                Err(error) => Err(error.message),
+            };
+            row.set_sensitive(true);
+            dialog.add_toast(adw::Toast::new(&match saved {
+                Ok(()) => gettext("Données exportées."),
+                Err(message) => message,
+            }));
+        });
+    });
 }
 
 /// Page « Langues » : langue proposée pour les posts, langues des posts
