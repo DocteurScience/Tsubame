@@ -60,6 +60,18 @@ pub struct Post {
     pub quote: Option<Box<Post>>,
     /// Lien joint, avec son aperçu.
     pub link: Option<Link>,
+    /// Notification regroupée : les personnes, de la plus récente à la plus
+    /// ancienne, et la clé du groupe (raison, post concerné).
+    pub group: Vec<Person>,
+    pub group_key: Option<(String, String)>,
+}
+
+/// Personne citée dans une notification regroupée.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Person {
+    pub name: String,
+    pub handle: String,
+    pub avatar: Option<String>,
 }
 
 /// Aperçu d'un lien joint à un post (embed `external`).
@@ -113,6 +125,8 @@ impl Post {
             pinned: false,
             quote: None,
             link: None,
+            group: Vec::new(),
+            group_key: None,
         }
     }
 }
@@ -347,6 +361,8 @@ fn post(
         pinned: false,
         quote: None,
         link: None,
+        group: Vec::new(),
+        group_key: None,
     }
 }
 
@@ -657,19 +673,35 @@ pub fn notifications() -> Vec<Post> {
                 12,
             ),
         ),
-        notification(
-            "Pierre Delmas et 4 autres ont aimé votre post",
-            post(
-                "Pierre Delmas",
-                "pierre.example.social",
-                "40 min",
-                "20 nov., 14:19",
-                "Rappel : ajoutez un texte alternatif à vos captures d'écran.",
-                1,
-                5,
-                20,
-            ),
-        ),
+        Post {
+            group: [
+                ("Pierre Delmas", "pierre.example.social"),
+                ("Nadia Safi", "nadia.example.social"),
+                ("Romain Bailly", "romain.example.social"),
+                ("Lucie Morel", "lucie.example.social"),
+                ("Aya Koné", "aya.example.social"),
+            ]
+            .into_iter()
+            .map(|(name, handle)| Person {
+                name: name.into(),
+                handle: handle.into(),
+                avatar: None,
+            })
+            .collect(),
+            ..notification(
+                "Pierre Delmas et 4 autres ont aimé votre post",
+                post(
+                    "Pierre Delmas",
+                    "pierre.example.social",
+                    "40 min",
+                    "20 nov., 14:19",
+                    "Rappel : ajoutez un texte alternatif à vos captures d'écran.",
+                    1,
+                    5,
+                    20,
+                ),
+            )
+        },
         notification(
             "a répondu à votre post",
             post(

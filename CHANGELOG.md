@@ -34,6 +34,7 @@ Logiciels et Flathub).
 
 ### Lire
 
+- Notifications regroupées : avatars et liste des personnes, groupes poursuivis d'une page à l'autre.
 - GIF reçus lus en boucle, sans son, d'un clic.
 - Langue proposée pour les posts, filtre des posts par langue, « Traduire » dans le menu d'un post.
 - Profils : « Suivi par … » (comptes que vous suivez), notifications d'activité d'un compte, onglets Vidéos, Flux, Listes et Starter packs.

@@ -420,6 +420,82 @@ fn add_gif_button(overlay: &gtk::Overlay, playlist: &str, description: &str, hei
     });
 }
 
+/// Personnes d'une notification regroupée : leurs avatars (6 au plus), et
+/// au clic la liste complète, chaque nom ouvrant son profil.
+fn group_button(people: &[crate::data::Person]) -> gtk::MenuButton {
+    const SHOWN: usize = 6;
+    let faces = gtk::Box::builder().spacing(2).build();
+    for person in people.iter().take(SHOWN) {
+        let avatar = adw::Avatar::builder()
+            .size(24)
+            .text(&person.name)
+            .show_initials(true)
+            .accessible_role(gtk::AccessibleRole::Presentation)
+            .build();
+        if let Some(url) = &person.avatar {
+            let weak = avatar.downgrade();
+            images::load(url, move |texture| {
+                if let Some(avatar) = weak.upgrade() {
+                    avatar.set_custom_image(Some(texture));
+                }
+            });
+        }
+        faces.append(&avatar);
+    }
+    if people.len() > SHOWN {
+        faces.append(&label(
+            &format!("+{}", people.len() - SHOWN),
+            &["dim-label", "caption"],
+        ));
+    }
+    let list = gtk::Box::builder()
+        .orientation(gtk::Orientation::Vertical)
+        .build();
+    let popover = gtk::Popover::builder()
+        .child(
+            &gtk::ScrolledWindow::builder()
+                .hscrollbar_policy(gtk::PolicyType::Never)
+                .propagate_natural_height(true)
+                .max_content_height(360)
+                .child(&list)
+                .build(),
+        )
+        .build();
+    for person in people {
+        let row = gtk::Button::builder()
+            .label(format!("{} · @{}", person.name, person.handle))
+            .css_classes(["flat"])
+            .build();
+        if let Some(text) = row.child().and_downcast::<gtk::Label>() {
+            text.set_xalign(0.0);
+            text.set_ellipsize(gtk::pango::EllipsizeMode::End);
+        }
+        let (handle, popover) = (person.handle.clone(), popover.downgrade());
+        row.connect_clicked(move |row| {
+            if let Some(popover) = popover.upgrade() {
+                popover.popdown();
+            }
+            let _ = row.activate_action("win.open-profile", Some(&handle.to_variant()));
+        });
+        list.append(&row);
+    }
+    let label = ngettext(
+        "Voir les {} personnes",
+        "Voir les {} personnes",
+        people.len() as u32,
+    )
+    .replace("{}", &people.len().to_string());
+    let button = gtk::MenuButton::builder()
+        .child(&faces)
+        .popover(&popover)
+        .tooltip_text(&label)
+        .halign(gtk::Align::Start)
+        .css_classes(["flat", "group-faces"])
+        .build();
+    button.update_property(&[gtk::accessible::Property::Label(&label)]);
+    button
+}
+
 /// Texte d'un post sans image, caché sous un avertissement : une ligne
 /// « ⚠ étiquette » et « Afficher », qui révèle le texte.
 fn warned_text(text: gtk::Label, warning: &str) -> gtk::Widget {
@@ -857,6 +933,9 @@ pub fn post_card(post: &Post) -> gtk::Box {
     }
     if let Some(context) = &post.context {
         body.append(&label(context, &["dim-label", "caption"]));
+    }
+    if post.group.len() > 1 {
+        body.append(&group_button(&post.group));
     }
     body.append(&meta(&post.name, &post.handle, &post.time));
     if !post.text.is_empty() {

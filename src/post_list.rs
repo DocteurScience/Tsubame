@@ -217,11 +217,32 @@ impl PostList {
                 }
                 // Les posts qui contiennent un mot masqué ne sont pas
                 // affichés ; les indices des rangées suivent ceux des posts.
-                let posts: Vec<Post> = page
+                let mut posts: Vec<Post> = page
                     .posts
                     .into_iter()
                     .filter(|post| !crate::moderation::is_hidden(post))
                     .collect();
+                // Notifications regroupées : un groupe commencé dans une
+                // page précédente s'agrandit au lieu d'avoir une autre carte.
+                if load.more {
+                    posts.retain(|post| {
+                        let Some(key) = &post.group_key else {
+                            return true;
+                        };
+                        let mut shown = self.posts.borrow_mut();
+                        let Some(index) =
+                            shown.iter().position(|p| p.group_key.as_ref() == Some(key))
+                        else {
+                            return true;
+                        };
+                        crate::api::merge_group(&mut shown[index], post.clone());
+                        if let Some(row) = self.list.row_at_index(index as i32) {
+                            self.list.remove(&row);
+                        }
+                        self.list.insert(&post_row(&shown[index]), index as i32);
+                        false
+                    });
+                }
                 for post in &posts {
                     self.list.append(&post_row(post));
                 }

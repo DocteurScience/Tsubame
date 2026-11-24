@@ -470,6 +470,8 @@ pub fn post_from_view(post: &PostView, now: DateTime<Utc>) -> Post {
         pinned: viewer.and_then(|v| v.pinned).unwrap_or(false),
         quote: quote(post, now),
         link: link(post),
+        group: Vec::new(),
+        group_key: None,
     }
 }
 
@@ -710,7 +712,7 @@ fn group_key(notification: &Notification) -> Option<(String, String)> {
 }
 
 /// « Aya Koné et 3 autres ont aimé votre post ».
-fn group_context(reason: &str, name: &str, others: usize) -> Option<String> {
+pub fn group_context(reason: &str, name: &str, others: usize) -> Option<String> {
     let n = others.min(u32::MAX as usize) as u32;
     let text = match reason {
         "like" => ngettext(
@@ -756,6 +758,12 @@ pub fn grouped_notifications(
     let mut groups: HashMap<(String, String), (usize, usize)> = HashMap::new();
     for notification in notifications {
         let key = group_key(notification);
+        let author = &notification.author;
+        let person = crate::data::Person {
+            name: name_or_handle(author.display_name.as_deref(), author.handle.as_str()),
+            handle: author.handle.as_str().to_owned(),
+            avatar: author.avatar.clone(),
+        };
         if let Some(key) = &key
             && let Some((index, others)) = groups.get_mut(key)
         {
@@ -763,17 +771,32 @@ pub fn grouped_notifications(
             let card = &mut cards[*index];
             card.unread |= !notification.is_read;
             card.context = group_context(&notification.reason, &card.name, *others);
+            card.group.push(person);
             continue;
         }
-        let Some(card) = post_from_notification(notification, posts, now) else {
+        let Some(mut card) = post_from_notification(notification, posts, now) else {
             continue;
         };
         if let Some(key) = key {
-            groups.insert(key, (cards.len(), 0));
+            groups.insert(key.clone(), (cards.len(), 0));
+            card.group = vec![person];
+            card.group_key = Some(key);
         }
         cards.push(card);
     }
     cards
+}
+
+/// Réunit à la carte `card` la notification regroupée `more` du même
+/// groupe, venue d'une page suivante : ses personnes, son état non lu, le
+/// nombre dans la ligne de contexte.
+pub fn merge_group(card: &mut Post, more: Post) {
+    card.unread |= more.unread;
+    card.group.extend(more.group);
+    if let Some((reason, _)) = &card.group_key {
+        let others = card.group.len().saturating_sub(1);
+        card.context = group_context(reason, &card.name, others).or(card.context.take());
+    }
 }
 
 /// Nombre de notifications pas encore vues (`getUnreadCount`).
@@ -881,6 +904,8 @@ pub fn post_from_notification(
             pinned: false,
             quote: None,
             link: None,
+            group: Vec::new(),
+            group_key: None,
         },
     };
     let author = &notification.author;
@@ -2478,6 +2503,32 @@ mod tests {
         );
         assert_eq!(post.time, "40 min");
         assert!(post.unread);
+    }
+
+    #[test]
+    fn groups_continue_on_the_next_page() {
+        let person = |name: &str| crate::data::Person {
+            name: name.into(),
+            handle: format!("{}.example", name.to_lowercase()),
+            avatar: None,
+        };
+        let key = Some(("like".to_owned(), "at://x/app.bsky.feed.post/1".to_owned()));
+        let mut card = Post {
+            name: "Aya".into(),
+            group: vec![person("Aya"), person("Lucie")],
+            group_key: key.clone(),
+            ..Post::unavailable()
+        };
+        let more = Post {
+            unread: true,
+            group: vec![person("Nadia"), person("Romain")],
+            group_key: key,
+            ..Post::unavailable()
+        };
+        merge_group(&mut card, more);
+        assert_eq!(card.group.len(), 4);
+        assert!(card.unread);
+        assert_eq!(card.context.as_deref(), Some("Aya et 3 autres ont aimé votre post"));
     }
 
     #[test]

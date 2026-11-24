@@ -118,7 +118,8 @@ columnsview > .column headerbar {
 .compact .profile-count,
 .compact .avatar-button,
 .compact .compose-add-thread,
-.compact .known-followers {
+.compact .known-followers,
+.compact .group-faces {
   min-height: 44px;
 }
 
@@ -187,6 +188,12 @@ columnsview > .column headerbar {
   padding: 8px 12px;
   border-radius: 8px;
   background-color: alpha(currentColor, 0.08);
+}
+
+/* Avatars d'une notification regroupée. */
+.group-faces {
+  padding: 2px 4px;
+  margin-left: -4px;
 }
 
 /* GIF lu dans une carte : le bouton autour ne change pas l'image. */
