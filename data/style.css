@@ -360,3 +360,11 @@ columnsview > .column headerbar {
 .link-card picture {
   border-radius: 8px 8px 0 0;
 }
+
+/* Tendance en forte hausse (Explorer). */
+.trend-hot {
+  padding: 2px 8px;
+  border-radius: 10px;
+  color: @accent_fg_color;
+  background-color: @accent_bg_color;
+}

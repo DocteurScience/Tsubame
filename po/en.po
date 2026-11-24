@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: tsubame\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-24 11:43+0000\n"
+"POT-Creation-Date: 2026-11-24 11:49+0000\n"
 "PO-Revision-Date: 2026-11-22\n"
 "Last-Translator: \n"
 "Language-Team: English\n"
@@ -87,8 +87,8 @@ msgstr ""
 msgid "Cet identifiant n'est pas valide."
 msgstr "This handle is not valid."
 
-#: src/account.rs:135 src/edit_profile.rs:576 src/explore.rs:182
-#: src/explore.rs:544 src/feeds.rs:467 src/feeds.rs:670 src/feeds.rs:1119
+#: src/account.rs:135 src/edit_profile.rs:576 src/explore.rs:234
+#: src/explore.rs:686 src/feeds.rs:467 src/feeds.rs:670 src/feeds.rs:1119
 #: src/lists.rs:861 src/lists.rs:891 src/messages.rs:1022
 #: src/preferences.rs:435 src/preferences.rs:526 src/preferences.rs:641
 #: src/preferences.rs:976 src/profile.rs:1019 src/profile.rs:1138
@@ -259,15 +259,15 @@ msgstr "reposted your post"
 msgid "vous suit"
 msgstr "followed you"
 
-#: src/api.rs:860 src/data.rs:628
+#: src/api.rs:860 src/data.rs:639
 msgid "vous a mentionné"
 msgstr "mentioned you"
 
-#: src/api.rs:861 src/data.rs:627
+#: src/api.rs:861 src/data.rs:638
 msgid "a répondu à votre post"
 msgstr "replied to your post"
 
-#: src/api.rs:862 src/data.rs:629
+#: src/api.rs:862 src/data.rs:640
 msgid "a cité votre post"
 msgstr "quoted your post"
 
@@ -283,189 +283,189 @@ msgstr "reposted your repost"
 msgid "a rejoint Bluesky avec votre starter pack"
 msgstr "joined Bluesky with your starter pack"
 
-#: src/api.rs:1167 src/feeds.rs:252 src/moderation.rs:754 src/report.rs:158
+#: src/api.rs:1207 src/feeds.rs:252 src/moderation.rs:754 src/report.rs:158
 msgid "Ce compte n'existe pas."
 msgstr "This account does not exist."
 
-#: src/api.rs:1403
+#: src/api.rs:1443
 msgid "Abonnés"
 msgstr "Followers"
 
-#: src/api.rs:1404
+#: src/api.rs:1444
 msgid "Abonnements"
 msgstr "Following"
 
-#: src/api.rs:1405
+#: src/api.rs:1445
 msgctxt "comptes qui ont aimé un post"
 msgid "J'aime"
 msgstr "Likes"
 
-#: src/api.rs:1406
+#: src/api.rs:1446
 msgid "Reposts"
 msgstr "Reposts"
 
-#: src/api.rs:1407
+#: src/api.rs:1447
 msgid "Abonnés que vous connaissez"
 msgstr "Followers you know"
 
-#: src/api.rs:1413
+#: src/api.rs:1453
 msgid "Aucun abonné pour l'instant."
 msgstr "No followers yet."
 
-#: src/api.rs:1414
+#: src/api.rs:1454
 msgid "Aucun abonnement pour l'instant."
 msgstr "Not following anyone yet."
 
-#: src/api.rs:1415
+#: src/api.rs:1455
 msgid "Personne n'a encore aimé ce post."
 msgstr "No one has liked this post yet."
 
-#: src/api.rs:1416
+#: src/api.rs:1456
 msgid "Personne n'a encore reposté ce post."
 msgstr "No one has reposted this post yet."
 
-#: src/api.rs:1417
+#: src/api.rs:1457
 msgid "Aucun compte que vous suivez ne suit ce compte."
 msgstr "No account you follow follows this account."
 
-#: src/api.rs:1550
+#: src/api.rs:1590
 msgid "Ce post ne peut pas être modifié."
 msgstr "This post cannot be changed."
 
-#: src/api.rs:1754 src/compose.rs:528 src/preferences.rs:895
+#: src/api.rs:1794 src/compose.rs:528 src/preferences.rs:895
 msgid "Tout le monde"
 msgstr "Everyone"
 
-#: src/api.rs:1758 src/compose.rs:530 src/preferences.rs:896
+#: src/api.rs:1798 src/compose.rs:530 src/preferences.rs:896
 msgid "Comptes que vous suivez"
 msgstr "Accounts you follow"
 
-#: src/api.rs:1761 src/compose.rs:533
+#: src/api.rs:1801 src/compose.rs:533
 msgid "Vos abonnés"
 msgstr "Your followers"
 
-#: src/api.rs:1764 src/compose.rs:534
+#: src/api.rs:1804 src/compose.rs:534
 msgid "Comptes mentionnés"
 msgstr "Mentioned accounts"
 
-#: src/api.rs:1767 src/compose.rs:535
+#: src/api.rs:1807 src/compose.rs:535
 msgid "Personne"
 msgstr "No one"
 
-#: src/api.rs:1769
+#: src/api.rs:1809
 msgid "Une liste"
 msgstr "One list"
 
-#: src/api.rs:1770
+#: src/api.rs:1810
 msgid "Réponses limitées"
 msgstr "Limited replies"
 
-#: src/api.rs:2058 src/edit_profile.rs:198 src/lists.rs:95
+#: src/api.rs:2098 src/edit_profile.rs:198 src/lists.rs:95
 msgid "Une image n'a pas pu être envoyée : {}"
 msgstr "An image could not be uploaded: {}"
 
-#: src/api.rs:2172
+#: src/api.rs:2212
 msgid "La vidéo n'a pas pu être envoyée."
 msgstr "The video could not be uploaded."
 
-#: src/api.rs:2246
+#: src/api.rs:2286
 msgid "La vidéo a été refusée : {}"
 msgstr "The video was rejected: {}"
 
-#: src/api.rs:2247
+#: src/api.rs:2287
 msgid "La vidéo n'a pas pu être convertie."
 msgstr "The video could not be processed."
 
-#: src/api.rs:2266
+#: src/api.rs:2306
 msgid "La conversion de la vidéo prend trop de temps."
 msgstr "Processing the video is taking too long."
 
-#: src/api.rs:2317
+#: src/api.rs:2357
 msgid "Vous ne pouvez plus envoyer de vidéo aujourd'hui."
 msgstr "You cannot upload more videos today."
 
-#: src/api.rs:2332
+#: src/api.rs:2372
 msgid "janv."
 msgstr "Jan"
 
-#: src/api.rs:2333
+#: src/api.rs:2373
 msgid "févr."
 msgstr "Feb"
 
-#: src/api.rs:2334
+#: src/api.rs:2374
 msgid "mars"
 msgstr "Mar"
 
-#: src/api.rs:2335
+#: src/api.rs:2375
 msgid "avr."
 msgstr "Apr"
 
-#: src/api.rs:2336
+#: src/api.rs:2376
 msgid "mai"
 msgstr "May"
 
-#: src/api.rs:2337
+#: src/api.rs:2377
 msgid "juin"
 msgstr "Jun"
 
-#: src/api.rs:2338
+#: src/api.rs:2378
 msgid "juil."
 msgstr "Jul"
 
-#: src/api.rs:2339
+#: src/api.rs:2379
 msgid "août"
 msgstr "Aug"
 
-#: src/api.rs:2340
+#: src/api.rs:2380
 msgid "sept."
 msgstr "Sep"
 
-#: src/api.rs:2341
+#: src/api.rs:2381
 msgid "oct."
 msgstr "Oct"
 
-#: src/api.rs:2342
+#: src/api.rs:2382
 msgid "nov."
 msgstr "Nov"
 
-#: src/api.rs:2343
+#: src/api.rs:2383
 msgid "déc."
 msgstr "Dec"
 
-#: src/api.rs:2353
+#: src/api.rs:2393
 msgid "à l'instant"
 msgstr "now"
 
-#: src/api.rs:2355
+#: src/api.rs:2395
 msgid "{} min"
 msgstr "{} min"
 
-#: src/api.rs:2357
+#: src/api.rs:2397
 msgid "{} h"
 msgstr "{} h"
 
-#: src/api.rs:2360
+#: src/api.rs:2400
 msgid "{} j"
 msgid_plural "{} j"
 msgstr[0] "{} d"
 msgstr[1] "{} d"
 
-#: src/api.rs:2367
+#: src/api.rs:2407
 msgctxt "jour, mois abrégé et année"
 msgid "{day} {month} {year}"
 msgstr "{month} {day}, {year}"
 
-#: src/api.rs:2378
+#: src/api.rs:2418
 msgctxt "date et heure d'un post"
 msgid "{day} {month} {year}, {time}"
 msgstr "{month} {day}, {year}, {time}"
 
-#: src/api.rs:2388
+#: src/api.rs:2428
 msgctxt "horloge : 24 ou 12 heures"
 msgid "24"
 msgstr "12"
 
-#: src/api.rs:2406
+#: src/api.rs:2446
 msgctxt "jour et mois abrégé"
 msgid "{day} {month}"
 msgstr "{month} {day}"
@@ -1180,113 +1180,173 @@ msgstr "Choose a banner"
 msgid "Choisir un avatar"
 msgstr "Choose an avatar"
 
-#: src/explore.rs:132
+#: src/explore.rs:184
 msgctxt "bouton : vous suivez ce compte"
 msgid "Abonné"
 msgstr "Following"
 
-#: src/explore.rs:134 src/profile.rs:817
+#: src/explore.rs:186 src/profile.rs:817
 msgid "Suivre"
 msgstr "Follow"
 
-#: src/explore.rs:137
+#: src/explore.rs:189
 msgid "Ne plus suivre {}"
 msgstr "Unfollow {}"
 
-#: src/explore.rs:139
+#: src/explore.rs:191
 msgid "Suivre {}"
 msgstr "Follow {}"
 
-#: src/explore.rs:191 src/profile.rs:1038
+#: src/explore.rs:243 src/profile.rs:1038
 msgid "L'abonnement n'a pas changé."
 msgstr "Following did not change."
 
-#: src/explore.rs:220
+#: src/explore.rs:259
+msgctxt "catégorie de tendance"
+msgid "Culture"
+msgstr "Pop culture"
+
+#: src/explore.rs:260
+msgctxt "catégorie de tendance"
+msgid "Sport"
+msgstr "Sports"
+
+#: src/explore.rs:261
+msgctxt "catégorie de tendance"
+msgid "Politique"
+msgstr "Politics"
+
+#: src/explore.rs:262
+msgctxt "catégorie de tendance"
+msgid "Jeux vidéo"
+msgstr "Video games"
+
+#: src/explore.rs:263
+msgctxt "catégorie de tendance"
+msgid "Actualité"
+msgstr "News"
+
+#: src/explore.rs:285 src/profile.rs:808
+msgid "{} post"
+msgid_plural "{} posts"
+msgstr[0] "{} post"
+msgstr[1] "{} posts"
+
+#: src/explore.rs:304
+msgctxt "tendance"
+msgid "En hausse"
+msgstr "Hot"
+
+#: src/explore.rs:324
 msgid "Rechercher des posts, des personnes, des flux…"
 msgstr "Search posts, people, feeds…"
 
-#: src/explore.rs:224
+#: src/explore.rs:328
 msgid "Rechercher"
 msgstr "Search"
 
-#. Sans recherche : sujets du moment, personnes à suivre.
-#: src/explore.rs:235 src/explore.rs:246
+#. Sans recherche : onglets « Pour vous », « Tendances », « Flux », « Starter
+#. packs »,
+#. « Personnes » (maquette).
+#: src/explore.rs:340 src/explore.rs:344
 msgid "Sujets du moment"
 msgstr "Trending topics"
 
-#: src/explore.rs:236 src/explore.rs:248
+#: src/explore.rs:341 src/explore.rs:346 src/explore.rs:366
 msgid "Personnes à suivre"
 msgstr "People to follow"
 
-#: src/explore.rs:237 src/explore.rs:250 src/explore.rs:292 src/profile.rs:55
+#: src/explore.rs:342 src/explore.rs:348 src/explore.rs:356 src/explore.rs:381
+#: src/explore.rs:435 src/profile.rs:55
 msgid "Starter packs"
 msgstr "Starter packs"
 
-#: src/explore.rs:253
+#: src/explore.rs:350 src/explore.rs:379
+msgid "Tendances"
+msgstr "Trending"
+
+#: src/explore.rs:353 src/feeds.rs:760 src/feeds.rs:938
+msgid "Flux populaires"
+msgstr "Popular feeds"
+
+#: src/explore.rs:360
 msgid "Créer un starter pack…"
 msgstr "Create a starter pack…"
 
-#: src/explore.rs:278 src/feeds.rs:645 src/feeds.rs:940
-msgid "Résultats"
-msgstr "Results"
+#: src/explore.rs:375 src/window.rs:64
+msgid "Explorer"
+msgstr "Explore"
 
-#: src/explore.rs:280 src/profile.rs:48
-msgid "Posts"
-msgstr "Posts"
+#: src/explore.rs:378
+msgid "Pour vous"
+msgstr "For you"
 
-#: src/explore.rs:284
-msgid "Personnes"
-msgstr "People"
-
-#: src/explore.rs:288 src/feeds.rs:591 src/feeds.rs:787 src/profile.rs:53
-#: src/starter_packs.rs:310 src/window.rs:76
+#: src/explore.rs:380 src/explore.rs:431 src/feeds.rs:591 src/feeds.rs:787
+#: src/profile.rs:53 src/starter_packs.rs:310 src/window.rs:76
 msgid "Flux"
 msgstr "Feeds"
 
-#: src/explore.rs:299
+#: src/explore.rs:382 src/explore.rs:427
+msgid "Personnes"
+msgstr "People"
+
+#: src/explore.rs:421 src/feeds.rs:645 src/feeds.rs:940
+msgid "Résultats"
+msgstr "Results"
+
+#: src/explore.rs:423 src/profile.rs:48
+msgid "Posts"
+msgstr "Posts"
+
+#: src/explore.rs:442
 msgid "Flux trouvés"
 msgstr "Feeds found"
 
-#: src/explore.rs:314
+#: src/explore.rs:457
 msgid "Starter packs trouvés"
 msgstr "Starter packs found"
 
-#: src/explore.rs:329
+#: src/explore.rs:472
 msgid "Posts trouvés"
 msgstr "Posts found"
 
-#: src/explore.rs:330
+#: src/explore.rs:473
 msgid "Personnes trouvées"
 msgstr "People found"
 
-#: src/explore.rs:496
+#: src/explore.rs:640
 msgid "Aucun flux ne correspond à cette recherche."
 msgstr "No feeds match this search."
 
-#: src/explore.rs:517 src/explore.rs:608 src/explore.rs:631 src/explore.rs:640
-#: src/explore.rs:735 src/explore.rs:760 src/feed_page.rs:94
-#: src/feed_page.rs:269 src/feed_page.rs:386 src/feeds.rs:429 src/feeds.rs:839
-#: src/feeds.rs:960 src/lists.rs:1199 src/lists.rs:1333 src/messages.rs:703
-#: src/messages.rs:800 src/messages.rs:1061 src/messages.rs:1261
-#: src/preferences.rs:299 src/preferences.rs:472 src/preferences.rs:577
-#: src/profile.rs:673 src/profile.rs:868 src/profile.rs:985
-#: src/starter_packs.rs:503 src/window.rs:1123
+#: src/explore.rs:659 src/explore.rs:750 src/explore.rs:778 src/explore.rs:788
+#: src/explore.rs:797 src/explore.rs:904 src/explore.rs:929
+#: src/feed_page.rs:94 src/feed_page.rs:269 src/feed_page.rs:386
+#: src/feeds.rs:429 src/feeds.rs:839 src/feeds.rs:960 src/lists.rs:1199
+#: src/lists.rs:1333 src/messages.rs:703 src/messages.rs:800
+#: src/messages.rs:1061 src/messages.rs:1261 src/preferences.rs:299
+#: src/preferences.rs:472 src/preferences.rs:577 src/profile.rs:673
+#: src/profile.rs:868 src/profile.rs:985 src/starter_packs.rs:503
+#: src/window.rs:1123
 msgid "Chargement interrompu."
 msgstr "Loading interrupted."
 
-#: src/explore.rs:588 src/profile.rs:901
+#: src/explore.rs:730 src/profile.rs:901
 msgid "Aucun starter pack."
 msgstr "No starter packs."
 
-#: src/explore.rs:671
+#: src/explore.rs:768 src/explore.rs:790 src/feeds.rs:593 src/profile.rs:899
+msgid "Aucun flux."
+msgstr "No feeds."
+
+#: src/explore.rs:828
 msgid "Aucun sujet pour l'instant."
 msgstr "No topics yet."
 
-#: src/explore.rs:690
+#: src/explore.rs:848
 msgid "Aucune suggestion pour l'instant."
 msgstr "No suggestions yet."
 
-#: src/explore.rs:788
+#: src/explore.rs:957
 msgid "Personne ne correspond à cette recherche."
 msgstr "No one matches this search."
 
@@ -1345,10 +1405,6 @@ msgstr "Search feeds"
 msgid "Mes flux"
 msgstr "My feeds"
 
-#: src/feeds.rs:593 src/profile.rs:899
-msgid "Aucun flux."
-msgstr "No feeds."
-
 #: src/feeds.rs:751
 msgid "Flux à découvrir"
 msgstr "Feeds to discover"
@@ -1356,10 +1412,6 @@ msgstr "Feeds to discover"
 #: src/feeds.rs:755
 msgid "Les flux épinglés peuvent s'ouvrir en colonne sur l'accueil."
 msgstr "Pinned feeds can open as columns on the home page."
-
-#: src/feeds.rs:760 src/feeds.rs:938
-msgid "Flux populaires"
-msgstr "Popular feeds"
 
 #: src/feeds.rs:859
 msgid "Aucun flux enregistré."
@@ -2245,12 +2297,6 @@ msgstr[1] "{} following"
 msgid "Voir les abonnements"
 msgstr "See following"
 
-#: src/profile.rs:808
-msgid "{} post"
-msgid_plural "{} posts"
-msgstr[0] "{} post"
-msgstr[1] "{} posts"
-
 #: src/profile.rs:814
 msgid "Ne plus suivre"
 msgstr "Unfollow"
@@ -2621,10 +2667,6 @@ msgstr "No alternative text."
 #: src/viewer.rs:310
 msgid "image"
 msgstr "image"
-
-#: src/window.rs:64
-msgid "Explorer"
-msgstr "Explore"
 
 #: src/window.rs:82 src/window.rs:1533
 msgid "Signets"

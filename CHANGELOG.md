@@ -47,6 +47,7 @@ Logiciels et Flathub).
 - Profils : « Suivi par … » (comptes que vous suivez), notifications d'activité d'un compte, onglets Vidéos, Flux, Listes et Starter packs.
 - Messages : actualisation automatique, messages plus anciens, nouvelle conversation, réactions, partage de posts (qui s'ouvrent d'un clic), couper les notifications d'une conversation ou la quitter, choisir qui peut vous écrire, bouton « Envoyer un message » sur les profils.
 - Listes : créer, modifier (nom, description, image), supprimer, ajouter ou retirer des comptes ; masquer ou bloquer les comptes d'une liste de modération ; épingler une liste comme colonne.
+- Explorer : onglets Pour vous, Tendances (catégorie, nombre de posts, sujets en hausse), Flux, Starter packs et Personnes.
 - Starter packs dans Explorer : voir leurs comptes et leurs flux, tout suivre ; créer, modifier et supprimer les siens, y ajouter des comptes et jusqu'à trois flux.
 - Recherche de flux dans Explorer.
 - Liens, mentions et mots-dièse cliquables dans les posts, y compris les posts cités ; page d'un mot-dièse.

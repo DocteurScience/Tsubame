@@ -192,20 +192,31 @@ pub struct Topic {
     pub name: String,
     /// Recherche correspondante.
     pub query: String,
+    /// Catégorie (`sports`, `politics`…), pour les tendances.
+    pub category: Option<String>,
+    /// Nombre de posts, s'il est connu.
+    pub posts: u64,
+    /// Tendance en forte hausse.
+    pub hot: bool,
 }
 
 /// Personnes à suivre et sujets du moment de démonstration, repris de la
 /// maquette `Explorer.dc.html`.
 pub fn demo_topics() -> Vec<Topic> {
     [
-        "#GNOME49",
-        "Accessibilité numérique",
-        "Photographie de montagne",
+        ("#GNOME49", "Logiciels libres", 1240, true),
+        ("Accessibilité numérique", "Techno", 860, false),
+        ("Photographie de montagne", "Photo", 540, false),
+        ("Flatpak", "Logiciels libres", 410, false),
+        ("Fête de la science", "Actualité", 320, false),
     ]
     .into_iter()
-    .map(|name| Topic {
+    .map(|(name, category, posts, hot)| Topic {
         name: name.to_owned(),
         query: name.to_owned(),
+        category: Some(category.to_owned()),
+        posts,
+        hot,
     })
     .collect()
 }

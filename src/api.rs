@@ -1015,6 +1015,43 @@ pub async fn typeahead(session: Arc<Session>, query: String) -> Result<Vec<Actor
         .collect())
 }
 
+/// Tendances (`getTrends`) : sujet, catégorie, nombre de posts. Si le service ne les donne pas,
+/// les sujets du moment (`getTrendingTopics`).
+pub async fn trends(session: Arc<Session>) -> Result<Vec<Topic>, ApiError> {
+    let api = session.api().await?;
+    let output = api
+        .api
+        .app
+        .bsky
+        .unspecced
+        .get_trends(
+            atrium_api::app::bsky::unspecced::get_trends::ParametersData {
+                limit: 10.try_into().ok(),
+            }
+            .into(),
+        )
+        .await;
+    match output {
+        Ok(output) if !output.data.trends.is_empty() => Ok(output
+            .data
+            .trends
+            .iter()
+            .map(|trend| Topic {
+                name: if trend.display_name.trim().is_empty() {
+                    trend.topic.clone()
+                } else {
+                    trend.display_name.clone()
+                },
+                query: trend.topic.clone(),
+                category: trend.category.clone().filter(|c| !c.is_empty()),
+                posts: trend.post_count.max(0) as u64,
+                hot: trend.status.as_deref() == Some("hot"),
+            })
+            .collect()),
+        _ => Box::pin(trending(session)).await,
+    }
+}
+
 /// Sujets du moment (`getTrendingTopics`).
 pub async fn trending(session: Arc<Session>) -> Result<Vec<Topic>, ApiError> {
     let api = session.api().await?;
@@ -1043,6 +1080,9 @@ pub async fn trending(session: Arc<Session>) -> Result<Vec<Topic>, ApiError> {
                 .filter(|name| !name.trim().is_empty())
                 .unwrap_or_else(|| topic.topic.clone()),
             query: topic.topic.clone(),
+            category: None,
+            posts: 0,
+            hot: false,
         })
         .collect())
 }
