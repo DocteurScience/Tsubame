@@ -11,7 +11,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 use adw::prelude::*;
-use gettextrs::{gettext, ngettext};
+use gettextrs::{gettext, ngettext, pgettext};
 use gtk::glib;
 use serde_json::{Value, json};
 
@@ -259,6 +259,232 @@ pub async fn by_actor(session: Arc<Session>, actor: String) -> Result<Vec<FeedIn
     .await
     .map_err(request_failed)?;
     Ok(output.data.feeds.iter().map(info_from_view).collect())
+}
+
+/// Détails d'un flux : ses informations, son CID (pour l'aimer) et mon
+/// « j'aime », s'il existe (`getFeedGenerator`).
+#[derive(Debug, Clone, Default)]
+pub struct FeedDetails {
+    pub info: FeedInfo,
+    pub cid: String,
+    pub like: Option<String>,
+}
+
+pub async fn details(session: Arc<Session>, uri: String) -> Result<FeedDetails, ApiError> {
+    let api = session.api().await?;
+    let output = Box::pin(api.api.app.bsky.feed.get_feed_generator(
+        atrium_api::app::bsky::feed::get_feed_generator::ParametersData { feed: uri }.into(),
+    ))
+    .await
+    .map_err(request_failed)?;
+    let view = &output.data.view;
+    Ok(FeedDetails {
+        info: info_from_view(view),
+        cid: serde_json::to_value(&view.cid)
+            .ok()
+            .and_then(|cid| cid.as_str().map(str::to_owned))
+            .unwrap_or_default(),
+        like: view.viewer.as_ref().and_then(|v| v.like.clone()),
+    })
+}
+
+/// Page d'un flux, avec « À propos du flux » dans l'en-tête.
+pub fn feed_page(name: &str, uri: &str, host: &Host) -> adw::NavigationPage {
+    let feed = FeedPage::new(
+        name,
+        Source::Feed(uri.to_owned()),
+        data::posts(data::Feed::Discover),
+        host.clone(),
+    );
+    let about = gtk::Button::builder()
+        .icon_name("help-about-symbolic")
+        .tooltip_text(gettext("À propos du flux"))
+        .build();
+    about.update_property(&[gtk::accessible::Property::Label(&gettext(
+        "À propos du flux",
+    ))]);
+    let (uri, host) = (uri.to_owned(), host.clone());
+    about.connect_clicked(move |button| about_dialog(button, &uri, &host));
+    feed.header.pack_end(&about);
+    feed.navigation_page(name)
+}
+
+/// « À propos du flux » : avatar, nom, créateur, description, j'aime, et
+/// « J'aime » / « Je n'aime plus ».
+fn about_dialog(parent: &gtk::Button, uri: &str, host: &Host) {
+    let avatar = adw::Avatar::builder()
+        .size(64)
+        .show_initials(true)
+        .accessible_role(gtk::AccessibleRole::Presentation)
+        .build();
+    let name = gtk::Label::builder()
+        .wrap(true)
+        .css_classes(["title-2"])
+        .build();
+    let creator = gtk::Label::builder().css_classes(["dim-label"]).build();
+    let description = gtk::Label::builder()
+        .wrap(true)
+        .justify(gtk::Justification::Center)
+        .build();
+    let likes = gtk::Label::builder()
+        .css_classes(["dim-label", "caption"])
+        .build();
+    let like = gtk::Button::builder()
+        .halign(gtk::Align::Center)
+        .sensitive(false)
+        .css_classes(["pill"])
+        .build();
+    let content = gtk::Box::builder()
+        .orientation(gtk::Orientation::Vertical)
+        .spacing(8)
+        .margin_top(12)
+        .margin_bottom(24)
+        .margin_start(24)
+        .margin_end(24)
+        .build();
+    for widget in [
+        avatar.upcast_ref::<gtk::Widget>(),
+        name.upcast_ref(),
+        creator.upcast_ref(),
+        description.upcast_ref(),
+        likes.upcast_ref(),
+        like.upcast_ref(),
+    ] {
+        content.append(widget);
+    }
+    let view = adw::ToolbarView::builder().content(&content).build();
+    view.add_top_bar(&adw::HeaderBar::new());
+    let dialog = adw::Dialog::builder()
+        .title(gettext("À propos du flux"))
+        .content_width(400)
+        .child(&view)
+        .build();
+
+    let state: Rc<RefCell<FeedDetails>> = Rc::default();
+    let show: Rc<dyn Fn()> = {
+        let (state, avatar, name, creator, description, likes, like) = (
+            state.clone(),
+            avatar.clone(),
+            name.clone(),
+            creator.clone(),
+            description.clone(),
+            likes.clone(),
+            like.clone(),
+        );
+        Rc::new(move || {
+            let details = state.borrow();
+            let info = &details.info;
+            avatar.set_text(Some(&info.name));
+            if let Some(url) = &info.avatar {
+                let weak = avatar.downgrade();
+                images::load(url, move |texture| {
+                    if let Some(avatar) = weak.upgrade() {
+                        avatar.set_custom_image(Some(texture));
+                    }
+                });
+            }
+            name.set_label(&info.name);
+            creator.set_label(&gettext("par @{}").replace("{}", &info.creator));
+            description.set_label(&info.description);
+            description.set_visible(!info.description.trim().is_empty());
+            likes.set_label(
+                &ngettext(
+                    "{} j'aime",
+                    "{} j'aime",
+                    info.likes.min(u32::MAX as u64) as u32,
+                )
+                .replace("{}", &crate::profile::format_count(info.likes)),
+            );
+            like.set_label(&if details.like.is_some() {
+                gettext("Je n'aime plus")
+            } else {
+                pgettext("aimer un flux", "J'aime")
+            });
+        })
+    };
+
+    match host.session.clone() {
+        None => {
+            let info = demo_feeds()
+                .into_iter()
+                .find(|f| f.uri == uri)
+                .unwrap_or_default();
+            state.replace(FeedDetails {
+                info,
+                ..FeedDetails::default()
+            });
+            show();
+        }
+        Some(session) => {
+            let task = runtime().spawn(details(session, uri.to_owned()));
+            let (state, show, like, toasts) = (
+                state.clone(),
+                show.clone(),
+                like.clone(),
+                host.toasts.clone(),
+            );
+            glib::spawn_future_local(async move {
+                match task
+                    .await
+                    .unwrap_or_else(|_| Err(ApiError::new(gettext("Chargement interrompu."))))
+                {
+                    Ok(details) => {
+                        state.replace(details);
+                        show();
+                        like.set_sensitive(true);
+                    }
+                    Err(error) => toasts.add_toast(adw::Toast::new(&error.message)),
+                }
+            });
+        }
+    }
+
+    let (session, toasts) = (host.session.clone(), host.toasts.clone());
+    like.connect_clicked(move |button| {
+        let Some(session) = session.clone() else {
+            return;
+        };
+        let current = state.borrow().clone();
+        button.set_sensitive(false);
+        let task = runtime().spawn(async move {
+            match current.like {
+                Some(record) => crate::api::delete(session, record).await.map(|()| None),
+                None => crate::api::create(
+                    session,
+                    crate::api::Interaction::Like,
+                    current.info.uri,
+                    current.cid,
+                )
+                .await
+                .map(Some),
+            }
+        });
+        let (state, show, button, toasts) =
+            (state.clone(), show.clone(), button.clone(), toasts.clone());
+        glib::spawn_future_local(async move {
+            let result = task
+                .await
+                .unwrap_or_else(|_| Err(ApiError::new(gettext("Requête interrompue."))));
+            button.set_sensitive(true);
+            match result {
+                Ok(like) => {
+                    {
+                        let mut details = state.borrow_mut();
+                        let liked = like.is_some();
+                        details.info.likes = if liked {
+                            details.info.likes + 1
+                        } else {
+                            details.info.likes.saturating_sub(1)
+                        };
+                        details.like = like;
+                    }
+                    show();
+                }
+                Err(error) => toasts.add_toast(adw::Toast::new(&error.message)),
+            }
+        });
+    });
+    dialog.present(Some(parent));
 }
 
 /// Flux de démonstration.
@@ -688,13 +914,7 @@ impl FeedsPage {
     }
 
     fn open(&self, info: &FeedInfo) {
-        let feed = FeedPage::new(
-            &info.name,
-            Source::Feed(info.uri.clone()),
-            data::posts(data::Feed::Discover),
-            self.host.clone(),
-        );
-        (self.host.push)(feed.navigation_page(&info.name));
+        (self.host.push)(feed_page(&info.name, &info.uri, &self.host));
     }
 
     /// Applique le changement à l'écran, puis aux préférences du compte.

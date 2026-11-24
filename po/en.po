@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: tsubame\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-24 11:12+0000\n"
+"POT-Creation-Date: 2026-11-24 11:16+0000\n"
 "PO-Revision-Date: 2026-11-22\n"
 "Last-Translator: \n"
 "Language-Team: English\n"
@@ -88,13 +88,14 @@ msgid "Cet identifiant n'est pas valide."
 msgstr "This handle is not valid."
 
 #: src/account.rs:135 src/edit_profile.rs:576 src/explore.rs:182
-#: src/explore.rs:546 src/feeds.rs:759 src/lists.rs:640 src/lists.rs:670
-#: src/messages.rs:1022 src/preferences.rs:435 src/preferences.rs:526
-#: src/preferences.rs:641 src/preferences.rs:976 src/profile.rs:987
-#: src/profile.rs:1106 src/profile.rs:1154 src/profile.rs:1209
-#: src/report.rs:314 src/starter_packs.rs:555 src/starter_packs.rs:605
-#: src/starter_packs.rs:658 src/starter_packs.rs:697 src/window.rs:1227
-#: src/window.rs:1295 src/window.rs:1372 src/window.rs:1473 src/window.rs:1852
+#: src/explore.rs:544 src/feeds.rs:467 src/feeds.rs:979 src/lists.rs:640
+#: src/lists.rs:670 src/messages.rs:1022 src/preferences.rs:435
+#: src/preferences.rs:526 src/preferences.rs:641 src/preferences.rs:976
+#: src/profile.rs:981 src/profile.rs:1100 src/profile.rs:1148
+#: src/profile.rs:1203 src/report.rs:314 src/starter_packs.rs:548
+#: src/starter_packs.rs:598 src/starter_packs.rs:651 src/starter_packs.rs:690
+#: src/window.rs:1227 src/window.rs:1295 src/window.rs:1372 src/window.rs:1473
+#: src/window.rs:1852
 msgid "Requête interrompue."
 msgstr "Request interrupted."
 
@@ -121,8 +122,8 @@ msgstr "New handle"
 #. En-tête : Annuler, titre, Publier.
 #: src/account.rs:158 src/compose.rs:263 src/compose.rs:1837
 #: src/edit_profile.rs:234 src/lists.rs:334 src/lists.rs:526 src/lists.rs:848
-#: src/login.rs:160 src/messages.rs:910 src/profile.rs:1280 src/report.rs:185
-#: src/starter_packs.rs:677 src/window.rs:640 src/window.rs:1278
+#: src/login.rs:160 src/messages.rs:910 src/profile.rs:1274 src/report.rs:185
+#: src/starter_packs.rs:670 src/window.rs:640 src/window.rs:1278
 #: src/window.rs:1453
 msgid "Annuler"
 msgstr "Cancel"
@@ -592,7 +593,7 @@ msgid_plural "Répondre, {} réponses"
 msgstr[0] "Reply, {} reply"
 msgstr[1] "Reply, {} replies"
 
-#: src/card.rs:776 src/profile.rs:1017
+#: src/card.rs:776 src/profile.rs:1011
 msgid "Copier le lien"
 msgstr "Copy link"
 
@@ -712,7 +713,7 @@ msgstr "Open link: {}"
 msgid "Post cité de {} : {}"
 msgstr "Quoted post by {}: {}"
 
-#: src/card.rs:1262 src/feeds.rs:340
+#: src/card.rs:1262 src/feeds.rs:392 src/feeds.rs:566
 msgid "{} j'aime"
 msgid_plural "{} j'aime"
 msgstr[0] "{} like"
@@ -966,7 +967,7 @@ msgid "Le brouillon n'a pas pu être enregistré."
 msgstr "The draft could not be saved."
 
 #: src/compose.rs:1223 src/lists.rs:609 src/lists.rs:858 src/messages.rs:1501
-#: src/starter_packs.rs:487
+#: src/starter_packs.rs:480
 msgid "Mode démonstration : rien n'est publié."
 msgstr "Demo mode: nothing is posted."
 
@@ -1177,7 +1178,7 @@ msgstr "Unfollow {}"
 msgid "Suivre {}"
 msgstr "Follow {}"
 
-#: src/explore.rs:191 src/profile.rs:1006
+#: src/explore.rs:191 src/profile.rs:1000
 msgid "L'abonnement n'a pas changé."
 msgstr "Following did not change."
 
@@ -1206,7 +1207,7 @@ msgstr "Starter packs"
 msgid "Créer un starter pack…"
 msgstr "Create a starter pack…"
 
-#: src/explore.rs:278 src/feeds.rs:574
+#: src/explore.rs:278 src/feeds.rs:800
 msgid "Résultats"
 msgstr "Results"
 
@@ -1218,8 +1219,8 @@ msgstr "Posts"
 msgid "Personnes"
 msgstr "People"
 
-#: src/explore.rs:288 src/feeds.rs:421 src/profile.rs:53
-#: src/starter_packs.rs:309 src/window.rs:76
+#: src/explore.rs:288 src/feeds.rs:647 src/profile.rs:53
+#: src/starter_packs.rs:308 src/window.rs:76
 msgid "Flux"
 msgstr "Feeds"
 
@@ -1239,34 +1240,34 @@ msgstr "Posts found"
 msgid "Personnes trouvées"
 msgstr "People found"
 
-#: src/explore.rs:498
+#: src/explore.rs:496
 msgid "Aucun flux ne correspond à cette recherche."
 msgstr "No feeds match this search."
 
-#: src/explore.rs:519 src/explore.rs:610 src/explore.rs:633 src/explore.rs:642
-#: src/explore.rs:737 src/explore.rs:762 src/feed_page.rs:94
-#: src/feed_page.rs:269 src/feed_page.rs:386 src/feeds.rs:473 src/feeds.rs:594
-#: src/lists.rs:978 src/lists.rs:1112 src/messages.rs:703 src/messages.rs:800
-#: src/messages.rs:1061 src/messages.rs:1261 src/preferences.rs:299
-#: src/preferences.rs:472 src/preferences.rs:577 src/profile.rs:657
-#: src/profile.rs:830 src/profile.rs:953 src/starter_packs.rs:471
-#: src/window.rs:1092
+#: src/explore.rs:517 src/explore.rs:608 src/explore.rs:631 src/explore.rs:640
+#: src/explore.rs:735 src/explore.rs:760 src/feed_page.rs:94
+#: src/feed_page.rs:269 src/feed_page.rs:386 src/feeds.rs:429 src/feeds.rs:699
+#: src/feeds.rs:820 src/lists.rs:978 src/lists.rs:1112 src/messages.rs:703
+#: src/messages.rs:800 src/messages.rs:1061 src/messages.rs:1261
+#: src/preferences.rs:299 src/preferences.rs:472 src/preferences.rs:577
+#: src/profile.rs:657 src/profile.rs:830 src/profile.rs:947
+#: src/starter_packs.rs:464 src/window.rs:1092
 msgid "Chargement interrompu."
 msgstr "Loading interrupted."
 
-#: src/explore.rs:590 src/profile.rs:863
+#: src/explore.rs:588 src/profile.rs:863
 msgid "Aucun starter pack."
 msgstr "No starter packs."
 
-#: src/explore.rs:673
+#: src/explore.rs:671
 msgid "Aucun sujet pour l'instant."
 msgstr "No topics yet."
 
-#: src/explore.rs:692
+#: src/explore.rs:690
 msgid "Aucune suggestion pour l'instant."
 msgstr "No suggestions yet."
 
-#: src/explore.rs:790
+#: src/explore.rs:788
 msgid "Personne ne correspond à cette recherche."
 msgstr "No one matches this search."
 
@@ -1296,75 +1297,88 @@ msgstr "New list"
 msgid "Vous n'avez pas encore de liste."
 msgstr "You have no lists yet."
 
-#: src/feeds.rs:335
+#: src/feeds.rs:301 src/feeds.rs:304 src/feeds.rs:358
+msgid "À propos du flux"
+msgstr "About this feed"
+
+#: src/feeds.rs:387 src/feeds.rs:561
 msgid "par @{}"
 msgstr "by @{}"
 
-#: src/feeds.rs:378 src/feeds.rs:382
+#: src/feeds.rs:399
+msgid "Je n'aime plus"
+msgstr "Unlike"
+
+#: src/feeds.rs:401
+msgctxt "aimer un flux"
+msgid "J'aime"
+msgstr "Like"
+
+#: src/feeds.rs:604 src/feeds.rs:608
 msgid "Rechercher des flux"
 msgstr "Search feeds"
 
-#: src/feeds.rs:384 src/feeds.rs:387
+#: src/feeds.rs:610 src/feeds.rs:613
 msgid "Mes flux"
 msgstr "My feeds"
 
-#: src/feeds.rs:385
+#: src/feeds.rs:611
 msgid "Flux à découvrir"
 msgstr "Feeds to discover"
 
-#: src/feeds.rs:389
+#: src/feeds.rs:615
 msgid "Les flux épinglés peuvent s'ouvrir en colonne sur l'accueil."
 msgstr "Pinned feeds can open as columns on the home page."
 
-#: src/feeds.rs:394 src/feeds.rs:572
+#: src/feeds.rs:620 src/feeds.rs:798
 msgid "Flux populaires"
 msgstr "Popular feeds"
 
-#: src/feeds.rs:493
+#: src/feeds.rs:719
 msgid "Aucun flux enregistré."
 msgstr "No saved feeds."
 
-#: src/feeds.rs:509
+#: src/feeds.rs:735
 msgid "Désépingler {}"
 msgstr "Unpin {}"
 
-#: src/feeds.rs:511
+#: src/feeds.rs:737
 msgid "Épingler {}"
 msgstr "Pin {}"
 
-#: src/feeds.rs:518
+#: src/feeds.rs:744
 msgid "Monter {}"
 msgstr "Move {} up"
 
-#: src/feeds.rs:523
+#: src/feeds.rs:749
 msgid "Descendre {}"
 msgstr "Move {} down"
 
-#: src/feeds.rs:528
+#: src/feeds.rs:754
 msgid "Retirer {}"
 msgstr "Remove {}"
 
-#: src/feeds.rs:615
+#: src/feeds.rs:841
 msgid "Aucun flux trouvé."
 msgstr "No feeds found."
 
-#: src/feeds.rs:670
+#: src/feeds.rs:896
 msgid "Ajouté"
 msgstr "Added"
 
-#: src/feeds.rs:672
+#: src/feeds.rs:898
 msgid "Ajouter"
 msgstr "Add"
 
-#: src/feeds.rs:676
+#: src/feeds.rs:902
 msgid "{} est dans vos flux"
 msgstr "{} is in your feeds"
 
-#: src/feeds.rs:678
+#: src/feeds.rs:904
 msgid "Ajouter {} à vos flux"
 msgstr "Add {} to your feeds"
 
-#: src/feeds.rs:767
+#: src/feeds.rs:987
 msgid "La liste des flux n'a pas été enregistrée."
 msgstr "The feed list was not saved."
 
@@ -1372,7 +1386,7 @@ msgstr "The feed list was not saved."
 msgid "Rechercher un compte"
 msgstr "Search for an account"
 
-#: src/lists.rs:221 src/messages.rs:1311 src/starter_packs.rs:324
+#: src/lists.rs:221 src/messages.rs:1311 src/starter_packs.rs:323
 msgid "Comptes"
 msgstr "Accounts"
 
@@ -1486,7 +1500,7 @@ msgstr "Delete this list?"
 msgid "Elle disparaîtra pour tout le monde. Ses comptes ne sont pas prévenus."
 msgstr "It will disappear for everyone. Its accounts are not notified."
 
-#: src/lists.rs:849 src/starter_packs.rs:678 src/window.rs:1279
+#: src/lists.rs:849 src/starter_packs.rs:671 src/window.rs:1279
 msgid "Supprimer"
 msgstr "Delete"
 
@@ -1926,7 +1940,7 @@ msgstr "Accounts in these lists are muted or blocked for you."
 msgid "Ne plus bloquer"
 msgstr "Unblock"
 
-#: src/preferences.rs:501 src/preferences.rs:607 src/profile.rs:1038
+#: src/preferences.rs:501 src/preferences.rs:607 src/profile.rs:1032
 msgid "Ne plus masquer"
 msgstr "Unmute"
 
@@ -1934,7 +1948,7 @@ msgstr "Unmute"
 msgid "Ne plus suivre la liste {}"
 msgstr "Unsubscribe from the list {}"
 
-#: src/preferences.rs:605 src/profile.rs:1044
+#: src/preferences.rs:605 src/profile.rs:1038
 msgid "Débloquer"
 msgstr "Unblock"
 
@@ -2151,7 +2165,7 @@ msgstr "Profile not found"
 msgid "Profil enregistré."
 msgstr "Profile saved."
 
-#: src/profile.rs:529 src/profile.rs:1231 src/window.rs:1217
+#: src/profile.rs:529 src/profile.rs:1225 src/window.rs:1217
 #: src/window.rs:1464
 msgid "Mode démonstration : rien n'est enregistré."
 msgstr "Demo mode: nothing is saved."
@@ -2202,72 +2216,72 @@ msgstr "No feeds."
 msgid "Aucune liste."
 msgstr "No lists."
 
-#: src/profile.rs:926
+#: src/profile.rs:920
 msgid "Vous avez bloqué ce compte"
 msgstr "You blocked this account"
 
-#: src/profile.rs:927
+#: src/profile.rs:921
 msgid "Débloquez-le depuis le menu pour voir ses posts."
 msgstr "Unblock it from the menu to see its posts."
 
-#: src/profile.rs:1019
+#: src/profile.rs:1013
 msgid "Ajouter à une liste…"
 msgstr "Add to a list…"
 
-#: src/profile.rs:1028
+#: src/profile.rs:1022
 msgid "Se désabonner du service d'étiquetage"
 msgstr "Unsubscribe from labeling service"
 
-#: src/profile.rs:1030
+#: src/profile.rs:1024
 msgid "S'abonner au service d'étiquetage"
 msgstr "Subscribe to labeling service"
 
-#: src/profile.rs:1040
+#: src/profile.rs:1034
 msgctxt "masquer un compte"
 msgid "Masquer"
 msgstr "Mute"
 
-#: src/profile.rs:1046
+#: src/profile.rs:1040
 msgid "Bloquer…"
 msgstr "Block…"
 
-#: src/profile.rs:1049
+#: src/profile.rs:1043
 msgid "Signaler…"
 msgstr "Report…"
 
-#: src/profile.rs:1064 src/window.rs:1206
+#: src/profile.rs:1058 src/window.rs:1206
 msgid "Lien copié."
 msgstr "Link copied."
 
-#: src/profile.rs:1136
+#: src/profile.rs:1130
 msgid "Le nombre maximal de services d'étiquetage est atteint."
 msgstr "You have reached the maximum number of labeling services."
 
-#: src/profile.rs:1160
+#: src/profile.rs:1154
 msgid "Désabonné du service d'étiquetage."
 msgstr "Unsubscribed from labeling service."
 
-#: src/profile.rs:1163
+#: src/profile.rs:1157
 msgid "Abonné : ses étiquettes s'afficheront à la prochaine actualisation."
 msgstr "Subscribed: its labels will appear on the next refresh."
 
-#: src/profile.rs:1246 src/window.rs:1232
+#: src/profile.rs:1240 src/window.rs:1232
 msgid "@{} est masqué."
 msgstr "@{} is muted."
 
-#: src/profile.rs:1248
+#: src/profile.rs:1242
 msgid "@{} n'est plus masqué."
 msgstr "@{} is no longer muted."
 
-#: src/profile.rs:1268
+#: src/profile.rs:1262
 msgid "@{} est débloqué."
 msgstr "@{} is unblocked."
 
-#: src/profile.rs:1274 src/window.rs:1447
+#: src/profile.rs:1268 src/window.rs:1447
 msgid "Bloquer @{} ?"
 msgstr "Block @{}?"
 
-#: src/profile.rs:1276 src/window.rs:1449
+#: src/profile.rs:1270 src/window.rs:1449
 msgid ""
 "Ses posts et son profil vous seront cachés, et ce compte ne pourra plus "
 "interagir avec vous. Le blocage est public."
@@ -2275,33 +2289,33 @@ msgstr ""
 "Their posts and profile will be hidden from you, and this account will no "
 "longer be able to interact with you. Blocks are public."
 
-#: src/profile.rs:1281 src/window.rs:1454
+#: src/profile.rs:1275 src/window.rs:1454
 msgid "Bloquer"
 msgstr "Block"
 
-#: src/profile.rs:1294 src/window.rs:1478
+#: src/profile.rs:1288 src/window.rs:1478
 msgid "@{} est bloqué."
 msgstr "@{} is blocked."
 
-#: src/profile.rs:1336
+#: src/profile.rs:1330
 msgid "Profil de démonstration : les noms et les posts sont fictifs."
 msgstr "Demo profile: names and posts are fictional."
 
-#: src/profile.rs:1362
+#: src/profile.rs:1356
 msgid "Suivi par {a}"
 msgstr "Followed by {a}"
 
-#: src/profile.rs:1364
+#: src/profile.rs:1358
 msgid "Suivi par {a} et {n} autre"
 msgid_plural "Suivi par {a} et {n} autres"
 msgstr[0] "Followed by {a} and {n} other"
 msgstr[1] "Followed by {a} and {n} others"
 
-#: src/profile.rs:1369
+#: src/profile.rs:1363
 msgid "Suivi par {a} et {b}"
 msgstr "Followed by {a} and {b}"
 
-#: src/profile.rs:1373
+#: src/profile.rs:1367
 msgid "Suivi par {a}, {b} et {n} autre"
 msgid_plural "Suivi par {a}, {b} et {n} autres"
 msgstr[0] "Followed by {a}, {b} and {n} other"
@@ -2391,91 +2405,91 @@ msgstr "Send to"
 msgid "Précisions (facultatif)"
 msgstr "Details (optional)"
 
-#: src/starter_packs.rs:224
+#: src/starter_packs.rs:223
 msgid "Par {}"
 msgstr "By {}"
 
-#: src/starter_packs.rs:229
+#: src/starter_packs.rs:228
 msgid "{} compte"
 msgid_plural "{} comptes"
 msgstr[0] "{} account"
 msgstr[1] "{} accounts"
 
-#: src/starter_packs.rs:239
+#: src/starter_packs.rs:238
 msgid "{} flux"
 msgid_plural "{} flux"
 msgstr[0] "{} feed"
 msgstr[1] "{} feeds"
 
-#: src/starter_packs.rs:301
+#: src/starter_packs.rs:300
 msgid "Starter pack"
 msgstr "Starter pack"
 
-#: src/starter_packs.rs:305
+#: src/starter_packs.rs:304
 msgid "Tout suivre"
 msgstr "Follow all"
 
-#: src/starter_packs.rs:310
+#: src/starter_packs.rs:309
 msgid "Flux du starter pack"
 msgstr "Starter pack feeds"
 
-#: src/starter_packs.rs:311
+#: src/starter_packs.rs:310
 msgid "Comptes du starter pack"
 msgstr "Starter pack accounts"
 
-#: src/starter_packs.rs:337 src/window.rs:567
+#: src/starter_packs.rs:336 src/window.rs:567
 msgid "Ajouter un compte…"
 msgstr "Add an account…"
 
-#: src/starter_packs.rs:338
+#: src/starter_packs.rs:337
 msgid "Modifier…"
 msgstr "Edit…"
 
-#: src/starter_packs.rs:340
+#: src/starter_packs.rs:339
 msgid "Supprimer le starter pack…"
 msgstr "Delete starter pack…"
 
-#: src/starter_packs.rs:345 src/starter_packs.rs:350
+#: src/starter_packs.rs:344 src/starter_packs.rs:349
 msgid "Options du starter pack"
 msgstr "Starter pack options"
 
-#: src/starter_packs.rs:510
+#: src/starter_packs.rs:503
 msgid "{} compte suivi, puis une erreur s'est produite."
 msgid_plural "{} comptes suivis, puis une erreur s'est produite."
 msgstr[0] "Followed {} account, then an error occurred."
 msgstr[1] "Followed {} accounts, then an error occurred."
 
-#: src/starter_packs.rs:515
+#: src/starter_packs.rs:508
 msgid "{} compte suivi."
 msgid_plural "{} comptes suivis."
 msgstr[0] "Followed {} account."
 msgstr[1] "Followed {} accounts."
 
-#: src/starter_packs.rs:542
+#: src/starter_packs.rs:535
 msgid "Retirer du starter pack"
 msgstr "Remove from starter pack"
 
-#: src/starter_packs.rs:547
+#: src/starter_packs.rs:540
 msgid "Retirer {} du starter pack"
 msgstr "Remove {} from the starter pack"
 
-#: src/starter_packs.rs:590
+#: src/starter_packs.rs:583
 msgid "Ajouter un compte"
 msgstr "Add an account"
 
-#: src/starter_packs.rs:610
+#: src/starter_packs.rs:603
 msgid "@{} ajouté au starter pack."
 msgstr "@{} added to the starter pack."
 
-#: src/starter_packs.rs:671
+#: src/starter_packs.rs:664
 msgid "Supprimer ce starter pack ?"
 msgstr "Delete this starter pack?"
 
-#: src/starter_packs.rs:673
+#: src/starter_packs.rs:666
 msgid "Il disparaîtra pour tout le monde. Ses comptes ne sont pas prévenus."
 msgstr "It will disappear for everyone. Its accounts are not notified."
 
-#: src/starter_packs.rs:703
+#: src/starter_packs.rs:696
 msgid "Starter pack supprimé."
 msgstr "Starter pack deleted."
 

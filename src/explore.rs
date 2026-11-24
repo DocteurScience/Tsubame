@@ -471,13 +471,11 @@ impl ExplorePage {
                 return;
             };
             let name = row.title().to_string();
-            let feed = crate::feed_page::FeedPage::new(
+            (page.host.push)(crate::feeds::feed_page(
                 &name,
-                Source::Feed(row.widget_name().to_string()),
-                data::posts(data::Feed::Discover),
-                page.host.clone(),
-            );
-            (page.host.push)(feed.navigation_page(&name));
+                &row.widget_name(),
+                &page.host,
+            ));
         });
 
         page.load_discover();

@@ -875,13 +875,7 @@ impl ProfilePage {
         let items = self.other_items.borrow();
         let Some(item) = items.get(index) else { return };
         let page = match item {
-            Other::Feed(info) => crate::feed_page::FeedPage::new(
-                &info.name,
-                Source::Feed(info.uri.clone()),
-                data::posts(data::Feed::Discover),
-                self.host.clone(),
-            )
-            .navigation_page(&info.name),
+            Other::Feed(info) => crate::feeds::feed_page(&info.name, &info.uri, &self.host),
             Other::List(list) if list.moderation => {
                 crate::lists::members_page(list, &self.host, Rc::new(|| {}))
             }

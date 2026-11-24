@@ -35,6 +35,7 @@ Logiciels et Flathub).
 
 ### Lire
 
+- « À propos du flux » : description, créateur, et aimer un flux.
 - Vidéos en plein écran.
 - Visionneuse : zoom (boutons, +, -, 0) et enregistrement de l'image.
 - Notifications regroupées : avatars et liste des personnes, groupes poursuivis d'une page à l'autre.

@@ -9,11 +9,10 @@ use adw::prelude::*;
 use gettextrs::{gettext, ngettext};
 use gtk::{gio, glib};
 
-use crate::api::{self, ApiError, Source};
+use crate::api::{self, ApiError};
 use crate::auth::Session;
 use crate::data::{self, Actor};
 use crate::explore::actor_row;
-use crate::feed_page::FeedPage;
 use crate::feeds::{FeedInfo, feed_row, info_from_view};
 use crate::profile::Host;
 use crate::runtime::runtime;
@@ -399,13 +398,7 @@ impl StarterPackPage {
                 .downcast_ref::<adw::ActionRow>()
                 .map(|r| r.title().to_string())
                 .unwrap_or_default();
-            let feed = FeedPage::new(
-                &name,
-                Source::Feed(uri.to_string()),
-                data::posts(data::Feed::Discover),
-                page.host.clone(),
-            );
-            (page.host.push)(feed.navigation_page(&name));
+            (page.host.push)(crate::feeds::feed_page(&name, &uri, &page.host));
         });
         page.load();
         page
