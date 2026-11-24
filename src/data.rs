@@ -357,8 +357,8 @@ fn post(
         context: None,
         name: name.into(),
         handle: handle.into(),
-        time: time.into(),
-        date: date.into(),
+        time: demo_moment(time, date).0,
+        date: demo_moment(time, date).1,
         text: text.into(),
         // Les mentions de démonstration ouvrent le profil par identifiant.
         facets: crate::richtext::detect(text),
@@ -389,10 +389,62 @@ fn reply(
         avatar: None,
         name: name.into(),
         handle: handle.into(),
-        time: time.into(),
+        time: demo_moment(time, "").0,
         text: text.into(),
         facets: crate::richtext::detect(text),
     }
+}
+
+/// Instant de référence des données de démonstration : le 20 novembre 2026 à 14:59, heure locale.
+pub fn demo_now() -> chrono::DateTime<chrono::Local> {
+    use chrono::TimeZone;
+    chrono::Local
+        .with_ymd_and_hms(2026, 11, 20, 14, 59, 0)
+        .earliest()
+        .unwrap_or_else(chrono::Local::now)
+}
+
+/// Heure relative et date complète d'un post de démonstration, dans la langue de l'interface.
+/// Les données les donnent en français : « 4 min » ou « 2 h », et « 20 nov., 14:55 » (date
+/// vide : aucune). La date, si elle est donnée, fait foi.
+fn demo_moment(time: &str, date: &str) -> (String, String) {
+    use chrono::TimeZone;
+    let now = demo_now();
+    let from_date = date.split_once(" nov., ").and_then(|(day, clock)| {
+        let (hour, minute) = clock.split_once(':')?;
+        chrono::Local
+            .with_ymd_and_hms(
+                2026,
+                11,
+                day.parse().ok()?,
+                hour.parse().ok()?,
+                minute.parse().ok()?,
+                0,
+            )
+            .earliest()
+    });
+    let from_time = || {
+        let (count, unit) = time.split_once(' ')?;
+        let count: i64 = count.parse().ok()?;
+        let elapsed = match unit {
+            "min" => chrono::Duration::minutes(count),
+            "h" => chrono::Duration::hours(count),
+            "j" => chrono::Duration::days(count),
+            _ => return None,
+        };
+        Some(now - elapsed)
+    };
+    let Some(then) = from_date.or_else(from_time) else {
+        return (time.to_owned(), date.to_owned());
+    };
+    let then = then.fixed_offset();
+    let relative = crate::api::relative_time(then, now.to_utc());
+    let full = if date.is_empty() {
+        String::new()
+    } else {
+        crate::api::full_date(then)
+    };
+    (relative, full)
 }
 
 fn lucie_gnome_49() -> Post {

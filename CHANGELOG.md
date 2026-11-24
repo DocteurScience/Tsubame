@@ -38,6 +38,7 @@ Logiciels et Flathub).
 
 ### Lire
 
+- Mode démonstration : heures et dates dans la langue de l'interface.
 - Heure sur 12 heures en anglais.
 - « À propos du flux » : description, créateur, et aimer un flux.
 - Vidéos en plein écran.

@@ -138,7 +138,7 @@ Fils (`src/api.rs`) :
 - xgettext lit le Rust comme du C. Deux règles, vérifiées par des tests (`src/i18n.rs`) : une chaîne traduite tient sur une ligne (sans « \ » de continuation, qui y garderait l'indentation) et elle est littérale (`gettext(variable)` ne serait jamais extrait). Le nombre d'un compteur se place dans la chaîne traduite (« {} abonnés »), pas devant.
 - Traduction anglaise : `po/en.po`, complète. Vérifiée en installant dans un préfixe et en lançant avec `LANG=en_US.UTF-8`.
 - Contexte (`pgettext`) pour les chaînes qui changent de sens : « Masquer » (un compte : « Mute » ; une étiquette : « Hide »), « Afficher », « Avertir », « J'aime » (onglet, liste), « Abonné », « Citer ». Le séparateur des milliers (« séparateur des milliers ») et l'ordre des dates (« {day} {month} », « {day} {month} {year}, {time} ») sont des chaînes traduites : « 1,284 », « Nov 20 » en anglais. Une chaîne traduite contient les caractères eux-mêmes, pas « \u{…} », que xgettext ne lit pas.
-- L'heure suit la langue : la traduction choisit l'horloge de 24 ou de 12 heures (contexte « horloge : 24 ou 12 heures », « 12 » en anglais : « 2:05 PM »). Pas encore : dates et durées des posts de démonstration, écrites en français dans les données.
+- L'heure suit la langue : la traduction choisit l'horloge de 24 ou de 12 heures (contexte « horloge : 24 ou 12 heures », « 12 » en anglais : « 2:05 PM »). Les heures et dates des données de démonstration (posts, réponses, messagerie) passent par les mêmes fonctions, depuis un instant de référence fixe (20 novembre 2026, 14:59).
 
 ## Limites de la proposition
 
