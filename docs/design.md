@@ -1,6 +1,6 @@
 # Design de Tsubame
 
-Ce document résume la proposition de design faite avec Claude (maquettes sur un canvas, novembre 2026). Les sources des maquettes sont dans `docs/mockups/source/`. Ce sont des pages HTML autonomes : on peut les lire pour retrouver les dimensions, les espacements et le contenu de chaque écran. Les noms, comptes et textes de posts y sont fictifs.
+Ce document résume la proposition de design (maquettes, novembre 2026). Les sources des maquettes sont dans `docs/mockups/source/`. Ce sont des pages HTML autonomes : on peut les lire pour retrouver les dimensions, les espacements et le contenu de chaque écran. Les noms, comptes et textes de posts y sont fictifs.
 
 ## Écrans
 
