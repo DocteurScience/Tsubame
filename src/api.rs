@@ -2370,10 +2370,26 @@ pub fn full_date(then: DateTime<FixedOffset>) -> String {
         .replace("{day}", &local.day().to_string())
         .replace("{month}", &month(local.month()))
         .replace("{year}", &local.year().to_string())
-        .replace(
-            "{time}",
-            &format!("{:02}:{:02}", local.hour(), local.minute()),
-        )
+        .replace("{time}", &clock(local.hour(), local.minute()))
+}
+
+/// Heure selon la langue : « 14:05 », ou « 2:05 PM » si la traduction
+/// choisit l'horloge de 12 heures.
+pub fn clock(hour: u32, minute: u32) -> String {
+    if pgettext("horloge : 24 ou 12 heures", "24") == "12" {
+        clock_12(hour, minute)
+    } else {
+        format!("{hour:02}:{minute:02}")
+    }
+}
+
+fn clock_12(hour: u32, minute: u32) -> String {
+    let suffix = if hour < 12 { "AM" } else { "PM" };
+    let hour = match hour % 12 {
+        0 => 12,
+        h => h,
+    };
+    format!("{hour}:{minute:02} {suffix}")
 }
 
 /// « 20 nov. » (ou « Nov 20 » selon la langue).
@@ -2381,6 +2397,18 @@ pub fn day_month(day: u32, month_number: u32) -> String {
     pgettext("jour et mois abrégé", "{day} {month}")
         .replace("{day}", &day.to_string())
         .replace("{month}", &month(month_number))
+}
+
+#[cfg(test)]
+mod clock_tests {
+    #[test]
+    fn twelve_hour_clock() {
+        assert_eq!(super::clock_12(0, 5), "12:05 AM");
+        assert_eq!(super::clock_12(12, 30), "12:30 PM");
+        assert_eq!(super::clock_12(23, 9), "11:09 PM");
+        // Langue source : horloge de 24 heures.
+        assert_eq!(super::clock(9, 7), "09:07");
+    }
 }
 
 #[cfg(test)]

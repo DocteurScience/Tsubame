@@ -27,6 +27,7 @@ Logiciels et Flathub).
 
 ### Écrire
 
+- 22 langues proposées pour les posts.
 - Qui peut répondre : plusieurs groupes à la fois, et les membres de vos listes.
 - Vidéo : avancement de l'envoi et de la conversion, limites du compte vérifiées avant l'envoi.
 - Émojis, coller une image (Ctrl+V) ou la déposer sur la boîte de rédaction.
@@ -36,6 +37,7 @@ Logiciels et Flathub).
 
 ### Lire
 
+- Heure sur 12 heures en anglais.
 - « À propos du flux » : description, créateur, et aimer un flux.
 - Vidéos en plein écran.
 - Visionneuse : zoom (boutons, +, -, 0) et enregistrement de l'image.

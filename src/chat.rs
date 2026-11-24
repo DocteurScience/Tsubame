@@ -148,7 +148,7 @@ fn list_time(then: DateTime<chrono::FixedOffset>, now: DateTime<Utc>) -> String 
     let today = now.with_timezone(&Local).date_naive();
     let day = local.date_naive();
     if day == today {
-        format!("{:02}:{:02}", local.hour(), local.minute())
+        api::clock(local.hour(), local.minute())
     } else if today.pred_opt() == Some(day) {
         gettext("hier")
     } else {
@@ -258,7 +258,7 @@ pub fn message_from_json(message: &Value, me: &str, now: DateTime<Utc>) -> Optio
         time: sent
             .map(|t| {
                 let local = t.with_timezone(&Local);
-                format!("{:02}:{:02}", local.hour(), local.minute())
+                api::clock(local.hour(), local.minute())
             })
             .unwrap_or_default(),
         day: sent.map(|t| day_label(t, now)).unwrap_or_default(),

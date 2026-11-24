@@ -1169,7 +1169,7 @@ impl MessagesPage {
             text: text.clone(),
             mine: true,
             sender: String::new(),
-            time: now.format("%H:%M").to_string(),
+            time: crate::api::clock(chrono::Timelike::hour(&now), chrono::Timelike::minute(&now)),
             day: gettext("Aujourd'hui"),
             failed: false,
             reactions: Vec::new(),

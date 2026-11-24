@@ -195,16 +195,31 @@ impl Followup {
 }
 
 /// Langues proposées, sous leur propre nom.
-pub const LANGUAGES: [(&str, &str); 6] = [
+pub const LANGUAGES: [(&str, &str); 22] = [
     ("fr", "Français"),
     ("en", "English"),
     ("es", "Español"),
     ("de", "Deutsch"),
     ("it", "Italiano"),
     ("pt", "Português"),
+    ("nl", "Nederlands"),
+    ("ca", "Català"),
+    ("br", "Brezhoneg"),
+    ("eu", "Euskara"),
+    ("oc", "Occitan"),
+    ("pl", "Polski"),
+    ("sv", "Svenska"),
+    ("fi", "Suomi"),
+    ("tr", "Türkçe"),
+    ("uk", "Українська"),
+    ("ru", "Русский"),
+    ("ar", "العربية"),
+    ("hi", "हिन्दी"),
+    ("zh", "中文"),
+    ("ja", "日本語"),
+    ("ko", "한국어"),
 ];
 
-/// Langue de l'interface si elle est proposée, sinon le français.
 /// Langue proposée : celle choisie dans les préférences, sinon celle du
 /// système, sinon le français.
 fn default_language() -> &'static str {
