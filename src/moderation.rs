@@ -395,6 +395,15 @@ pub fn set_definitions(definitions: Vec<LabelDefinition>) {
     DEFINITIONS.with_borrow_mut(|current| *current = definitions);
 }
 
+/// Noms des services tiers suivis, pour les choisir (signalement).
+pub fn set_labeler_names(names: Vec<(String, String)>) {
+    LABELER_NAMES.with_borrow_mut(|current| *current = names);
+}
+
+pub fn labeler_names() -> Vec<(String, String)> {
+    LABELER_NAMES.with_borrow(Clone::clone)
+}
+
 /// Langue de l'interface (« fr », « en »…), pour les noms d'étiquettes.
 pub fn interface_language() -> String {
     gtk::glib::language_names()
@@ -607,6 +616,8 @@ thread_local! {
     static MUTED: RefCell<Vec<MutedWord>> = RefCell::default();
     /// Étiquettes des services tiers suivis.
     static DEFINITIONS: RefCell<Vec<LabelDefinition>> = RefCell::default();
+    /// Services tiers suivis : DID et nom.
+    static LABELER_NAMES: RefCell<Vec<(String, String)>> = RefCell::default();
     /// Langues des posts à afficher (vide : toutes).
     static CONTENT_LANGUAGES: RefCell<Vec<String>> = RefCell::default();
 }

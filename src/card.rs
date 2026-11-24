@@ -420,6 +420,54 @@ fn add_gif_button(overlay: &gtk::Overlay, playlist: &str, description: &str, hei
     });
 }
 
+/// Texte d'un post sans image, caché sous un avertissement : une ligne
+/// « ⚠ étiquette » et « Afficher », qui révèle le texte.
+fn warned_text(text: gtk::Label, warning: &str) -> gtk::Widget {
+    let bar = gtk::Box::builder()
+        .spacing(8)
+        .css_classes(["text-warning"])
+        .build();
+    bar.append(&decorative_icon("dialog-warning-symbolic"));
+    bar.append(
+        &gtk::Label::builder()
+            .label(warning)
+            .wrap(true)
+            .xalign(0.0)
+            .hexpand(true)
+            .css_classes(["heading"])
+            .build(),
+    );
+    let show = gtk::Button::builder()
+        .label(pgettext("voir une image floutée", "Afficher"))
+        .valign(gtk::Align::Center)
+        .css_classes(["pill"])
+        .build();
+    show.update_property(&[gtk::accessible::Property::Description(warning)]);
+    bar.append(&show);
+    let revealer = gtk::Revealer::builder().child(&text).build();
+    let holder = gtk::Box::builder()
+        .orientation(gtk::Orientation::Vertical)
+        .spacing(6)
+        .build();
+    holder.append(&bar);
+    holder.append(&revealer);
+    show.connect_clicked(move |show| {
+        revealer.set_reveal_child(true);
+        show.set_visible(false);
+    });
+    holder.upcast()
+}
+
+/// Texte du post, caché sous l'avertissement d'une étiquette s'il n'a pas
+/// d'image à flouter.
+fn post_text(post: &Post, classes: &[&str]) -> gtk::Widget {
+    let text = rich_text(&post.text, &post.facets, classes);
+    match crate::moderation::media_warning(post) {
+        Some(warning) if post.media.is_none() => warned_text(text, &warning),
+        _ => text.upcast(),
+    }
+}
+
 /// Image floutée sous un avertissement, avec « Afficher » pour la voir.
 fn add_warning(overlay: &gtk::Overlay, content: &gtk::Widget, warning: &str) {
     content.add_css_class("media-blurred");
@@ -812,7 +860,7 @@ pub fn post_card(post: &Post) -> gtk::Box {
     }
     body.append(&meta(&post.name, &post.handle, &post.time));
     if !post.text.is_empty() {
-        body.append(&rich_text(&post.text, &post.facets, &[]));
+        body.append(&post_text(post, &[]));
     }
     if let Some(m) = &post.media {
         body.append(&media(m, crate::moderation::media_warning(post)));
@@ -1071,7 +1119,7 @@ pub fn post_detail(post: &Post) -> gtk::Box {
         &format!("@{} · {}", post.handle, post.date),
         &["dim-label", "caption"],
     ));
-    body.append(&rich_text(&post.text, &post.facets, &["post-detail-text"]));
+    body.append(&post_text(post, &["post-detail-text"]));
     if let Some(m) = &post.media {
         body.append(&media(m, crate::moderation::media_warning(post)));
     }

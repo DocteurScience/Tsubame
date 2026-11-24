@@ -182,6 +182,13 @@ columnsview > .column headerbar {
   padding-right: 0;
 }
 
+/* Avertissement sur le texte d'un post étiqueté sans image. */
+.text-warning {
+  padding: 8px 12px;
+  border-radius: 8px;
+  background-color: alpha(currentColor, 0.08);
+}
+
 /* GIF lu dans une carte : le bouton autour ne change pas l'image. */
 .gif-toggle {
   padding: 0;

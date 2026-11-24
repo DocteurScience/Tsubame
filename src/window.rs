@@ -1171,6 +1171,12 @@ impl State {
                         moderation::labeler_details(session, labelers, lang).await
                     });
                     if let Ok(Ok(details)) = task.await {
+                        moderation::set_labeler_names(
+                            details
+                                .iter()
+                                .map(|(did, name, _)| (did.clone(), name.clone()))
+                                .collect(),
+                        );
                         moderation::set_definitions(
                             details.into_iter().flat_map(|(_, _, defs)| defs).collect(),
                         );

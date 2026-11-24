@@ -137,11 +137,14 @@ pub fn input(
     .into())
 }
 
+/// Envoie le signalement au service `service` (DID) : celui de Bluesky, ou
+/// un service d'étiquetage suivi.
 pub async fn send(
     session: Arc<Session>,
     subject: Subject,
     reason: String,
     details: String,
+    service: String,
 ) -> Result<(), ApiError> {
     let did = match &subject {
         Subject::Account(actor) if actor.starts_with("did:") => Some(actor.clone()),
@@ -156,7 +159,9 @@ pub async fn send(
     .transpose()?;
     let input = input(&subject, did, &reason, &details)?;
     let api = session.api().await?;
-    let service = Did::new(MODERATION_SERVICE.to_owned()).expect("DID du service de modération");
+    let service = Did::new(service)
+        .or_else(|_| Did::new(MODERATION_SERVICE.to_owned()))
+        .expect("DID du service de modération");
     let proxied = api.api_with_proxy(service, MODERATION_SERVICE_TYPE);
     Box::pin(proxied.com.atproto.moderation.create_report(input))
         .await
@@ -224,6 +229,43 @@ pub fn present(
         reasons_group.add(&row);
     }
     page.add(&reasons_group);
+    // Destinataire : Bluesky, ou un service d'étiquetage suivi.
+    let service: Rc<RefCell<String>> = Rc::new(RefCell::new(MODERATION_SERVICE.to_owned()));
+    let labelers = crate::moderation::labeler_names();
+    if !labelers.is_empty() {
+        let services = adw::PreferencesGroup::builder()
+            .title(gettext("Destinataire"))
+            .build();
+        let mut first: Option<gtk::CheckButton> = None;
+        for (did, name) in
+            std::iter::once((MODERATION_SERVICE.to_owned(), gettext("Modération Bluesky")))
+                .chain(labelers)
+        {
+            let check = gtk::CheckButton::builder()
+                .valign(gtk::Align::Center)
+                .active(first.is_none())
+                .build();
+            if let Some(first) = &first {
+                check.set_group(Some(first));
+            } else {
+                first = Some(check.clone());
+            }
+            let row = adw::ActionRow::builder()
+                .title(&name)
+                .use_markup(false)
+                .activatable_widget(&check)
+                .build();
+            row.add_prefix(&check);
+            let service = service.clone();
+            check.connect_toggled(move |check| {
+                if check.is_active() {
+                    service.replace(did.clone());
+                }
+            });
+            services.add(&row);
+        }
+        page.add(&services);
+    }
     let details_group = adw::PreferencesGroup::new();
     let details = adw::EntryRow::builder()
         .title(gettext("Précisions (facultatif)"))
@@ -263,6 +305,7 @@ pub fn present(
             subject.clone(),
             reason.to_owned(),
             details.text().to_string(),
+            service.borrow().clone(),
         ));
         let (on_sent, button) = (on_sent.clone(), button.clone());
         glib::spawn_future_local(async move {
