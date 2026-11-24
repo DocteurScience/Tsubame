@@ -630,6 +630,7 @@ impl StarterPackPage {
                         uri,
                         name.clone(),
                         description,
+                        crate::edit_profile::ImageChange::Keep,
                     ))
                     .await?;
                     // La liste porte le même nom.
@@ -639,6 +640,7 @@ impl StarterPackPage {
                             list,
                             name,
                             String::new(),
+                            crate::edit_profile::ImageChange::Keep,
                         ))
                         .await?;
                     }

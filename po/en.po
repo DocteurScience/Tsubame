@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: tsubame\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-24 11:33+0000\n"
+"POT-Creation-Date: 2026-11-24 11:37+0000\n"
 "PO-Revision-Date: 2026-11-22\n"
 "Last-Translator: \n"
 "Language-Team: English\n"
@@ -88,12 +88,12 @@ msgid "Cet identifiant n'est pas valide."
 msgstr "This handle is not valid."
 
 #: src/account.rs:135 src/edit_profile.rs:576 src/explore.rs:182
-#: src/explore.rs:544 src/feeds.rs:467 src/feeds.rs:979 src/lists.rs:640
-#: src/lists.rs:670 src/messages.rs:1022 src/preferences.rs:435
+#: src/explore.rs:544 src/feeds.rs:467 src/feeds.rs:979 src/lists.rs:816
+#: src/lists.rs:846 src/messages.rs:1022 src/preferences.rs:435
 #: src/preferences.rs:526 src/preferences.rs:641 src/preferences.rs:976
 #: src/profile.rs:1019 src/profile.rs:1138 src/profile.rs:1186
 #: src/profile.rs:1241 src/report.rs:314 src/starter_packs.rs:548
-#: src/starter_packs.rs:598 src/starter_packs.rs:651 src/starter_packs.rs:690
+#: src/starter_packs.rs:598 src/starter_packs.rs:653 src/starter_packs.rs:692
 #: src/window.rs:1258 src/window.rs:1326 src/window.rs:1403 src/window.rs:1504
 #: src/window.rs:1885
 msgid "Requête interrompue."
@@ -121,9 +121,9 @@ msgstr "New handle"
 
 #. En-tête : Annuler, titre, Publier.
 #: src/account.rs:158 src/compose.rs:281 src/compose.rs:1912
-#: src/edit_profile.rs:234 src/lists.rs:334 src/lists.rs:526 src/lists.rs:848
+#: src/edit_profile.rs:234 src/lists.rs:384 src/lists.rs:681 src/lists.rs:1024
 #: src/login.rs:160 src/messages.rs:910 src/profile.rs:1312 src/report.rs:185
-#: src/starter_packs.rs:670 src/window.rs:671 src/window.rs:1309
+#: src/starter_packs.rs:672 src/window.rs:671 src/window.rs:1309
 #: src/window.rs:1484
 msgid "Annuler"
 msgstr "Cancel"
@@ -360,7 +360,7 @@ msgstr "One list"
 msgid "Réponses limitées"
 msgstr "Limited replies"
 
-#: src/api.rs:2058 src/edit_profile.rs:198
+#: src/api.rs:2058 src/edit_profile.rs:198 src/lists.rs:95
 msgid "Une image n'a pas pu être envoyée : {}"
 msgstr "An image could not be uploaded: {}"
 
@@ -985,7 +985,7 @@ msgstr "Keep as draft"
 msgid "Le brouillon n'a pas pu être enregistré."
 msgstr "The draft could not be saved."
 
-#: src/compose.rs:1298 src/lists.rs:609 src/lists.rs:858 src/messages.rs:1501
+#: src/compose.rs:1298 src/lists.rs:771 src/lists.rs:1034 src/messages.rs:1501
 #: src/starter_packs.rs:480
 msgid "Mode démonstration : rien n'est publié."
 msgstr "Demo mode: nothing is posted."
@@ -1068,7 +1068,7 @@ msgstr "A video is posted on its own, without images."
 msgid "Cette vidéo dépasse 100 Mo."
 msgstr "This video is larger than 100 MB."
 
-#: src/compose.rs:1675 src/edit_profile.rs:491
+#: src/compose.rs:1675 src/edit_profile.rs:491 src/lists.rs:656
 msgid "Ce fichier n'est pas une image lisible."
 msgstr "This file is not a readable image."
 
@@ -1076,7 +1076,7 @@ msgstr "This file is not a readable image."
 msgid "Images et vidéos"
 msgstr "Images and videos"
 
-#: src/compose.rs:1809 src/compose.rs:1813
+#: src/compose.rs:1809 src/compose.rs:1813 src/lists.rs:586 src/lists.rs:592
 msgid "Retirer l'image"
 msgstr "Remove image"
 
@@ -1084,8 +1084,8 @@ msgstr "Remove image"
 msgid "Texte alternatif"
 msgstr "Alternative text"
 
-#: src/compose.rs:1914 src/edit_profile.rs:236 src/lists.rs:338
-#: src/lists.rs:531
+#: src/compose.rs:1914 src/edit_profile.rs:236 src/lists.rs:388
+#: src/lists.rs:686
 msgid "Enregistrer"
 msgstr "Save"
 
@@ -1159,8 +1159,8 @@ msgstr "Display name"
 msgid "Bio"
 msgstr "Bio"
 
-#: src/edit_profile.rs:393 src/feed_page.rs:332 src/lists.rs:890
-#: src/lists.rs:1001 src/profile.rs:849
+#: src/edit_profile.rs:393 src/feed_page.rs:332 src/lists.rs:1066
+#: src/lists.rs:1177 src/profile.rs:849
 msgid "Chargement…"
 msgstr "Loading…"
 
@@ -1168,7 +1168,7 @@ msgstr "Loading…"
 msgid "Modifier le profil"
 msgstr "Edit profile"
 
-#: src/edit_profile.rs:447
+#: src/edit_profile.rs:447 src/lists.rs:609
 msgid "Images"
 msgstr "Images"
 
@@ -1266,7 +1266,7 @@ msgstr "No feeds match this search."
 #: src/explore.rs:517 src/explore.rs:608 src/explore.rs:631 src/explore.rs:640
 #: src/explore.rs:735 src/explore.rs:760 src/feed_page.rs:94
 #: src/feed_page.rs:269 src/feed_page.rs:386 src/feeds.rs:429 src/feeds.rs:699
-#: src/feeds.rs:820 src/lists.rs:978 src/lists.rs:1112 src/messages.rs:703
+#: src/feeds.rs:820 src/lists.rs:1154 src/lists.rs:1288 src/messages.rs:703
 #: src/messages.rs:800 src/messages.rs:1061 src/messages.rs:1261
 #: src/preferences.rs:299 src/preferences.rs:472 src/preferences.rs:577
 #: src/profile.rs:673 src/profile.rs:868 src/profile.rs:985
@@ -1296,7 +1296,7 @@ msgid_plural "{} membres"
 msgstr[0] "{} member"
 msgstr[1] "{} members"
 
-#: src/feed_page.rs:180 src/lists.rs:547 src/lists.rs:1052
+#: src/feed_page.rs:180 src/lists.rs:702 src/lists.rs:1228
 msgid "Liste de modération"
 msgstr "Moderation list"
 
@@ -1304,15 +1304,15 @@ msgstr "Moderation list"
 msgid "Mes listes"
 msgstr "My lists"
 
-#: src/feed_page.rs:219 src/lists.rs:988 src/profile.rs:54 src/window.rs:88
+#: src/feed_page.rs:219 src/lists.rs:1164 src/profile.rs:54 src/window.rs:88
 msgid "Listes"
 msgstr "Lists"
 
-#: src/feed_page.rs:223 src/feed_page.rs:225 src/lists.rs:520
+#: src/feed_page.rs:223 src/feed_page.rs:225 src/lists.rs:675
 msgid "Nouvelle liste"
 msgstr "New list"
 
-#: src/feed_page.rs:290 src/lists.rs:1097
+#: src/feed_page.rs:290 src/lists.rs:1273
 msgid "Vous n'avez pas encore de liste."
 msgstr "You have no lists yet."
 
@@ -1401,165 +1401,181 @@ msgstr "Add {} to your feeds"
 msgid "La liste des flux n'a pas été enregistrée."
 msgstr "The feed list was not saved."
 
-#: src/lists.rs:209 src/lists.rs:213 src/messages.rs:1298 src/messages.rs:1303
+#: src/lists.rs:259 src/lists.rs:263 src/messages.rs:1298 src/messages.rs:1303
 msgid "Rechercher un compte"
 msgstr "Search for an account"
 
-#: src/lists.rs:221 src/messages.rs:1311 src/starter_packs.rs:323
+#: src/lists.rs:271 src/messages.rs:1311 src/starter_packs.rs:323
 msgid "Comptes"
 msgstr "Accounts"
 
-#: src/lists.rs:310
+#: src/lists.rs:360
 msgid "Modifier le starter pack"
 msgstr "Edit starter pack"
 
-#: src/lists.rs:312
+#: src/lists.rs:362
 msgid "Nouveau starter pack"
 msgstr "New starter pack"
 
-#: src/lists.rs:315
+#: src/lists.rs:365
 msgid ""
 "Une sélection de comptes à suivre d'un coup. Ajoutez-y des comptes ensuite."
 msgstr ""
 "A selection of accounts to follow at once. Add accounts to it afterwards."
 
-#: src/lists.rs:318 src/lists.rs:542
+#: src/lists.rs:368 src/lists.rs:697
 msgid "Nom"
 msgstr "Name"
 
-#: src/lists.rs:320 src/lists.rs:544
+#: src/lists.rs:370 src/lists.rs:699
 msgid "Description"
 msgstr "Description"
 
-#: src/lists.rs:340 src/lists.rs:529
+#: src/lists.rs:390 src/lists.rs:684
 msgid "Créer"
 msgstr "Create"
 
-#: src/lists.rs:522
+#: src/lists.rs:576 src/viewer.rs:105 src/viewer.rs:133
+msgid "Image"
+msgstr "Image"
+
+#: src/lists.rs:577 src/lists.rs:654
+msgid "Facultative. PNG, JPEG ou WebP."
+msgstr "Optional. PNG, JPEG or WebP."
+
+#: src/lists.rs:581
+msgid "Choisir…"
+msgstr "Choose…"
+
+#: src/lists.rs:616
+msgid "Choisir une image"
+msgstr "Choose an image"
+
+#: src/lists.rs:677
 msgid "Modifier la liste"
 msgstr "Edit list"
 
-#: src/lists.rs:549
+#: src/lists.rs:704
 msgid "Pour masquer ou bloquer ses comptes, sans fil de posts."
 msgstr "To mute or block its accounts, with no post feed."
 
-#: src/lists.rs:643
+#: src/lists.rs:819
 msgid "Liste enregistrée."
 msgstr "List saved."
 
-#: src/lists.rs:692 src/lists.rs:696
+#: src/lists.rs:868 src/lists.rs:872
 msgid "Options de la liste"
 msgstr "List options"
 
-#: src/lists.rs:710
+#: src/lists.rs:886
 msgid "Retirer des colonnes"
 msgstr "Remove from columns"
 
-#: src/lists.rs:712
+#: src/lists.rs:888
 msgid "Épingler comme colonne"
 msgstr "Pin as a column"
 
-#: src/lists.rs:734
+#: src/lists.rs:910
 msgid "Liste retirée des colonnes."
 msgstr "List removed from columns."
 
-#: src/lists.rs:736
+#: src/lists.rs:912
 msgid "Liste épinglée : « Ajouter une colonne » la propose."
 msgstr "List pinned: “Add a column” now offers it."
 
-#: src/lists.rs:749 src/lists.rs:914
+#: src/lists.rs:925 src/lists.rs:1090
 msgid "Membres"
 msgstr "Members"
 
-#: src/lists.rs:757
+#: src/lists.rs:933
 msgid "Modifier la liste…"
 msgstr "Edit list…"
 
-#: src/lists.rs:758
+#: src/lists.rs:934
 msgid "Supprimer la liste…"
 msgstr "Delete list…"
 
-#: src/lists.rs:778
+#: src/lists.rs:954
 msgid "Ne plus masquer ces comptes"
 msgstr "Unmute these accounts"
 
-#: src/lists.rs:780
+#: src/lists.rs:956
 msgid "Masquer ces comptes"
 msgstr "Mute these accounts"
 
-#: src/lists.rs:784
+#: src/lists.rs:960
 msgid "Ne plus bloquer ces comptes"
 msgstr "Unblock these accounts"
 
-#: src/lists.rs:786
+#: src/lists.rs:962
 msgid "Bloquer ces comptes"
 msgstr "Block these accounts"
 
-#: src/lists.rs:803
+#: src/lists.rs:979
 msgid "Les comptes de cette liste sont masqués."
 msgstr "Accounts in this list are muted."
 
-#: src/lists.rs:805
+#: src/lists.rs:981
 msgid "Les comptes de cette liste ne sont plus masqués."
 msgstr "Accounts in this list are no longer muted."
 
-#: src/lists.rs:824
+#: src/lists.rs:1000
 msgid "Les comptes de cette liste ne sont plus bloqués."
 msgstr "Accounts in this list are no longer blocked."
 
-#: src/lists.rs:830
+#: src/lists.rs:1006
 msgid "Les comptes de cette liste sont bloqués."
 msgstr "Accounts in this list are blocked."
 
-#: src/lists.rs:842
+#: src/lists.rs:1018
 msgid "Supprimer cette liste ?"
 msgstr "Delete this list?"
 
-#: src/lists.rs:844
+#: src/lists.rs:1020
 msgid "Elle disparaîtra pour tout le monde. Ses comptes ne sont pas prévenus."
 msgstr "It will disappear for everyone. Its accounts are not notified."
 
-#: src/lists.rs:849 src/starter_packs.rs:671 src/window.rs:1310
+#: src/lists.rs:1025 src/starter_packs.rs:673 src/window.rs:1310
 msgid "Supprimer"
 msgstr "Delete"
 
-#: src/lists.rs:866
+#: src/lists.rs:1042
 msgid "Liste supprimée."
 msgstr "List deleted."
 
-#: src/lists.rs:936
+#: src/lists.rs:1112
 msgid "Retirer de la liste"
 msgstr "Remove from list"
 
-#: src/lists.rs:941
+#: src/lists.rs:1117
 msgid "Retirer {} de la liste"
 msgstr "Remove {} from the list"
 
-#: src/lists.rs:949
+#: src/lists.rs:1125
 msgid "Compte retiré de la liste."
 msgstr "Account removed from the list."
 
-#: src/lists.rs:963
+#: src/lists.rs:1139
 msgid "Cette liste est vide."
 msgstr "This list is empty."
 
-#: src/lists.rs:998
+#: src/lists.rs:1174
 msgid "Listes de {}"
 msgstr "Lists for {}"
 
-#: src/lists.rs:1025
+#: src/lists.rs:1201
 msgid "Ajouter à une liste"
 msgstr "Add to a list"
 
-#: src/lists.rs:1054
+#: src/lists.rs:1230
 msgid "Liste de comptes"
 msgstr "List of accounts"
 
-#: src/lists.rs:1073
+#: src/lists.rs:1249
 msgid "Ajouté à « {} »."
 msgstr "Added to “{}”."
 
-#: src/lists.rs:1084
+#: src/lists.rs:1260
 msgid "Retiré de « {} »."
 msgstr "Removed from “{}”."
 
@@ -2504,15 +2520,15 @@ msgstr "Add an account"
 msgid "@{} ajouté au starter pack."
 msgstr "@{} added to the starter pack."
 
-#: src/starter_packs.rs:664
+#: src/starter_packs.rs:666
 msgid "Supprimer ce starter pack ?"
 msgstr "Delete this starter pack?"
 
-#: src/starter_packs.rs:666
+#: src/starter_packs.rs:668
 msgid "Il disparaîtra pour tout le monde. Ses comptes ne sont pas prévenus."
 msgstr "It will disappear for everyone. Its accounts are not notified."
 
-#: src/starter_packs.rs:696
+#: src/starter_packs.rs:698
 msgid "Starter pack supprimé."
 msgstr "Starter pack deleted."
 
@@ -2565,10 +2581,6 @@ msgstr "Previous image"
 #: src/viewer.rs:92
 msgid "Image suivante"
 msgstr "Next image"
-
-#: src/viewer.rs:105 src/viewer.rs:133
-msgid "Image"
-msgstr "Image"
 
 #: src/viewer.rs:115 src/viewer.rs:309
 msgid "Enregistrer l'image"
