@@ -843,7 +843,7 @@ fn account_page(session: Arc<Session>, dialog: &adw::PreferencesDialog) -> adw::
         .build();
     export.add_suffix(&crate::card::decorative_icon("document-save-symbolic"));
     {
-        let dialog = dialog.downgrade();
+        let (session, dialog) = (session.clone(), dialog.downgrade());
         export.connect_activated(move |row| {
             let Some(dialog) = dialog.upgrade() else {
                 return;
@@ -852,6 +852,34 @@ fn account_page(session: Arc<Session>, dialog: &adw::PreferencesDialog) -> adw::
         });
     }
     manage.add(&export);
+    let handle = adw::ActionRow::builder()
+        .title(gettext("Changer d'identifiant…"))
+        .activatable(true)
+        .build();
+    {
+        let (session, dialog) = (session.clone(), dialog.downgrade());
+        handle.connect_activated(move |_| {
+            if let Some(dialog) = dialog.upgrade() {
+                crate::account::change_handle_dialog(&dialog, session.clone());
+            }
+        });
+    }
+    manage.add(&handle);
+    let passwords = adw::ActionRow::builder()
+        .title(gettext("Mots de passe d'application"))
+        .activatable(true)
+        .build();
+    passwords.add_suffix(&crate::card::decorative_icon("go-next-symbolic"));
+    {
+        let (session, dialog) = (session.clone(), dialog.downgrade());
+        passwords.connect_activated(move |_| {
+            if let Some(dialog) = dialog.upgrade() {
+                let page = crate::account::app_passwords_page(session.clone(), &dialog);
+                dialog.push_subpage(&page);
+            }
+        });
+    }
+    manage.add(&passwords);
     page.add(&manage);
     page.add(&messages_group(chat_session, dialog));
     page

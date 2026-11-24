@@ -15,7 +15,7 @@ Logiciels et Flathub).
 ### Compte
 
 - Plusieurs comptes : en ajouter un, passer de l'un à l'autre depuis le menu principal.
-- Préférences « Compte » : identifiant, lien vers la gestion du compte, export des données.
+- Préférences « Compte » : identifiant, lien vers la gestion du compte, export des données, changer d'identifiant, mots de passe d'application.
 
 ### Modération
 

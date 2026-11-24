@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: tsubame\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-24 08:23+0000\n"
+"POT-Creation-Date: 2026-11-24 08:26+0000\n"
 "PO-Revision-Date: 2026-11-22\n"
 "Last-Translator: \n"
 "Language-Team: English\n"
@@ -19,7 +19,7 @@ msgid "Tsubame"
 msgstr "Tsubame"
 
 #: data/io.github.DocteurScience.Tsubame.desktop.in:4
-#: data/io.github.DocteurScience.Tsubame.metainfo.xml.in:7 src/main.rs:62
+#: data/io.github.DocteurScience.Tsubame.metainfo.xml.in:7 src/main.rs:63
 msgid "Client Bluesky pour GNOME"
 msgstr "Bluesky client for GNOME"
 
@@ -74,6 +74,113 @@ msgstr "Moderation: mute, block, report, content labels"
 #: data/io.github.DocteurScience.Tsubame.metainfo.xml.in:44
 msgid "Connexion dans le navigateur, session gardée dans le trousseau"
 msgstr "Sign-in in the browser, session kept in the keyring"
+
+#: src/account.rs:39
+msgid ""
+"Bluesky n'autorise pas ce changement depuis une application. Faites-le sur "
+"le site de Bluesky."
+msgstr ""
+"Bluesky does not allow this change from an app. Make it on the Bluesky "
+"website."
+
+#: src/account.rs:56
+msgid "Cet identifiant n'est pas valide."
+msgstr "This handle is not valid."
+
+#: src/account.rs:135 src/edit_profile.rs:576 src/explore.rs:182
+#: src/feeds.rs:759 src/lists.rs:419 src/lists.rs:449 src/messages.rs:1022
+#: src/preferences.rs:435 src/preferences.rs:526 src/preferences.rs:641
+#: src/preferences.rs:976 src/profile.rs:987 src/profile.rs:1106
+#: src/profile.rs:1154 src/profile.rs:1209 src/report.rs:271
+#: src/window.rs:1221 src/window.rs:1289 src/window.rs:1366 src/window.rs:1467
+#: src/window.rs:1846
+msgid "Requête interrompue."
+msgstr "Request interrupted."
+
+#: src/account.rs:144
+msgid "Changer d'identifiant"
+msgstr "Change handle"
+
+#: src/account.rs:146
+msgid ""
+"Un identifiant en .bsky.social, ou un nom de domaine que vous possédez et "
+"que vous avez déjà relié à votre compte."
+msgstr ""
+"A .bsky.social handle, or a domain name you own and have already linked to "
+"your account."
+
+#: src/account.rs:150
+msgid "vous.bsky.social"
+msgstr "you.bsky.social"
+
+#: src/account.rs:154
+msgid "Nouvel identifiant"
+msgstr "New handle"
+
+#. En-tête : Annuler, titre, Publier.
+#: src/account.rs:158 src/compose.rs:263 src/compose.rs:1811
+#: src/edit_profile.rs:234 src/lists.rs:305 src/lists.rs:627 src/login.rs:160
+#: src/messages.rs:910 src/profile.rs:1280 src/report.rs:180 src/window.rs:640
+#: src/window.rs:1272 src/window.rs:1447
+msgid "Annuler"
+msgstr "Cancel"
+
+#: src/account.rs:159
+msgid "Changer"
+msgstr "Change"
+
+#: src/account.rs:181
+msgid ""
+"Identifiant changé en @{}. Il s'affichera partout à la prochaine connexion."
+msgstr "Handle changed to @{}. It will show everywhere at your next sign-in."
+
+#: src/account.rs:197
+msgid "Nom d'un nouveau mot de passe"
+msgstr "Name of a new password"
+
+#: src/account.rs:202
+msgid ""
+"Pour vous connecter à une application qui ne gère pas la connexion par "
+"navigateur. Chaque mot de passe se révoque à part."
+msgstr ""
+"To sign in to an app that does not support browser sign-in. Each password "
+"can be revoked on its own."
+
+#: src/account.rs:213 src/preferences.rs:869
+msgid "Mots de passe d'application"
+msgstr "App passwords"
+
+#: src/account.rs:244
+msgid "Créé le {}"
+msgstr "Created on {}"
+
+#: src/account.rs:248
+msgid "Révoquer"
+msgstr "Revoke"
+
+#: src/account.rs:253
+msgid "Révoquer {}"
+msgstr "Revoke {}"
+
+#: src/account.rs:314
+msgid "Mot de passe « {} »"
+msgstr "Password “{}”"
+
+#: src/account.rs:316
+msgid ""
+"Notez-le maintenant : il ne sera plus montré. Il donne accès à votre compte,"
+" gardez-le pour vous."
+msgstr ""
+"Write it down now: it will not be shown again. It gives access to your "
+"account, keep it to yourself."
+
+#: src/account.rs:325
+msgid "Copier"
+msgstr "Copy"
+
+#: src/account.rs:325
+msgid "Fermer"
+msgstr "Close"
 
 #: src/api.rs:109
 msgid "Bluesky n'a pas répondu : {}"
@@ -222,11 +329,11 @@ msgstr "No account you follow follows this account."
 msgid "Ce post ne peut pas être modifié."
 msgstr "This post cannot be changed."
 
-#: src/api.rs:1683 src/preferences.rs:867
+#: src/api.rs:1683 src/preferences.rs:895
 msgid "Tout le monde"
 msgstr "Everyone"
 
-#: src/api.rs:1684 src/preferences.rs:868
+#: src/api.rs:1684 src/preferences.rs:896
 msgid "Comptes que vous suivez"
 msgstr "Accounts you follow"
 
@@ -728,14 +835,6 @@ msgstr "Quote"
 msgid "Nouveau post"
 msgstr "New post"
 
-#. En-tête : Annuler, titre, Publier.
-#: src/compose.rs:263 src/compose.rs:1811 src/edit_profile.rs:234
-#: src/lists.rs:305 src/lists.rs:627 src/login.rs:160 src/messages.rs:910
-#: src/profile.rs:1280 src/report.rs:180 src/window.rs:640 src/window.rs:1272
-#: src/window.rs:1447
-msgid "Annuler"
-msgstr "Cancel"
-
 #: src/compose.rs:265 src/compose.rs:1347
 msgid "Publier"
 msgstr "Post"
@@ -971,7 +1070,7 @@ msgid_plural "Et {} autres notifications non lues."
 msgstr[0] "And {} other unread notification."
 msgstr[1] "And {} other unread notifications."
 
-#: src/edit_profile.rs:95 src/edit_profile.rs:168 src/preferences.rs:933
+#: src/edit_profile.rs:95 src/edit_profile.rs:168 src/preferences.rs:961
 msgid "Compte invalide."
 msgstr "Invalid account."
 
@@ -1027,16 +1126,6 @@ msgstr "Choose a banner"
 #: src/edit_profile.rs:457
 msgid "Choisir un avatar"
 msgstr "Choose an avatar"
-
-#: src/edit_profile.rs:576 src/explore.rs:182 src/feeds.rs:759
-#: src/lists.rs:419 src/lists.rs:449 src/messages.rs:1022
-#: src/preferences.rs:435 src/preferences.rs:526 src/preferences.rs:641
-#: src/preferences.rs:948 src/profile.rs:987 src/profile.rs:1106
-#: src/profile.rs:1154 src/profile.rs:1209 src/report.rs:271
-#: src/window.rs:1221 src/window.rs:1289 src/window.rs:1366 src/window.rs:1467
-#: src/window.rs:1846
-msgid "Requête interrompue."
-msgstr "Request interrupted."
 
 #: src/explore.rs:132
 msgctxt "bouton : vous suivez ce compte"
@@ -1448,7 +1537,7 @@ msgid "erreur inattendue"
 msgstr "unexpected error"
 
 #. Traducteurs : remplacez « translator-credits » par vos noms, un par ligne.
-#: src/main.rs:68
+#: src/main.rs:69
 msgid "translator-credits"
 msgstr ""
 
@@ -1508,7 +1597,7 @@ msgstr "Open post"
 msgid "Ouvrir le post de {} : {}"
 msgstr "Open post by {}: {}"
 
-#: src/messages.rs:374 src/messages.rs:445 src/preferences.rs:864
+#: src/messages.rs:374 src/messages.rs:445 src/preferences.rs:892
 #: src/window.rs:70
 msgid "Messages"
 msgstr "Messages"
@@ -1873,7 +1962,7 @@ msgstr "Manage the account on Bluesky"
 msgid "Le navigateur n'a pas pu être ouvert."
 msgstr "The browser could not be opened."
 
-#: src/preferences.rs:838 src/preferences.rs:917
+#: src/preferences.rs:838 src/preferences.rs:945
 msgid "Exporter mes données"
 msgstr "Export my data"
 
@@ -1881,52 +1970,56 @@ msgstr "Export my data"
 msgid "Tous vos posts, j'aime, abonnements… dans un fichier CAR."
 msgstr "All your posts, likes, follows… in a CAR file."
 
-#: src/preferences.rs:869
+#: src/preferences.rs:856
+msgid "Changer d'identifiant…"
+msgstr "Change handle…"
+
+#: src/preferences.rs:897
 msgctxt "personne ne peut écrire"
 msgid "Personne"
 msgstr "No one"
 
-#: src/preferences.rs:871
+#: src/preferences.rs:899
 msgid "Qui peut vous écrire"
 msgstr "Who can message you"
 
-#: src/preferences.rs:926
+#: src/preferences.rs:954
 msgid "Export en cours…"
 msgstr "Exporting…"
 
-#: src/preferences.rs:954
+#: src/preferences.rs:982
 msgid "Le fichier n'a pas pu être enregistré."
 msgstr "The file could not be saved."
 
-#: src/preferences.rs:959
+#: src/preferences.rs:987
 msgid "Données exportées."
 msgstr "Data exported."
 
-#: src/preferences.rs:972
+#: src/preferences.rs:1000
 msgid "Langues"
 msgstr "Languages"
 
-#: src/preferences.rs:977
+#: src/preferences.rs:1005
 msgid "Vos posts"
 msgstr "Your posts"
 
-#: src/preferences.rs:980
+#: src/preferences.rs:1008
 msgid "Celle du système"
 msgstr "System language"
 
-#: src/preferences.rs:985
+#: src/preferences.rs:1013
 msgid "Langue proposée"
 msgstr "Suggested language"
 
-#: src/preferences.rs:986
+#: src/preferences.rs:1014
 msgid "Elle se change aussi dans chaque post."
 msgstr "It can also be changed in each post."
 
-#: src/preferences.rs:1009
+#: src/preferences.rs:1037
 msgid "Posts affichés"
 msgstr "Shown posts"
 
-#: src/preferences.rs:1011
+#: src/preferences.rs:1039
 msgid ""
 "Seuls les posts dans ces langues s'affichent dans vos fils. Aucune langue "
 "cochée : toutes."
@@ -1934,11 +2027,11 @@ msgstr ""
 "Only posts in these languages are shown in your feeds. None selected: all of"
 " them."
 
-#: src/preferences.rs:1046
+#: src/preferences.rs:1074
 msgid "Aucune liste"
 msgstr "No lists"
 
-#: src/preferences.rs:1053
+#: src/preferences.rs:1081
 msgid "Aucun compte"
 msgstr "No accounts"
 
