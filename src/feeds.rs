@@ -116,6 +116,8 @@ pub enum Change {
     Pin(String, bool),
     /// Déplacer d'un cran parmi les flux (-1 : vers le haut).
     Move(String, i32),
+    /// Placer un flux à cet indice parmi les flux (glisser-déposer).
+    MoveTo(String, usize),
     /// Épingler une liste (son fil devient une colonne), ou la retirer.
     PinList(String, bool),
 }
@@ -158,25 +160,37 @@ impl Change {
                     item["pinned"] = json!(pinned);
                 }
             }
-            Change::Move(uri, delta) => {
-                // Échange avec le flux voisin ; les autres éléments (fil
-                // Following, listes) gardent leur place.
-                let feeds: Vec<usize> = items
-                    .iter()
-                    .enumerate()
-                    .filter(|(_, item)| item.get("type").and_then(Value::as_str) == Some("feed"))
-                    .map(|(i, _)| i)
-                    .collect();
-                let Some(at) = feeds.iter().position(|&i| is_feed(&items[i], uri)) else {
-                    return;
-                };
+            Change::Move(uri, delta) => move_feed(items, uri, |at, count| {
                 let target = at as i32 + delta;
-                if target < 0 || target as usize >= feeds.len() {
-                    return;
-                }
-                items.swap(feeds[at], feeds[target as usize]);
+                (target >= 0 && (target as usize) < count).then_some(target as usize)
+            }),
+            Change::MoveTo(uri, to) => {
+                move_feed(items, uri, |_, count| (*to < count).then_some(*to))
             }
         }
+    }
+}
+
+/// Déplace le flux `uri` parmi les flux, à l'indice que `target` calcule (depuis son indice et
+/// le nombre de flux). Les autres éléments (fil Following, listes) gardent leur place.
+fn move_feed(items: &mut [Value], uri: &str, target: impl FnOnce(usize, usize) -> Option<usize>) {
+    let slots: Vec<usize> = items
+        .iter()
+        .enumerate()
+        .filter(|(_, item)| item.get("type").and_then(Value::as_str) == Some("feed"))
+        .map(|(i, _)| i)
+        .collect();
+    let Some(at) = slots.iter().position(|&i| is_feed(&items[i], uri)) else {
+        return;
+    };
+    let Some(to) = target(at, slots.len()) else {
+        return;
+    };
+    let mut feeds: Vec<Value> = slots.iter().map(|&i| items[i].clone()).collect();
+    let moved = feeds.remove(at);
+    feeds.insert(to, moved);
+    for (slot, feed) in slots.into_iter().zip(feeds) {
+        items[slot] = feed;
     }
 }
 
@@ -748,6 +762,7 @@ impl FeedsPage {
             "Rechercher des flux",
         ))]);
         let saved_list = boxed_list(&gettext("Mes flux"));
+        saved_list.add_css_class("saved-feeds");
         let found_list = boxed_list(&gettext("Flux à découvrir"));
         let saved_group = adw::PreferencesGroup::builder()
             .title(gettext("Mes flux"))
@@ -922,6 +937,7 @@ impl FeedsPage {
                     page.change(Change::Remove(uri.clone()));
                 }
             });
+            self.make_draggable(&row, &feed.uri, index);
             let weak = Rc::downgrade(self);
             row.connect_activated(move |_| {
                 if let Some(page) = weak.upgrade() {
@@ -930,6 +946,84 @@ impl FeedsPage {
             });
             self.saved_list.append(&row);
         }
+    }
+
+    /// Les flux enregistrés se réordonnent aussi par glisser-déposer (les boutons « Monter » et
+    /// « Descendre » restent pour le clavier). Un trait marque l'endroit du dépôt.
+    fn make_draggable(self: &Rc<Self>, row: &adw::ActionRow, uri: &str, index: usize) {
+        let source = gtk::DragSource::new();
+        source.set_actions(gtk::gdk::DragAction::MOVE);
+        let dragged = uri.to_owned();
+        source.connect_prepare(move |_, _, _| {
+            Some(gtk::gdk::ContentProvider::for_value(&dragged.to_value()))
+        });
+        source.connect_drag_begin(|source, _| {
+            if let Some(row) = source.widget() {
+                source.set_icon(Some(&gtk::WidgetPaintable::new(Some(&row))), 0, 0);
+                row.add_css_class("dragged");
+            }
+        });
+        source.connect_drag_end(|source, _, _| {
+            if let Some(row) = source.widget() {
+                row.remove_css_class("dragged");
+            }
+        });
+        row.add_controller(source);
+
+        let target = gtk::DropTarget::new(glib::Type::STRING, gtk::gdk::DragAction::MOVE);
+        target.set_preload(true);
+        let page = Rc::downgrade(self);
+        target.connect_motion(move |target, _, y| {
+            let Some(row) = target.widget() else {
+                return gtk::gdk::DragAction::empty();
+            };
+            let destination = page
+                .upgrade()
+                .and_then(|page| page.drop_destination(target.value().as_ref(), index, &row, y));
+            crate::window::show_drop_marker(&row, destination.as_ref().map(|(_, _, after)| *after));
+            match destination {
+                Some(_) => gtk::gdk::DragAction::MOVE,
+                None => gtk::gdk::DragAction::empty(),
+            }
+        });
+        target.connect_leave(|target| {
+            if let Some(row) = target.widget() {
+                crate::window::show_drop_marker(&row, None);
+            }
+        });
+        let page = Rc::downgrade(self);
+        target.connect_drop(move |target, value, _, y| {
+            let Some(row) = target.widget() else {
+                return false;
+            };
+            crate::window::show_drop_marker(&row, None);
+            let Some(page) = page.upgrade() else {
+                return false;
+            };
+            let Some((uri, to, _)) = page.drop_destination(Some(value), index, &row, y) else {
+                return false;
+            };
+            page.change(Change::MoveTo(uri, to));
+            true
+        });
+        row.add_controller(target);
+    }
+
+    /// Où irait le flux glissé (`value`) si on le déposait à la hauteur `y` de la rangée
+    /// d'indice `over` : son adresse, son nouvel indice et si le dépôt se fait après la rangée.
+    /// `None` quand rien ne changerait.
+    fn drop_destination(
+        &self,
+        value: Option<&glib::Value>,
+        over: usize,
+        row: &gtk::Widget,
+        y: f64,
+    ) -> Option<(String, usize, bool)> {
+        let uri = value.and_then(|v| v.get::<String>().ok())?;
+        let from = self.saved.borrow().iter().position(|(f, _)| f.uri == uri)?;
+        let after = y > f64::from(row.height()) / 2.0;
+        let to = crate::window::drop_index(from, over, after)?;
+        Some((uri, to, after))
     }
 
     fn load_found(self: &Rc<Self>) {
@@ -1094,6 +1188,14 @@ impl FeedsPage {
                         }
                     }
                 }
+                Change::MoveTo(uri, to) => {
+                    if let Some(at) = saved.iter().position(|(f, _)| &f.uri == uri)
+                        && *to < saved.len()
+                    {
+                        let moved = saved.remove(at);
+                        saved.insert(*to, moved);
+                    }
+                }
             }
         }
         // Reconstruire la liste après la fin du signal en cours (le bouton
@@ -1191,6 +1293,17 @@ mod tests {
         assert_eq!(items[2]["type"], "list");
         Change::Move(y.clone(), -1).apply(&mut p);
         assert_eq!(saved_feeds(&p)[0].uri, y, "déjà en tête");
+        Change::MoveTo(y.clone(), 1).apply(&mut p);
+        assert_eq!(saved_feeds(&p)[1].uri, y);
+        assert_eq!(
+            saved_items(&p)[2]["type"],
+            "list",
+            "la liste reste à sa place"
+        );
+        Change::MoveTo(y.clone(), 0).apply(&mut p);
+        assert_eq!(saved_feeds(&p)[0].uri, y);
+        Change::MoveTo(y.clone(), 9).apply(&mut p);
+        assert_eq!(saved_feeds(&p)[0].uri, y, "hors limites : rien ne change");
         Change::Pin(x.clone(), false).apply(&mut p);
         assert!(!saved_feeds(&p)[1].pinned);
         Change::Save(z.clone(), true).apply(&mut p);

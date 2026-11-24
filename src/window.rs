@@ -1948,7 +1948,7 @@ impl State {
 
 /// Nouvel indice d'une colonne glissée depuis `from` et déposée avant ou
 /// après la colonne d'indice `over`, ou `None` si elle ne bouge pas.
-fn drop_index(from: usize, over: usize, after: bool) -> Option<usize> {
+pub(crate) fn drop_index(from: usize, over: usize, after: bool) -> Option<usize> {
     let insert_at = over + usize::from(after);
     // Retirer la colonne décale celles qui la suivent.
     let to = if from < insert_at {
@@ -1961,7 +1961,7 @@ fn drop_index(from: usize, over: usize, after: bool) -> Option<usize> {
 
 /// Trait de dépôt au-dessus (`Some(false)`) ou en dessous (`Some(true)`)
 /// d'une rangée, ou aucun.
-fn show_drop_marker(row: &gtk::Widget, after: Option<bool>) {
+pub(crate) fn show_drop_marker(row: &gtk::Widget, after: Option<bool>) {
     row.set_css_classes(
         &row.css_classes()
             .iter()

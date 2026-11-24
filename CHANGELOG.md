@@ -51,7 +51,7 @@ Logiciels et Flathub).
 - Starter packs dans Explorer : voir leurs comptes et leurs flux, tout suivre ; créer, modifier et supprimer les siens, y ajouter des comptes et jusqu'à trois flux.
 - Recherche de flux dans Explorer.
 - Liens, mentions et mots-dièse cliquables dans les posts, y compris les posts cités ; page d'un mot-dièse.
-- Page « Flux » : épingler, réordonner, retirer ses flux ; découvrir et
+- Page « Flux » : épingler, réordonner (boutons ou glisser-déposer), retirer ses flux ; découvrir et
   rechercher des flux, les ouvrir, les ajouter.
 
 ### Intégration continue

@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: tsubame\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-24 11:49+0000\n"
+"POT-Creation-Date: 2026-11-24 11:53+0000\n"
 "PO-Revision-Date: 2026-11-22\n"
 "Last-Translator: \n"
 "Language-Team: English\n"
@@ -23,8 +23,7 @@ msgstr "Tsubame"
 msgid "Client Bluesky pour GNOME"
 msgstr "Bluesky client for GNOME"
 
-#. Traducteurs : mots-clés séparés par des points-virgules, sans traduire «
-#. Tsubame ».
+#. Traducteurs : mots-clés séparés par des points-virgules, sans traduire « Tsubame ».
 #: data/io.github.DocteurScience.Tsubame.desktop.in:6
 msgid "Bluesky;réseau social;AT Protocol;microblog;"
 msgstr "Bluesky;social network;AT Protocol;microblog;"
@@ -34,8 +33,8 @@ msgid ""
 "Tsubame est un client Bluesky natif pour le bureau GNOME. Les posts "
 "s’affichent en cartes et la discussion s’ouvre dans un volet à côté du fil."
 msgstr ""
-"Tsubame is a native Bluesky client for the GNOME desktop. Posts are shown as"
-" cards and the conversation opens in a pane next to the feed."
+"Tsubame is a native Bluesky client for the GNOME desktop. Posts are shown as "
+"cards and the conversation opens in a pane next to the feed."
 
 #: data/io.github.DocteurScience.Tsubame.metainfo.xml.in:16
 msgid "DocteurScience"
@@ -88,7 +87,7 @@ msgid "Cet identifiant n'est pas valide."
 msgstr "This handle is not valid."
 
 #: src/account.rs:135 src/edit_profile.rs:576 src/explore.rs:234
-#: src/explore.rs:686 src/feeds.rs:467 src/feeds.rs:670 src/feeds.rs:1119
+#: src/explore.rs:686 src/feeds.rs:481 src/feeds.rs:684 src/feeds.rs:1221
 #: src/lists.rs:861 src/lists.rs:891 src/messages.rs:1022
 #: src/preferences.rs:435 src/preferences.rs:526 src/preferences.rs:641
 #: src/preferences.rs:976 src/profile.rs:1019 src/profile.rs:1138
@@ -171,8 +170,8 @@ msgstr "Password “{}”"
 
 #: src/account.rs:316
 msgid ""
-"Notez-le maintenant : il ne sera plus montré. Il donne accès à votre compte,"
-" gardez-le pour vous."
+"Notez-le maintenant : il ne sera plus montré. Il donne accès à votre compte, "
+"gardez-le pour vous."
 msgstr ""
 "Write it down now: it will not be shown again. It gives access to your "
 "account, keep it to yourself."
@@ -283,7 +282,7 @@ msgstr "reposted your repost"
 msgid "a rejoint Bluesky avec votre starter pack"
 msgstr "joined Bluesky with your starter pack"
 
-#: src/api.rs:1207 src/feeds.rs:252 src/moderation.rs:754 src/report.rs:158
+#: src/api.rs:1207 src/feeds.rs:266 src/moderation.rs:754 src/report.rs:158
 msgid "Ce compte n'existe pas."
 msgstr "This account does not exist."
 
@@ -498,8 +497,8 @@ msgstr "Your session has expired. Please sign in again."
 
 #: src/auth/mod.rs:68
 msgid ""
-"Impossible de trouver ce compte. Vérifiez l'identifiant et votre connexion à"
-" Internet."
+"Impossible de trouver ce compte. Vérifiez l'identifiant et votre connexion à "
+"Internet."
 msgstr ""
 "Could not find this account. Check the handle and your Internet connection."
 
@@ -726,7 +725,7 @@ msgstr "Open link: {}"
 msgid "Post cité de {} : {}"
 msgstr "Quoted post by {}: {}"
 
-#: src/card.rs:1291 src/feeds.rs:392 src/feeds.rs:706
+#: src/card.rs:1291 src/feeds.rs:406 src/feeds.rs:720
 msgid "{} j'aime"
 msgid_plural "{} j'aime"
 msgstr[0] "{} like"
@@ -1103,8 +1102,7 @@ msgid ""
 msgstr "Describe what the video shows for people who cannot see it."
 
 #: src/compose.rs:1954
-msgid ""
-"Décrivez ce que montre l'image pour les personnes qui ne la voient pas."
+msgid "Décrivez ce que montre l'image pour les personnes qui ne la voient pas."
 msgstr "Describe what the image shows for people who cannot see it."
 
 #: src/desktop.rs:16
@@ -1245,8 +1243,7 @@ msgstr "Search posts, people, feeds…"
 msgid "Rechercher"
 msgstr "Search"
 
-#. Sans recherche : onglets « Pour vous », « Tendances », « Flux », « Starter
-#. packs »,
+#. Sans recherche : onglets « Pour vous », « Tendances », « Flux », « Starter packs »,
 #. « Personnes » (maquette).
 #: src/explore.rs:340 src/explore.rs:344
 msgid "Sujets du moment"
@@ -1265,7 +1262,7 @@ msgstr "Starter packs"
 msgid "Tendances"
 msgstr "Trending"
 
-#: src/explore.rs:353 src/feeds.rs:760 src/feeds.rs:938
+#: src/explore.rs:353 src/feeds.rs:775 src/feeds.rs:1032
 msgid "Flux populaires"
 msgstr "Popular feeds"
 
@@ -1281,7 +1278,7 @@ msgstr "Explore"
 msgid "Pour vous"
 msgstr "For you"
 
-#: src/explore.rs:380 src/explore.rs:431 src/feeds.rs:591 src/feeds.rs:787
+#: src/explore.rs:380 src/explore.rs:431 src/feeds.rs:605 src/feeds.rs:802
 #: src/profile.rs:53 src/starter_packs.rs:310 src/window.rs:76
 msgid "Flux"
 msgstr "Feeds"
@@ -1290,7 +1287,7 @@ msgstr "Feeds"
 msgid "Personnes"
 msgstr "People"
 
-#: src/explore.rs:421 src/feeds.rs:645 src/feeds.rs:940
+#: src/explore.rs:421 src/feeds.rs:659 src/feeds.rs:1034
 msgid "Résultats"
 msgstr "Results"
 
@@ -1319,14 +1316,13 @@ msgid "Aucun flux ne correspond à cette recherche."
 msgstr "No feeds match this search."
 
 #: src/explore.rs:659 src/explore.rs:750 src/explore.rs:778 src/explore.rs:788
-#: src/explore.rs:797 src/explore.rs:904 src/explore.rs:929
-#: src/feed_page.rs:94 src/feed_page.rs:269 src/feed_page.rs:386
-#: src/feeds.rs:429 src/feeds.rs:839 src/feeds.rs:960 src/lists.rs:1199
-#: src/lists.rs:1333 src/messages.rs:703 src/messages.rs:800
-#: src/messages.rs:1061 src/messages.rs:1261 src/preferences.rs:299
-#: src/preferences.rs:472 src/preferences.rs:577 src/profile.rs:673
-#: src/profile.rs:868 src/profile.rs:985 src/starter_packs.rs:503
-#: src/window.rs:1123
+#: src/explore.rs:797 src/explore.rs:904 src/explore.rs:929 src/feed_page.rs:94
+#: src/feed_page.rs:269 src/feed_page.rs:386 src/feeds.rs:443 src/feeds.rs:854
+#: src/feeds.rs:1054 src/lists.rs:1199 src/lists.rs:1333 src/messages.rs:703
+#: src/messages.rs:800 src/messages.rs:1061 src/messages.rs:1261
+#: src/preferences.rs:299 src/preferences.rs:472 src/preferences.rs:577
+#: src/profile.rs:673 src/profile.rs:868 src/profile.rs:985
+#: src/starter_packs.rs:503 src/window.rs:1123
 msgid "Chargement interrompu."
 msgstr "Loading interrupted."
 
@@ -1334,7 +1330,7 @@ msgstr "Loading interrupted."
 msgid "Aucun starter pack."
 msgstr "No starter packs."
 
-#: src/explore.rs:768 src/explore.rs:790 src/feeds.rs:593 src/profile.rs:899
+#: src/explore.rs:768 src/explore.rs:790 src/feeds.rs:607 src/profile.rs:899
 msgid "Aucun flux."
 msgstr "No feeds."
 
@@ -1376,88 +1372,88 @@ msgstr "New list"
 msgid "Vous n'avez pas encore de liste."
 msgstr "You have no lists yet."
 
-#: src/feeds.rs:301 src/feeds.rs:304 src/feeds.rs:358
+#: src/feeds.rs:315 src/feeds.rs:318 src/feeds.rs:372
 msgid "À propos du flux"
 msgstr "About this feed"
 
-#: src/feeds.rs:387 src/feeds.rs:701
+#: src/feeds.rs:401 src/feeds.rs:715
 msgid "par @{}"
 msgstr "by @{}"
 
-#: src/feeds.rs:399
+#: src/feeds.rs:413
 msgid "Je n'aime plus"
 msgstr "Unlike"
 
-#: src/feeds.rs:401
+#: src/feeds.rs:415
 msgctxt "aimer un flux"
 msgid "J'aime"
 msgstr "Like"
 
-#: src/feeds.rs:569
+#: src/feeds.rs:583
 msgid "Ajouter un flux"
 msgstr "Add a feed"
 
-#: src/feeds.rs:574 src/feeds.rs:578 src/feeds.rs:744 src/feeds.rs:748
+#: src/feeds.rs:588 src/feeds.rs:592 src/feeds.rs:758 src/feeds.rs:762
 msgid "Rechercher des flux"
 msgstr "Search feeds"
 
-#: src/feeds.rs:581 src/feeds.rs:643 src/feeds.rs:750 src/feeds.rs:753
+#: src/feeds.rs:595 src/feeds.rs:657 src/feeds.rs:764 src/feeds.rs:768
 msgid "Mes flux"
 msgstr "My feeds"
 
-#: src/feeds.rs:751
+#: src/feeds.rs:766
 msgid "Flux à découvrir"
 msgstr "Feeds to discover"
 
-#: src/feeds.rs:755
+#: src/feeds.rs:770
 msgid "Les flux épinglés peuvent s'ouvrir en colonne sur l'accueil."
 msgstr "Pinned feeds can open as columns on the home page."
 
-#: src/feeds.rs:859
+#: src/feeds.rs:874
 msgid "Aucun flux enregistré."
 msgstr "No saved feeds."
 
-#: src/feeds.rs:875
+#: src/feeds.rs:890
 msgid "Désépingler {}"
 msgstr "Unpin {}"
 
-#: src/feeds.rs:877
+#: src/feeds.rs:892
 msgid "Épingler {}"
 msgstr "Pin {}"
 
-#: src/feeds.rs:884
+#: src/feeds.rs:899
 msgid "Monter {}"
 msgstr "Move {} up"
 
-#: src/feeds.rs:889
+#: src/feeds.rs:904
 msgid "Descendre {}"
 msgstr "Move {} down"
 
-#: src/feeds.rs:894
+#: src/feeds.rs:909
 msgid "Retirer {}"
 msgstr "Remove {}"
 
-#: src/feeds.rs:981
+#: src/feeds.rs:1075
 msgid "Aucun flux trouvé."
 msgstr "No feeds found."
 
-#: src/feeds.rs:1036
+#: src/feeds.rs:1130
 msgid "Ajouté"
 msgstr "Added"
 
-#: src/feeds.rs:1038
+#: src/feeds.rs:1132
 msgid "Ajouter"
 msgstr "Add"
 
-#: src/feeds.rs:1042
+#: src/feeds.rs:1136
 msgid "{} est dans vos flux"
 msgstr "{} is in your feeds"
 
-#: src/feeds.rs:1044
+#: src/feeds.rs:1138
 msgid "Ajouter {} à vos flux"
 msgstr "Add {} to your feeds"
 
-#: src/feeds.rs:1127
+#: src/feeds.rs:1229
 msgid "La liste des flux n'a pas été enregistrée."
 msgstr "The feed list was not saved."
 
@@ -1653,11 +1649,11 @@ msgstr "Handle"
 
 #: src/login.rs:95
 msgid ""
-"Par exemple : vous.bsky.social. Votre navigateur s'ouvrira pour confirmer la"
-" connexion ; Tsubame ne voit jamais votre mot de passe."
+"Par exemple : vous.bsky.social. Votre navigateur s'ouvrira pour confirmer la "
+"connexion ; Tsubame ne voit jamais votre mot de passe."
 msgstr ""
-"For example: you.bsky.social. Your browser will open to confirm the sign-in;"
-" Tsubame never sees your password."
+"For example: you.bsky.social. Your browser will open to confirm the sign-in; "
+"Tsubame never sees your password."
 
 #: src/login.rs:109
 msgid "Se connecter"
@@ -1800,8 +1796,7 @@ msgid "Messages plus anciens"
 msgstr "Older messages"
 
 #: src/messages.rs:485
-msgid ""
-"Demande de message : cette personne ne fait pas partie de vos contacts."
+msgid "Demande de message : cette personne ne fait pas partie de vos contacts."
 msgstr "Message request: this person is not one of your contacts."
 
 #: src/messages.rs:487
@@ -2184,8 +2179,8 @@ msgid ""
 "Seuls les posts dans ces langues s'affichent dans vos fils. Aucune langue "
 "cochée : toutes."
 msgstr ""
-"Only posts in these languages are shown in your feeds. None selected: all of"
-" them."
+"Only posts in these languages are shown in your feeds. None selected: all of "
+"them."
 
 #: src/preferences.rs:1074
 msgid "Aucune liste"
@@ -2260,8 +2255,7 @@ msgstr "Profile not found"
 msgid "Profil enregistré."
 msgstr "Profile saved."
 
-#: src/profile.rs:545 src/profile.rs:1263 src/window.rs:1248
-#: src/window.rs:1495
+#: src/profile.rs:545 src/profile.rs:1263 src/window.rs:1248 src/window.rs:1495
 msgid "Mode démonstration : rien n'est enregistré."
 msgstr "Demo mode: nothing is saved."
 
@@ -2483,8 +2477,8 @@ msgid ""
 "Le signalement est envoyé au service de modération de Bluesky. La personne "
 "signalée n'en est pas informée."
 msgstr ""
-"The report is sent to the Bluesky moderation service. The reported person is"
-" not told."
+"The report is sent to the Bluesky moderation service. The reported person is "
+"not told."
 
 #: src/report.rs:237
 msgid "Destinataire"
