@@ -196,8 +196,10 @@ fn media(media: &Media, warning: Option<String>) -> gtk::Widget {
             gtk::Align::Start,
         ));
     }
-    if let Some(playlist) = &media.video {
-        add_play_button(&overlay, playlist, &description, height);
+    match &media.video {
+        Some(playlist) if media.gif => add_gif_button(&overlay, playlist, &description, height),
+        Some(playlist) => add_play_button(&overlay, playlist, &description, height),
+        None => {}
     }
     if let Some(warning) = warning {
         add_warning(&overlay, &content, &warning);
@@ -357,6 +359,64 @@ fn add_play_button(overlay: &gtk::Overlay, playlist: &str, description: &str, he
         overlay.set_child(Some(&video));
         play.set_visible(false);
         video.grab_focus();
+    });
+}
+
+/// GIF (vidéo `presentation: gif`) : « Lire le GIF » ; un clic le lit en
+/// boucle, sans son ni commandes ; un autre clic le met en pause. Pas de
+/// lecture automatique : rien ne bouge sans le demander.
+fn add_gif_button(overlay: &gtk::Overlay, playlist: &str, description: &str, height: i32) {
+    overlay.add_overlay(&badge(
+        &gettext("GIF"),
+        &gettext("GIF animé"),
+        gtk::Align::Start,
+        gtk::Align::End,
+    ));
+    let play = gtk::Button::builder()
+        .icon_name("media-playback-start-symbolic")
+        .tooltip_text(gettext("Lire le GIF"))
+        .halign(gtk::Align::Center)
+        .valign(gtk::Align::Center)
+        .css_classes(["circular", "osd", "video-play"])
+        .build();
+    play.update_property(&[gtk::accessible::Property::Label(&gettext("Lire le GIF"))]);
+    overlay.add_overlay(&play);
+    let (playlist, description) = (playlist.to_owned(), description.to_owned());
+    let weak = overlay.downgrade();
+    play.connect_clicked(move |play| {
+        let Some(overlay) = weak.upgrade() else {
+            return;
+        };
+        let media = gtk::MediaFile::for_file(&gio::File::for_uri(&playlist));
+        media.set_loop(true);
+        media.set_muted(true);
+        let picture = gtk::Picture::builder()
+            .paintable(&media)
+            .height_request(height)
+            .content_fit(gtk::ContentFit::Cover)
+            .build();
+        picture.update_property(&[gtk::accessible::Property::Label(&description)]);
+        // Pause et reprise au clic, ou avec Espace sur le bouton qui l'entoure.
+        let toggle = gtk::Button::builder()
+            .child(&picture)
+            .tooltip_text(gettext("Mettre en pause ou reprendre le GIF"))
+            .css_classes(["flat", "gif-toggle"])
+            .build();
+        toggle.update_property(&[gtk::accessible::Property::Label(
+            &gettext("GIF : {}").replace("{}", &description),
+        )]);
+        let playing = media.clone();
+        toggle.connect_clicked(move |_| {
+            if playing.is_playing() {
+                playing.pause();
+            } else {
+                playing.play();
+            }
+        });
+        media.play();
+        overlay.set_child(Some(&toggle));
+        play.set_visible(false);
+        toggle.grab_focus();
     });
 }
 

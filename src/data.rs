@@ -276,6 +276,8 @@ pub struct Media {
     pub more: u32,
     /// Vidéo : adresse de sa liste de lecture (HLS), lue dans la carte.
     pub video: Option<String>,
+    /// Vidéo à montrer comme un GIF : en boucle, sans son ni commandes.
+    pub gif: bool,
     /// Toutes les images du post, pour la visionneuse.
     pub images: Vec<Image>,
 }

@@ -33,6 +33,7 @@ Logiciels et Flathub).
 
 ### Lire
 
+- GIF reçus lus en boucle, sans son, d'un clic.
 - Langue proposée pour les posts, filtre des posts par langue, « Traduire » dans le menu d'un post.
 - Profils : « Suivi par … » (comptes que vous suivez), notifications d'activité d'un compte, onglets Vidéos, Flux, Listes et Starter packs.
 - Messages : actualisation automatique, messages plus anciens, nouvelle conversation, réactions, partage de posts (qui s'ouvrent d'un clic), couper les notifications d'une conversation ou la quitter, choisir qui peut vous écrire, bouton « Envoyer un message » sur les profils.

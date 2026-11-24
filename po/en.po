@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: tsubame\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-24 08:21+0000\n"
+"POT-Creation-Date: 2026-11-24 08:23+0000\n"
 "PO-Revision-Date: 2026-11-22\n"
 "Last-Translator: \n"
 "Language-Team: English\n"
@@ -79,266 +79,266 @@ msgstr "Sign-in in the browser, session kept in the keyring"
 msgid "Bluesky n'a pas répondu : {}"
 msgstr "Bluesky did not respond: {}"
 
-#: src/api.rs:543
+#: src/api.rs:545
 msgid "Le post cité a été supprimé."
 msgstr "The quoted post was deleted."
 
-#: src/api.rs:546
+#: src/api.rs:548
 msgid "Le post cité n'est pas visible : un blocage l'empêche."
 msgstr "The quoted post is not visible: a block prevents it."
 
-#: src/api.rs:549
+#: src/api.rs:551
 msgid "Son auteur a retiré la citation de ce post."
 msgstr "Its author detached the quote from this post."
 
-#: src/api.rs:599
+#: src/api.rs:601
 msgid "Épinglé"
 msgstr "Pinned"
 
-#: src/api.rs:600
+#: src/api.rs:602
 msgid "{} a reposté"
 msgstr "{} reposted"
 
-#: src/api.rs:601 src/compose.rs:321
+#: src/api.rs:603 src/compose.rs:321
 msgid "En réponse à {}"
 msgstr "Replying to {}"
 
-#: src/api.rs:654
+#: src/api.rs:656
 msgid "Ce post n'est plus disponible."
 msgstr "This post is no longer available."
 
-#: src/api.rs:715
+#: src/api.rs:717
 msgid "{name} et {n} autre ont aimé votre post"
 msgid_plural "{name} et {n} autres ont aimé votre post"
 msgstr[0] "{name} and {n} other liked your post"
 msgstr[1] "{name} and {n} others liked your post"
 
-#: src/api.rs:720
+#: src/api.rs:722
 msgid "{name} et {n} autre ont reposté votre post"
 msgid_plural "{name} et {n} autres ont reposté votre post"
 msgstr[0] "{name} and {n} other reposted your post"
 msgstr[1] "{name} and {n} others reposted your post"
 
-#: src/api.rs:725
+#: src/api.rs:727
 msgid "{name} et {n} autre ont aimé votre repost"
 msgid_plural "{name} et {n} autres ont aimé votre repost"
 msgstr[0] "{name} and {n} other liked your repost"
 msgstr[1] "{name} and {n} others liked your repost"
 
-#: src/api.rs:730
+#: src/api.rs:732
 msgid "{name} et {n} autre ont reposté votre repost"
 msgid_plural "{name} et {n} autres ont reposté votre repost"
 msgstr[0] "{name} and {n} other reposted your repost"
 msgstr[1] "{name} and {n} others reposted your repost"
 
-#: src/api.rs:735
+#: src/api.rs:737
 msgid "{name} et {n} autre vous suivent"
 msgid_plural "{name} et {n} autres vous suivent"
 msgstr[0] "{name} and {n} other followed you"
 msgstr[1] "{name} and {n} others followed you"
 
-#: src/api.rs:823
+#: src/api.rs:825
 msgid "a aimé votre post"
 msgstr "liked your post"
 
-#: src/api.rs:824
+#: src/api.rs:826
 msgid "a reposté votre post"
 msgstr "reposted your post"
 
-#: src/api.rs:825
+#: src/api.rs:827
 msgid "vous suit"
 msgstr "followed you"
 
-#: src/api.rs:826 src/data.rs:608
+#: src/api.rs:828 src/data.rs:610
 msgid "vous a mentionné"
 msgstr "mentioned you"
 
-#: src/api.rs:827 src/data.rs:607
+#: src/api.rs:829 src/data.rs:609
 msgid "a répondu à votre post"
 msgstr "replied to your post"
 
-#: src/api.rs:828 src/data.rs:609
+#: src/api.rs:830 src/data.rs:611
 msgid "a cité votre post"
 msgstr "quoted your post"
 
-#: src/api.rs:829
+#: src/api.rs:831
 msgid "a aimé votre repost"
 msgstr "liked your repost"
 
-#: src/api.rs:830
+#: src/api.rs:832
 msgid "a reposté votre repost"
 msgstr "reposted your repost"
 
-#: src/api.rs:831
+#: src/api.rs:833
 msgid "a rejoint Bluesky avec votre starter pack"
 msgstr "joined Bluesky with your starter pack"
 
-#: src/api.rs:1131 src/feeds.rs:252 src/moderation.rs:732 src/report.rs:155
+#: src/api.rs:1133 src/feeds.rs:252 src/moderation.rs:732 src/report.rs:155
 msgid "Ce compte n'existe pas."
 msgstr "This account does not exist."
 
-#: src/api.rs:1392
+#: src/api.rs:1394
 msgid "Abonnés"
 msgstr "Followers"
 
-#: src/api.rs:1393
+#: src/api.rs:1395
 msgid "Abonnements"
 msgstr "Following"
 
-#: src/api.rs:1394
+#: src/api.rs:1396
 msgctxt "comptes qui ont aimé un post"
 msgid "J'aime"
 msgstr "Likes"
 
-#: src/api.rs:1395
+#: src/api.rs:1397
 msgid "Reposts"
 msgstr "Reposts"
 
-#: src/api.rs:1396
+#: src/api.rs:1398
 msgid "Abonnés que vous connaissez"
 msgstr "Followers you know"
 
-#: src/api.rs:1402
+#: src/api.rs:1404
 msgid "Aucun abonné pour l'instant."
 msgstr "No followers yet."
 
-#: src/api.rs:1403
+#: src/api.rs:1405
 msgid "Aucun abonnement pour l'instant."
 msgstr "Not following anyone yet."
 
-#: src/api.rs:1404
+#: src/api.rs:1406
 msgid "Personne n'a encore aimé ce post."
 msgstr "No one has liked this post yet."
 
-#: src/api.rs:1405
+#: src/api.rs:1407
 msgid "Personne n'a encore reposté ce post."
 msgstr "No one has reposted this post yet."
 
-#: src/api.rs:1406
+#: src/api.rs:1408
 msgid "Aucun compte que vous suivez ne suit ce compte."
 msgstr "No account you follow follows this account."
 
-#: src/api.rs:1539
+#: src/api.rs:1541
 msgid "Ce post ne peut pas être modifié."
 msgstr "This post cannot be changed."
 
-#: src/api.rs:1681 src/preferences.rs:867
+#: src/api.rs:1683 src/preferences.rs:867
 msgid "Tout le monde"
 msgstr "Everyone"
 
-#: src/api.rs:1682 src/preferences.rs:868
+#: src/api.rs:1684 src/preferences.rs:868
 msgid "Comptes que vous suivez"
 msgstr "Accounts you follow"
 
-#: src/api.rs:1683
+#: src/api.rs:1685
 msgid "Vos abonnés"
 msgstr "Your followers"
 
-#: src/api.rs:1684
+#: src/api.rs:1686
 msgid "Comptes mentionnés"
 msgstr "Mentioned accounts"
 
-#: src/api.rs:1685
+#: src/api.rs:1687
 msgid "Personne"
 msgstr "No one"
 
-#: src/api.rs:1957 src/edit_profile.rs:198
+#: src/api.rs:1959 src/edit_profile.rs:198
 msgid "Une image n'a pas pu être envoyée : {}"
 msgstr "An image could not be uploaded: {}"
 
-#: src/api.rs:2071
+#: src/api.rs:2073
 msgid "La vidéo n'a pas pu être envoyée."
 msgstr "The video could not be uploaded."
 
-#: src/api.rs:2129
+#: src/api.rs:2131
 msgid "La vidéo a été refusée : {}"
 msgstr "The video was rejected: {}"
 
-#: src/api.rs:2130
+#: src/api.rs:2132
 msgid "La vidéo n'a pas pu être convertie."
 msgstr "The video could not be processed."
 
-#: src/api.rs:2149
+#: src/api.rs:2151
 msgid "La conversion de la vidéo prend trop de temps."
 msgstr "Processing the video is taking too long."
 
-#: src/api.rs:2164
+#: src/api.rs:2166
 msgid "janv."
 msgstr "Jan"
 
-#: src/api.rs:2165
+#: src/api.rs:2167
 msgid "févr."
 msgstr "Feb"
 
-#: src/api.rs:2166
+#: src/api.rs:2168
 msgid "mars"
 msgstr "Mar"
 
-#: src/api.rs:2167
+#: src/api.rs:2169
 msgid "avr."
 msgstr "Apr"
 
-#: src/api.rs:2168
+#: src/api.rs:2170
 msgid "mai"
 msgstr "May"
 
-#: src/api.rs:2169
+#: src/api.rs:2171
 msgid "juin"
 msgstr "Jun"
 
-#: src/api.rs:2170
+#: src/api.rs:2172
 msgid "juil."
 msgstr "Jul"
 
-#: src/api.rs:2171
+#: src/api.rs:2173
 msgid "août"
 msgstr "Aug"
 
-#: src/api.rs:2172
+#: src/api.rs:2174
 msgid "sept."
 msgstr "Sep"
 
-#: src/api.rs:2173
+#: src/api.rs:2175
 msgid "oct."
 msgstr "Oct"
 
-#: src/api.rs:2174
+#: src/api.rs:2176
 msgid "nov."
 msgstr "Nov"
 
-#: src/api.rs:2175
+#: src/api.rs:2177
 msgid "déc."
 msgstr "Dec"
 
-#: src/api.rs:2185
+#: src/api.rs:2187
 msgid "à l'instant"
 msgstr "now"
 
-#: src/api.rs:2187
+#: src/api.rs:2189
 msgid "{} min"
 msgstr "{} min"
 
-#: src/api.rs:2189
+#: src/api.rs:2191
 msgid "{} h"
 msgstr "{} h"
 
-#: src/api.rs:2192
+#: src/api.rs:2194
 msgid "{} j"
 msgid_plural "{} j"
 msgstr[0] "{} d"
 msgstr[1] "{} d"
 
-#: src/api.rs:2199
+#: src/api.rs:2201
 msgctxt "jour, mois abrégé et année"
 msgid "{day} {month} {year}"
 msgstr "{month} {day}, {year}"
 
-#: src/api.rs:2210
+#: src/api.rs:2212
 msgctxt "date et heure d'un post"
 msgid "{day} {month} {year}, {time}"
 msgstr "{month} {day}, {year}, {time}"
 
-#: src/api.rs:2222
+#: src/api.rs:2224
 msgctxt "jour et mois abrégé"
 msgid "{day} {month}"
 msgstr "{month} {day}"
@@ -396,15 +396,15 @@ msgstr "unknown account identity"
 msgid "Voir le profil de {}"
 msgstr "View the profile of {}"
 
-#: src/card.rs:122 src/card.rs:263 src/compose.rs:1421
+#: src/card.rs:122 src/card.rs:265 src/compose.rs:1421
 msgid "Image sans texte alternatif"
 msgstr "Image without alternative text"
 
-#: src/card.rs:182 src/card.rs:285
+#: src/card.rs:182 src/card.rs:287
 msgid "ALT"
 msgstr "ALT"
 
-#: src/card.rs:183 src/card.rs:286
+#: src/card.rs:183 src/card.rs:288
 msgid "Texte alternatif : {}"
 msgstr "Alternative text: {}"
 
@@ -414,174 +414,194 @@ msgid_plural "{} autres images"
 msgstr[0] "{} more image"
 msgstr[1] "{} more images"
 
-#: src/card.rs:218
+#: src/card.rs:220
 msgid "Agrandir l'image"
 msgstr "Enlarge image"
 
-#: src/card.rs:222
+#: src/card.rs:224
 msgid "Agrandir l'image : {}"
 msgstr "Enlarge image: {}"
 
-#: src/card.rs:304 src/card.rs:309
+#: src/card.rs:306 src/card.rs:311
 msgid "Lire la vidéo"
 msgstr "Play video"
 
-#: src/card.rs:348
+#: src/card.rs:350
 msgid "Cette vidéo ne peut pas être lue."
 msgstr "This video cannot be played."
 
-#: src/card.rs:401
+#: src/card.rs:370 src/compose.rs:1735
+msgid "GIF"
+msgstr "GIF"
+
+#: src/card.rs:371
+msgid "GIF animé"
+msgstr "Animated GIF"
+
+#: src/card.rs:377 src/card.rs:382
+msgid "Lire le GIF"
+msgstr "Play GIF"
+
+#: src/card.rs:402
+msgid "Mettre en pause ou reprendre le GIF"
+msgstr "Pause or resume the GIF"
+
+#: src/card.rs:406
+msgid "GIF : {}"
+msgstr "GIF: {}"
+
+#: src/card.rs:461
 msgctxt "voir une image floutée"
 msgid "Afficher"
 msgstr "Show"
 
-#: src/card.rs:468
+#: src/card.rs:528
 msgid "Répondre, {} réponse"
 msgid_plural "Répondre, {} réponses"
 msgstr[0] "Reply, {} reply"
 msgstr[1] "Reply, {} replies"
 
-#: src/card.rs:495 src/profile.rs:1017
+#: src/card.rs:555 src/profile.rs:1017
 msgid "Copier le lien"
 msgstr "Copy link"
 
-#: src/card.rs:497
+#: src/card.rs:557
 msgid "Envoyer en message…"
 msgstr "Send in a message…"
 
-#: src/card.rs:500
+#: src/card.rs:560
 msgid "Traduire"
 msgstr "Translate"
 
-#: src/card.rs:507
+#: src/card.rs:567
 msgid "Retirer du haut du profil"
 msgstr "Unpin from profile"
 
-#: src/card.rs:509
+#: src/card.rs:569
 msgid "Épingler sur le profil"
 msgstr "Pin to profile"
 
-#: src/card.rs:514
+#: src/card.rs:574
 msgid "Supprimer le post…"
 msgstr "Delete post…"
 
-#: src/card.rs:519
+#: src/card.rs:579
 msgid "Signaler le post…"
 msgstr "Report post…"
 
-#: src/card.rs:524
+#: src/card.rs:584
 msgid "Masquer @{}"
 msgstr "Mute @{}"
 
-#: src/card.rs:529
+#: src/card.rs:589
 msgid "Bloquer @{}"
 msgstr "Block @{}"
 
-#: src/card.rs:535
+#: src/card.rs:595
 msgid "Signaler @{}…"
 msgstr "Report @{}…"
 
-#: src/card.rs:544 src/card.rs:547 src/profile.rs:187 src/profile.rs:190
+#: src/card.rs:604 src/card.rs:607 src/profile.rs:187 src/profile.rs:190
 msgid "Plus d'actions"
 msgstr "More actions"
 
-#: src/card.rs:555
+#: src/card.rs:615
 msgid "Aimer, {} j'aime"
 msgid_plural "Aimer, {} j'aime"
 msgstr[0] "Like, {} like"
 msgstr[1] "Like, {} likes"
 
-#: src/card.rs:557
+#: src/card.rs:617
 msgid "Ne plus aimer, {} j'aime"
 msgid_plural "Ne plus aimer, {} j'aime"
 msgstr[0] "Unlike, {} like"
 msgstr[1] "Unlike, {} likes"
 
-#: src/card.rs:562
+#: src/card.rs:622
 msgid "Reposter ou citer, {} repost"
 msgid_plural "Reposter ou citer, {} reposts"
 msgstr[0] "Repost or quote, {} repost"
 msgstr[1] "Repost or quote, {} reposts"
 
-#: src/card.rs:567
+#: src/card.rs:627
 msgid "Annuler le repost ou citer, {} repost"
 msgid_plural "Annuler le repost ou citer, {} reposts"
 msgstr[0] "Undo repost or quote, {} repost"
 msgstr[1] "Undo repost or quote, {} reposts"
 
-#: src/card.rs:571
+#: src/card.rs:631
 msgid "Ajouter aux signets"
 msgstr "Add to bookmarks"
 
-#: src/card.rs:572
+#: src/card.rs:632
 msgid "Retirer des signets"
 msgstr "Remove from bookmarks"
 
-#: src/card.rs:580
+#: src/card.rs:640
 msgid "J'aime · {}"
 msgstr "Like · {}"
 
-#: src/card.rs:581
+#: src/card.rs:641
 msgid "Aimé · {}"
 msgstr "Liked · {}"
 
-#: src/card.rs:582
+#: src/card.rs:642
 msgid "Reposter · {}"
 msgstr "Repost · {}"
 
-#: src/card.rs:583
+#: src/card.rs:643
 msgid "Reposté · {}"
 msgstr "Reposted · {}"
 
-#: src/card.rs:584
+#: src/card.rs:644
 msgid "Signet"
 msgstr "Bookmark"
 
-#: src/card.rs:585
+#: src/card.rs:645
 msgid "Dans les signets"
 msgstr "Bookmarked"
 
-#: src/card.rs:602
+#: src/card.rs:662
 msgid "Annuler le repost"
 msgstr "Undo repost"
 
-#: src/card.rs:604
+#: src/card.rs:664
 msgid "Reposter"
 msgstr "Repost"
 
-#: src/card.rs:608
+#: src/card.rs:668
 msgid "Citer…"
 msgstr "Quote…"
 
-#: src/card.rs:830
+#: src/card.rs:890
 msgid "Ouvrir le lien : {}"
 msgstr "Open link: {}"
 
-#: src/card.rs:905
+#: src/card.rs:965
 msgid "Post cité de {} : {}"
 msgstr "Quoted post by {}: {}"
 
-#: src/card.rs:978 src/feeds.rs:340
+#: src/card.rs:1038 src/feeds.rs:340
 msgid "{} j'aime"
 msgid_plural "{} j'aime"
 msgstr[0] "{} like"
 msgstr[1] "{} likes"
 
-#: src/card.rs:979
+#: src/card.rs:1039
 msgid "Voir qui a aimé"
 msgstr "See who liked"
 
-#: src/card.rs:982
+#: src/card.rs:1042
 msgid "{} repost"
 msgid_plural "{} reposts"
 msgstr[0] "{} repost"
 msgstr[1] "{} reposts"
 
-#: src/card.rs:983
+#: src/card.rs:1043
 msgid "Voir qui a reposté"
 msgstr "See who reposted"
 
-#: src/card.rs:1035 src/compose.rs:252
+#: src/card.rs:1095 src/compose.rs:252
 msgid "Répondre"
 msgstr "Reply"
 
@@ -908,10 +928,6 @@ msgstr "Images and videos"
 #: src/compose.rs:1708 src/compose.rs:1712
 msgid "Retirer l'image"
 msgstr "Remove image"
-
-#: src/compose.rs:1735
-msgid "GIF"
-msgstr "GIF"
 
 #: src/compose.rs:1808 src/compose.rs:1847
 msgid "Texte alternatif"

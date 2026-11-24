@@ -386,6 +386,7 @@ fn media(post: &PostView) -> Option<Media> {
             aspect_ratio: ratio(&first.aspect_ratio),
             more: view.images.len().saturating_sub(1) as u32,
             video: None,
+            gif: false,
             images: view
                 .images
                 .iter()
@@ -404,6 +405,7 @@ fn media(post: &PostView) -> Option<Media> {
             aspect_ratio: ratio(&view.aspect_ratio),
             more: 0,
             video: Some(view.playlist.clone()),
+            gif: view.presentation.as_deref() == Some("gif"),
             images: Vec::new(),
         })
     };
@@ -2319,6 +2321,7 @@ mod tests {
                 aspect_ratio: Some((1600, 900)),
                 more: 1,
                 video: None,
+                gif: false,
                 images: vec![
                     crate::data::Image {
                         thumb: "https://cdn.example/thumb.jpg".into(),
