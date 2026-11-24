@@ -120,6 +120,9 @@ pub struct ProfilePage {
     stack: gtk::Stack,
     error: adw::StatusPage,
     banner: gtk::Picture,
+    /// Avertissement d'un profil étiqueté : bannière, avatar et bio
+    /// restent cachés jusqu'à « Afficher ».
+    warning: adw::Banner,
     avatar: adw::Avatar,
     name: gtk::Label,
     handle: gtk::Label,
@@ -388,6 +391,10 @@ impl ProfilePage {
             .build();
         banner_frame.append(&banner);
         banner.set_hexpand(true);
+        let warning = adw::Banner::builder()
+            .button_label(pgettext("voir une image floutée", "Afficher"))
+            .build();
+        column.append(&warning);
         column.append(&banner_frame);
         column.append(&details);
         column.append(&posts.root);
@@ -440,6 +447,7 @@ impl ProfilePage {
             stack,
             error,
             banner,
+            warning,
             avatar,
             name,
             handle,
@@ -482,6 +490,14 @@ impl ProfilePage {
             if let Some(page) = weak.upgrade() {
                 page.open_other(row.index() as usize);
             }
+        });
+        let weak = Rc::downgrade(&page);
+        page.warning.connect_button_clicked(move |banner| {
+            let Some(page) = weak.upgrade() else { return };
+            banner.set_revealed(false);
+            page.banner.remove_css_class("media-blurred");
+            page.avatar.remove_css_class("media-blurred");
+            page.bio.set_visible(!page.bio.label().trim().is_empty());
         });
         let weak = Rc::downgrade(&page);
         retry.connect_clicked(move |_| {
@@ -680,6 +696,28 @@ impl ProfilePage {
         });
         self.bio.set_label(&profile.bio);
         self.bio.set_visible(!profile.bio.trim().is_empty());
+        // Profil étiqueté : bannière et avatar floutés, bio cachée.
+        let warning = crate::moderation::profile_warning(&profile.labels);
+        self.warning.set_title(
+            &warning
+                .as_ref()
+                .map(|w| gettext("Profil étiqueté : {}").replace("{}", w))
+                .unwrap_or_default(),
+        );
+        self.warning.set_revealed(warning.is_some());
+        for widget in [
+            self.banner.upcast_ref::<gtk::Widget>(),
+            self.avatar.upcast_ref(),
+        ] {
+            if warning.is_some() {
+                widget.add_css_class("media-blurred");
+            } else {
+                widget.remove_css_class("media-blurred");
+            }
+        }
+        if warning.is_some() {
+            self.bio.set_visible(false);
+        }
         let (feeds, lists, packs) = profile.associated;
         for (tab, button) in &self.tab_buttons {
             match tab {
@@ -1342,6 +1380,7 @@ fn demo_profile(handle: &str) -> Profile {
         activity: (false, false),
         associated: (1, 2, 1),
         labeler: false,
+        labels: Vec::new(),
     }
 }
 

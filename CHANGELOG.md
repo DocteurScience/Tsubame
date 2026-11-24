@@ -21,7 +21,7 @@ Logiciels et Flathub).
 
 - Mots masqués pour une durée, ou dans les mots-clics seulement.
 - Signaler un message ; envoyer un signalement à un service d'étiquetage suivi.
-- Le texte d'un post étiqueté sans image se cache sous un avertissement.
+- Le texte d'un post étiqueté sans image se cache sous un avertissement ; un profil étiqueté aussi (bannière, avatar, bio).
 - Préférences : listes de modération suivies.
 - S'abonner à des services d'étiquetage tiers, ou s'en désabonner ; régler chacune de leurs étiquettes.
 

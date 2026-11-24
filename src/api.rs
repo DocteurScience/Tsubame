@@ -559,18 +559,26 @@ fn quote(post: &PostView, now: DateTime<Utc>) -> Option<Box<Post>> {
 
 /// Étiquettes du post et de son auteur, sans celles qui sont annulées.
 fn labels(post: &PostView) -> Vec<String> {
+    label_values(
+        post.labels
+            .iter()
+            .flatten()
+            .chain(post.author.labels.iter().flatten()),
+        post.author.did.as_str(),
+    )
+}
+
+/// Valeurs d'étiquettes, annulations comprises. Étiquettes de Bluesky et
+/// de l'auteur lui-même : la valeur seule ; celles d'un service tiers :
+/// « service#valeur ».
+fn label_values<'a>(
+    all: impl Iterator<Item = &'a atrium_api::com::atproto::label::defs::Label>,
+    author: &str,
+) -> Vec<String> {
     let mut labels: Vec<String> = Vec::new();
-    for label in post
-        .labels
-        .iter()
-        .flatten()
-        .chain(post.author.labels.iter().flatten())
-    {
-        // Étiquettes de Bluesky et de l'auteur lui-même : la valeur seule ;
-        // celles d'un service tiers : « service#valeur ».
+    for label in all {
         let src = label.src.as_str();
-        let value = if src == crate::moderation::BLUESKY_LABELER || src == post.author.did.as_str()
-        {
+        let value = if src == crate::moderation::BLUESKY_LABELER || src == author {
             label.val.clone()
         } else {
             format!("{src}{}{}", crate::moderation::LABELER_SEPARATOR, label.val)
@@ -1206,6 +1214,7 @@ pub fn profile_from_view(
             .as_ref()
             .and_then(|a| a.labeler)
             .unwrap_or(false),
+        labels: label_values(profile.labels.iter().flatten(), profile.did.as_str()),
     }
 }
 

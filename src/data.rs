@@ -268,6 +268,8 @@ pub struct Profile {
     pub associated: (u64, u64, u64),
     /// Le compte est un service d'étiquetage.
     pub labeler: bool,
+    /// Étiquettes du compte (comme celles des posts).
+    pub labels: Vec<String>,
 }
 
 /// Référence à un post : son adresse et son contenu (CID).
