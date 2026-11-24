@@ -30,6 +30,7 @@ Logiciels et Flathub).
 - 22 langues proposées pour les posts.
 - Qui peut répondre : plusieurs groupes à la fois, et les membres de vos listes.
 - Vidéo : avancement de l'envoi et de la conversion, limites du compte vérifiées avant l'envoi.
+- Sous-titres d'une vidéo (fichiers WebVTT, un par langue).
 - Émojis, coller une image (Ctrl+V) ou la déposer sur la boîte de rédaction.
 - Étiquette de contenu sur les images (nudité, contenu sexuel, violence).
 - Images dans les posts suivants d'un fil.

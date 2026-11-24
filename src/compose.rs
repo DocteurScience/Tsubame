@@ -10,7 +10,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 use adw::prelude::*;
-use gettextrs::{gettext, pgettext};
+use gettextrs::{gettext, ngettext, pgettext};
 use gtk::{gdk, gio, glib};
 
 use crate::api::{self, NewImage, NewPost};
@@ -1482,6 +1482,8 @@ struct Attachment {
     /// Pour une vidéo ou un GIF animé : son type MIME.
     video: Option<String>,
     alt: RefCell<String>,
+    /// Sous-titres d'une vidéo.
+    captions: RefCell<Vec<api::Caption>>,
     tile: gtk::Overlay,
     alt_button: gtk::Button,
 }
@@ -1567,6 +1569,7 @@ fn video_of(attachments: &Rc<RefCell<Vec<Rc<Attachment>>>>) -> Option<api::NewVi
         );
         Some(api::NewVideo {
             bytes: a.bytes.to_vec(),
+            captions: a.captions.borrow().clone(),
             mime: mime.clone(),
             alt: a.alt.borrow().trim().to_owned(),
             size: (width > 0 && height > 0).then_some((width as u32, height as u32)),
@@ -1871,6 +1874,7 @@ fn attach(
         paintable,
         video,
         alt: RefCell::default(),
+        captions: RefCell::default(),
         tile: tile.clone(),
         alt_button: alt_button.clone(),
     });
@@ -1901,6 +1905,151 @@ fn attach(
             edit_alt(button, &attachment);
         }
     });
+}
+
+/// Rappel connu une fois construit (une rangée qui reconstruit sa propre liste).
+type LateCallback = Rc<RefCell<Option<Rc<dyn Fn()>>>>;
+
+/// Groupe « Sous-titres » de la boîte du texte alternatif d'une vidéo : la langue, « Ajouter un
+/// fichier… » (WebVTT) et les fichiers choisis, chacun avec « Retirer ». Un nouveau fichier
+/// remplace celui de la même langue.
+fn captions_group(
+    dialog: &adw::Dialog,
+    captions: Rc<RefCell<Vec<api::Caption>>>,
+) -> adw::PreferencesGroup {
+    let group = adw::PreferencesGroup::builder()
+        .title(gettext("Sous-titres"))
+        .description(gettext("Fichiers WebVTT (.vtt), un par langue."))
+        .build();
+    let names: Vec<&str> = LANGUAGES.iter().map(|(_, name)| *name).collect();
+    let language = adw::ComboRow::builder()
+        .title(gettext("Langue des sous-titres"))
+        .model(&gtk::StringList::new(&names))
+        .selected(
+            LANGUAGES
+                .iter()
+                .position(|(code, _)| *code == default_language())
+                .unwrap_or(0) as u32,
+        )
+        .build();
+    let add = gtk::Button::builder()
+        .label(gettext("Ajouter un fichier…"))
+        .valign(gtk::Align::Center)
+        .css_classes(["flat"])
+        .build();
+    let error = gtk::Label::builder()
+        .wrap(true)
+        .xalign(0.0)
+        .visible(false)
+        .accessible_role(gtk::AccessibleRole::Alert)
+        .css_classes(["error", "caption"])
+        .build();
+    group.set_header_suffix(Some(&add));
+    group.add(&language);
+    group.add(&error);
+
+    let rows: Rc<RefCell<Vec<adw::ActionRow>>> = Rc::default();
+    let refill: LateCallback = Rc::default();
+    let fill: Rc<dyn Fn()> = {
+        let (group, captions, rows, add, refill) = (
+            group.downgrade(),
+            captions.clone(),
+            rows.clone(),
+            add.clone(),
+            refill.clone(),
+        );
+        Rc::new(move || {
+            let Some(group) = group.upgrade() else { return };
+            for row in rows.borrow_mut().drain(..) {
+                group.remove(&row);
+            }
+            for caption in captions.borrow().iter() {
+                let name = language_name(&caption.lang);
+                let row = adw::ActionRow::builder()
+                    .title(name)
+                    .subtitle(
+                        ngettext("{} octet", "{} octets", caption.bytes.len() as u32)
+                            .replace("{}", &caption.bytes.len().to_string()),
+                    )
+                    .build();
+                let remove = gtk::Button::builder()
+                    .icon_name("user-trash-symbolic")
+                    .tooltip_text(gettext("Retirer"))
+                    .valign(gtk::Align::Center)
+                    .css_classes(["flat"])
+                    .build();
+                remove.update_property(&[gtk::accessible::Property::Label(
+                    &gettext("Retirer les sous-titres : {}").replace("{}", name),
+                )]);
+                let (lang, captions, refill) =
+                    (caption.lang.clone(), captions.clone(), refill.clone());
+                remove.connect_clicked(move |_| {
+                    captions.borrow_mut().retain(|c| c.lang != lang);
+                    let refill = refill.borrow().clone();
+                    if let Some(refill) = refill {
+                        glib::idle_add_local_once(move || refill());
+                    }
+                });
+                row.add_suffix(&remove);
+                group.add(&row);
+                rows.borrow_mut().push(row);
+            }
+            add.set_sensitive(captions.borrow().len() < api::MAX_CAPTIONS);
+        })
+    };
+    refill.replace(Some(fill.clone()));
+    fill();
+
+    let dialog = dialog.downgrade();
+    add.connect_clicked(move |_| {
+        let filter = gtk::FileFilter::new();
+        filter.set_name(Some(&gettext("Sous-titres WebVTT")));
+        filter.add_mime_type(api::CAPTION_MIME);
+        filter.add_suffix("vtt");
+        let filters = gio::ListStore::new::<gtk::FileFilter>();
+        filters.append(&filter);
+        let chooser = gtk::FileDialog::builder()
+            .title(gettext("Choisir des sous-titres"))
+            .modal(true)
+            .filters(&filters)
+            .default_filter(&filter)
+            .build();
+        let window = dialog
+            .upgrade()
+            .and_then(|d| d.root())
+            .and_downcast::<gtk::Window>();
+        let lang = LANGUAGES
+            .get(language.selected() as usize)
+            .map(|(code, _)| (*code).to_owned())
+            .unwrap_or_default();
+        let (captions, error, fill) = (captions.clone(), error.clone(), fill.clone());
+        chooser.open(window.as_ref(), gio::Cancellable::NONE, move |result| {
+            let Ok(file) = result else { return };
+            glib::spawn_future_local(async move {
+                let bytes = match file.load_bytes_future().await {
+                    Ok((bytes, _)) => bytes.to_vec(),
+                    Err(_) => Vec::new(),
+                };
+                if let Some(refusal) = api::caption_refusal(&bytes) {
+                    error.set_label(&refusal);
+                    error.set_visible(true);
+                    return;
+                }
+                error.set_visible(false);
+                {
+                    let mut captions = captions.borrow_mut();
+                    captions.retain(|c| c.lang != lang);
+                    captions.push(api::Caption {
+                        lang,
+                        bytes,
+                        blob: None,
+                    });
+                }
+                fill();
+            });
+        });
+    });
+    group
 }
 
 /// Boîte du texte alternatif : l'image en grand, le texte, un compteur.
@@ -1973,7 +2122,20 @@ fn edit_alt(parent: &gtk::Button, attachment: &Rc<Attachment>) {
     content.append(&text);
     content.append(&help);
     content.append(&counter);
-    let view = adw::ToolbarView::builder().content(&content).build();
+    // Sous-titres d'une vidéo (pas d'un GIF), enregistrés avec le texte.
+    let captions = Rc::new(RefCell::new(attachment.captions.borrow().clone()));
+    if is_video && attachment.video.as_deref() != Some("image/gif") {
+        content.append(&captions_group(&dialog, captions.clone()));
+    }
+    let view = adw::ToolbarView::builder()
+        .content(
+            &gtk::ScrolledWindow::builder()
+                .hscrollbar_policy(gtk::PolicyType::Never)
+                .propagate_natural_height(true)
+                .child(&content)
+                .build(),
+        )
+        .build();
     view.add_top_bar(&header);
     dialog.set_child(Some(&view));
 
@@ -2002,6 +2164,7 @@ fn edit_alt(parent: &gtk::Button, attachment: &Rc<Attachment>) {
     {
         let (dialog, text, attachment) = (dialog.clone(), text.clone(), attachment.clone());
         save.connect_clicked(move |_| {
+            attachment.captions.replace(captions.borrow().clone());
             let buffer = text.buffer();
             attachment.alt.replace(
                 buffer

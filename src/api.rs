@@ -1902,10 +1902,73 @@ pub struct NewPost {
     pub video: Option<NewVideo>,
 }
 
+/// Type des sous-titres d'une vidéo.
+pub const CAPTION_MIME: &str = "text/vtt";
+/// Taille maximale d'un fichier de sous-titres, et nombre maximal de fichiers.
+pub const MAX_CAPTION_BYTES: usize = 20_000;
+pub const MAX_CAPTIONS: usize = 20;
+
+/// Sous-titres d'une vidéo : la langue (« fr ») et le fichier WebVTT.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Caption {
+    pub lang: String,
+    pub bytes: Vec<u8>,
+    /// Blob, une fois envoyé.
+    pub blob: Option<serde_json::Value>,
+}
+
+/// Le fichier est-il un WebVTT acceptable ? Rend la raison du refus, sinon.
+pub fn caption_refusal(bytes: &[u8]) -> Option<String> {
+    let text = std::str::from_utf8(bytes).ok();
+    if !text.is_some_and(|t| t.trim_start_matches('\u{feff}').starts_with("WEBVTT")) {
+        return Some(gettext(
+            "Ce fichier n'est pas un fichier de sous-titres WebVTT (.vtt).",
+        ));
+    }
+    if bytes.len() > MAX_CAPTION_BYTES {
+        return Some(gettext("Ce fichier de sous-titres dépasse 20 ko."));
+    }
+    None
+}
+
+/// Envoie un blob au serveur du compte avec son type (l'agent l'envoie sans).
+async fn upload_typed(
+    session: &Session,
+    bytes: Vec<u8>,
+    mime: &str,
+) -> Result<serde_json::Value, ApiError> {
+    use atrium_api::com::atproto::repo::upload_blob;
+    use atrium_xrpc::{InputDataOrBytes, OutputDataOrBytes, XrpcClient, XrpcRequest};
+    let raw = session.raw().await?;
+    let response = raw
+        .send_xrpc::<(), Vec<u8>, upload_blob::Output, upload_blob::Error>(&XrpcRequest {
+            method: http::Method::POST,
+            nsid: upload_blob::NSID.into(),
+            parameters: None,
+            input: Some(InputDataOrBytes::Bytes(bytes)),
+            encoding: Some(mime.to_owned()),
+        })
+        .await
+        .map_err(|e| {
+            ApiError::new(
+                gettext("Les sous-titres n'ont pas pu être envoyés : {}")
+                    .replace("{}", &e.to_string()),
+            )
+        })?;
+    match response {
+        OutputDataOrBytes::Data(output) => {
+            serde_json::to_value(&output.blob).map_err(|_| invalid_post())
+        }
+        OutputDataOrBytes::Bytes(_) => Err(invalid_post()),
+    }
+}
+
 /// Vidéo jointe à un nouveau post.
 #[derive(Debug, Clone, Default)]
 pub struct NewVideo {
     pub bytes: Vec<u8>,
+    /// Sous-titres (WebVTT), un fichier par langue.
+    pub captions: Vec<Caption>,
     /// Type MIME du fichier (« video/mp4 »…).
     pub mime: String,
     pub alt: String,
@@ -2002,6 +2065,14 @@ pub fn post_record(
         }
         if let Some(presentation) = video.presentation {
             embed["presentation"] = json!(presentation);
+        }
+        let captions: Vec<serde_json::Value> = video
+            .captions
+            .iter()
+            .filter_map(|c| Some(json!({"lang": c.lang, "file": c.blob.clone()?})))
+            .collect();
+        if !captions.is_empty() {
+            embed["captions"] = json!(captions);
         }
         record["embed"] = embed;
     } else if !blobs.is_empty() {
@@ -2105,6 +2176,13 @@ pub async fn publish(session: Arc<Session>, mut post: NewPost) -> Result<Publish
         && video.blob.is_none()
     {
         video.blob = Some(upload_video(&api, &session.account.did, video).await?);
+    }
+    // Sous-titres : envoyés au serveur du compte avec leur type, `text/vtt`.
+    if let Some(video) = post.video.as_mut() {
+        for caption in video.captions.iter_mut().filter(|c| c.blob.is_none()) {
+            caption.blob =
+                Some(Box::pin(upload_typed(&session, caption.bytes.clone(), CAPTION_MIME)).await?);
+        }
     }
     // Image de l'aperçu du lien : sans elle, la carte reste valable.
     if post.images.is_empty()
@@ -2962,6 +3040,21 @@ mod tests {
                 blob: Some(serde_json::json!({
                     "$type": "blob", "ref": {"$link": CID}, "mimeType": "video/mp4", "size": 1
                 })),
+                captions: vec![
+                    Caption {
+                        lang: "fr".into(),
+                        bytes: Vec::new(),
+                        blob: Some(serde_json::json!({
+                            "$type": "blob", "ref": {"$link": CID}, "mimeType": "text/vtt", "size": 1
+                        })),
+                    },
+                    // Pas encore envoyé : laissé de côté.
+                    Caption {
+                        lang: "en".into(),
+                        bytes: Vec::new(),
+                        blob: None,
+                    },
+                ],
                 ..NewVideo::default()
             }),
             link: None,
@@ -2972,7 +3065,25 @@ mod tests {
         assert_eq!(record["embed"]["alt"], "Un train");
         assert_eq!(record["embed"]["aspectRatio"]["width"], 1920);
         assert_eq!(record["embed"]["presentation"], "gif");
+        assert_eq!(
+            record["embed"]["captions"].as_array().map(Vec::len),
+            Some(1)
+        );
+        assert_eq!(record["embed"]["captions"][0]["lang"], "fr");
         let _: atrium_api::app::bsky::feed::post::Record = serde_json::from_value(record).unwrap();
+    }
+
+    #[test]
+    fn captions_must_be_small_webvtt_files() {
+        assert_eq!(
+            caption_refusal(b"WEBVTT\n\n00:00.000 --> 00:01.000\nBonjour"),
+            None
+        );
+        assert_eq!(caption_refusal("\u{feff}WEBVTT".as_bytes()), None);
+        assert!(caption_refusal(b"1\n00:00:00,000 --> 00:00:01,000\nSRT").is_some());
+        assert!(caption_refusal(&[0xff, 0xfe]).is_some());
+        let big = format!("WEBVTT\n{}", "a".repeat(MAX_CAPTION_BYTES));
+        assert!(caption_refusal(big.as_bytes()).is_some());
     }
 
     #[test]

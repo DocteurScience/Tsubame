@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: tsubame\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-24 11:53+0000\n"
+"POT-Creation-Date: 2026-11-24 12:01+0000\n"
 "PO-Revision-Date: 2026-11-22\n"
 "Last-Translator: \n"
 "Language-Team: English\n"
@@ -23,7 +23,8 @@ msgstr "Tsubame"
 msgid "Client Bluesky pour GNOME"
 msgstr "Bluesky client for GNOME"
 
-#. Traducteurs : mots-clés séparés par des points-virgules, sans traduire « Tsubame ».
+#. Traducteurs : mots-clés séparés par des points-virgules, sans traduire «
+#. Tsubame ».
 #: data/io.github.DocteurScience.Tsubame.desktop.in:6
 msgid "Bluesky;réseau social;AT Protocol;microblog;"
 msgstr "Bluesky;social network;AT Protocol;microblog;"
@@ -33,8 +34,8 @@ msgid ""
 "Tsubame est un client Bluesky natif pour le bureau GNOME. Les posts "
 "s’affichent en cartes et la discussion s’ouvre dans un volet à côté du fil."
 msgstr ""
-"Tsubame is a native Bluesky client for the GNOME desktop. Posts are shown as "
-"cards and the conversation opens in a pane next to the feed."
+"Tsubame is a native Bluesky client for the GNOME desktop. Posts are shown as"
+" cards and the conversation opens in a pane next to the feed."
 
 #: data/io.github.DocteurScience.Tsubame.metainfo.xml.in:16
 msgid "DocteurScience"
@@ -119,7 +120,7 @@ msgid "Nouvel identifiant"
 msgstr "New handle"
 
 #. En-tête : Annuler, titre, Publier.
-#: src/account.rs:158 src/compose.rs:281 src/compose.rs:1912
+#: src/account.rs:158 src/compose.rs:281 src/compose.rs:2061
 #: src/edit_profile.rs:234 src/lists.rs:429 src/lists.rs:726 src/lists.rs:1069
 #: src/login.rs:160 src/messages.rs:910 src/profile.rs:1312 src/report.rs:185
 #: src/starter_packs.rs:768 src/window.rs:671 src/window.rs:1309
@@ -170,8 +171,8 @@ msgstr "Password “{}”"
 
 #: src/account.rs:316
 msgid ""
-"Notez-le maintenant : il ne sera plus montré. Il donne accès à votre compte, "
-"gardez-le pour vous."
+"Notez-le maintenant : il ne sera plus montré. Il donne accès à votre compte,"
+" gardez-le pour vous."
 msgstr ""
 "Write it down now: it will not be shown again. It gives access to your "
 "account, keep it to yourself."
@@ -359,112 +360,124 @@ msgstr "One list"
 msgid "Réponses limitées"
 msgstr "Limited replies"
 
-#: src/api.rs:2098 src/edit_profile.rs:198 src/lists.rs:95
+#: src/api.rs:1925
+msgid "Ce fichier n'est pas un fichier de sous-titres WebVTT (.vtt)."
+msgstr "This file is not a WebVTT caption file (.vtt)."
+
+#: src/api.rs:1929
+msgid "Ce fichier de sous-titres dépasse 20 ko."
+msgstr "This caption file is larger than 20 KB."
+
+#: src/api.rs:1954
+msgid "Les sous-titres n'ont pas pu être envoyés : {}"
+msgstr "The captions could not be uploaded: {}"
+
+#: src/api.rs:2169 src/edit_profile.rs:198 src/lists.rs:95
 msgid "Une image n'a pas pu être envoyée : {}"
 msgstr "An image could not be uploaded: {}"
 
-#: src/api.rs:2212
+#: src/api.rs:2290
 msgid "La vidéo n'a pas pu être envoyée."
 msgstr "The video could not be uploaded."
 
-#: src/api.rs:2286
+#: src/api.rs:2364
 msgid "La vidéo a été refusée : {}"
 msgstr "The video was rejected: {}"
 
-#: src/api.rs:2287
+#: src/api.rs:2365
 msgid "La vidéo n'a pas pu être convertie."
 msgstr "The video could not be processed."
 
-#: src/api.rs:2306
+#: src/api.rs:2384
 msgid "La conversion de la vidéo prend trop de temps."
 msgstr "Processing the video is taking too long."
 
-#: src/api.rs:2357
+#: src/api.rs:2435
 msgid "Vous ne pouvez plus envoyer de vidéo aujourd'hui."
 msgstr "You cannot upload more videos today."
 
-#: src/api.rs:2372
+#: src/api.rs:2450
 msgid "janv."
 msgstr "Jan"
 
-#: src/api.rs:2373
+#: src/api.rs:2451
 msgid "févr."
 msgstr "Feb"
 
-#: src/api.rs:2374
+#: src/api.rs:2452
 msgid "mars"
 msgstr "Mar"
 
-#: src/api.rs:2375
+#: src/api.rs:2453
 msgid "avr."
 msgstr "Apr"
 
-#: src/api.rs:2376
+#: src/api.rs:2454
 msgid "mai"
 msgstr "May"
 
-#: src/api.rs:2377
+#: src/api.rs:2455
 msgid "juin"
 msgstr "Jun"
 
-#: src/api.rs:2378
+#: src/api.rs:2456
 msgid "juil."
 msgstr "Jul"
 
-#: src/api.rs:2379
+#: src/api.rs:2457
 msgid "août"
 msgstr "Aug"
 
-#: src/api.rs:2380
+#: src/api.rs:2458
 msgid "sept."
 msgstr "Sep"
 
-#: src/api.rs:2381
+#: src/api.rs:2459
 msgid "oct."
 msgstr "Oct"
 
-#: src/api.rs:2382
+#: src/api.rs:2460
 msgid "nov."
 msgstr "Nov"
 
-#: src/api.rs:2383
+#: src/api.rs:2461
 msgid "déc."
 msgstr "Dec"
 
-#: src/api.rs:2393
+#: src/api.rs:2471
 msgid "à l'instant"
 msgstr "now"
 
-#: src/api.rs:2395
+#: src/api.rs:2473
 msgid "{} min"
 msgstr "{} min"
 
-#: src/api.rs:2397
+#: src/api.rs:2475
 msgid "{} h"
 msgstr "{} h"
 
-#: src/api.rs:2400
+#: src/api.rs:2478
 msgid "{} j"
 msgid_plural "{} j"
 msgstr[0] "{} d"
 msgstr[1] "{} d"
 
-#: src/api.rs:2407
+#: src/api.rs:2485
 msgctxt "jour, mois abrégé et année"
 msgid "{day} {month} {year}"
 msgstr "{month} {day}, {year}"
 
-#: src/api.rs:2418
+#: src/api.rs:2496
 msgctxt "date et heure d'un post"
 msgid "{day} {month} {year}, {time}"
 msgstr "{month} {day}, {year}, {time}"
 
-#: src/api.rs:2428
+#: src/api.rs:2506
 msgctxt "horloge : 24 ou 12 heures"
 msgid "24"
 msgstr "12"
 
-#: src/api.rs:2446
+#: src/api.rs:2524
 msgctxt "jour et mois abrégé"
 msgid "{day} {month}"
 msgstr "{month} {day}"
@@ -497,8 +510,8 @@ msgstr "Your session has expired. Please sign in again."
 
 #: src/auth/mod.rs:68
 msgid ""
-"Impossible de trouver ce compte. Vérifiez l'identifiant et votre connexion à "
-"Internet."
+"Impossible de trouver ce compte. Vérifiez l'identifiant et votre connexion à"
+" Internet."
 msgstr ""
 "Could not find this account. Check the handle and your Internet connection."
 
@@ -522,7 +535,7 @@ msgstr "unknown account identity"
 msgid "Voir le profil de {}"
 msgstr "View the profile of {}"
 
-#: src/card.rs:122 src/card.rs:265 src/compose.rs:1512
+#: src/card.rs:122 src/card.rs:265 src/compose.rs:1514
 msgid "Image sans texte alternatif"
 msgstr "Image without alternative text"
 
@@ -568,7 +581,7 @@ msgstr "Leave full screen"
 msgid "Vidéo"
 msgstr "Video"
 
-#: src/card.rs:467 src/compose.rs:1836
+#: src/card.rs:467 src/compose.rs:1839
 msgid "GIF"
 msgstr "GIF"
 
@@ -906,7 +919,7 @@ msgstr "Add a post to the thread"
 msgid "Langue du post"
 msgstr "Post language"
 
-#: src/compose.rs:514 src/compose.rs:518 src/compose.rs:1709
+#: src/compose.rs:514 src/compose.rs:518 src/compose.rs:1712
 msgid "Ajouter des images ou une vidéo"
 msgstr "Add images or a video"
 
@@ -989,7 +1002,7 @@ msgstr "The draft could not be saved."
 msgid "Mode démonstration : rien n'est publié."
 msgstr "Demo mode: nothing is posted."
 
-#: src/compose.rs:1305 src/compose.rs:1585
+#: src/compose.rs:1305 src/compose.rs:1588
 msgid "Publication…"
 msgstr "Posting…"
 
@@ -1019,90 +1032,129 @@ msgstr "Reply posted."
 msgid "Post publié."
 msgstr "Post published."
 
-#: src/compose.rs:1495
+#: src/compose.rs:1497
 msgid "ALT ✓"
 msgstr "ALT ✓"
 
-#: src/compose.rs:1497
+#: src/compose.rs:1499
 msgid "+ ALT"
 msgstr "+ ALT"
 
-#: src/compose.rs:1501
+#: src/compose.rs:1503
 msgid "Modifier le texte alternatif"
 msgstr "Edit alternative text"
 
-#: src/compose.rs:1506
+#: src/compose.rs:1508
 msgid "Ajouter un texte alternatif"
 msgstr "Add alternative text"
 
-#: src/compose.rs:1508
+#: src/compose.rs:1510
 msgid "GIF sans texte alternatif"
 msgstr "GIF without alternative text"
 
-#: src/compose.rs:1510
+#: src/compose.rs:1512
 msgid "Vidéo sans texte alternatif"
 msgstr "Video without alternative text"
 
-#: src/compose.rs:1584
+#: src/compose.rs:1587
 msgid "Envoi de la vidéo…"
 msgstr "Uploading video…"
 
-#: src/compose.rs:1586
+#: src/compose.rs:1589
 msgid "Conversion de la vidéo : {} %"
 msgstr "Processing video: {}%"
 
-#: src/compose.rs:1604
+#: src/compose.rs:1607
 msgid "Une image n'a pas pu être préparée : {}"
 msgstr "An image could not be prepared: {}"
 
-#: src/compose.rs:1632
+#: src/compose.rs:1635
 msgid "Ce fichier n'a pas pu être lu."
 msgstr "This file could not be read."
 
-#: src/compose.rs:1645 src/compose.rs:1649
+#: src/compose.rs:1648 src/compose.rs:1652
 msgid "Une vidéo se publie seule, sans images."
 msgstr "A video is posted on its own, without images."
 
-#: src/compose.rs:1647
+#: src/compose.rs:1650
 msgid "Cette vidéo dépasse 100 Mo."
 msgstr "This video is larger than 100 MB."
 
-#: src/compose.rs:1675 src/edit_profile.rs:491 src/lists.rs:701
+#: src/compose.rs:1678 src/edit_profile.rs:491 src/lists.rs:701
 msgid "Ce fichier n'est pas une image lisible."
 msgstr "This file is not a readable image."
 
-#: src/compose.rs:1693
+#: src/compose.rs:1696
 msgid "Images et vidéos"
 msgstr "Images and videos"
 
-#: src/compose.rs:1809 src/compose.rs:1813 src/lists.rs:631 src/lists.rs:637
+#: src/compose.rs:1812 src/compose.rs:1816 src/lists.rs:631 src/lists.rs:637
 msgid "Retirer l'image"
 msgstr "Remove image"
 
-#: src/compose.rs:1909 src/compose.rs:1948
+#: src/compose.rs:1921
+msgid "Sous-titres"
+msgstr "Captions"
+
+#: src/compose.rs:1922
+msgid "Fichiers WebVTT (.vtt), un par langue."
+msgstr "WebVTT files (.vtt), one per language."
+
+#: src/compose.rs:1926
+msgid "Langue des sous-titres"
+msgstr "Caption language"
+
+#: src/compose.rs:1936
+msgid "Ajouter un fichier…"
+msgstr "Add a file…"
+
+#: src/compose.rs:1971
+msgid "{} octet"
+msgid_plural "{} octets"
+msgstr[0] "{} byte"
+msgstr[1] "{} bytes"
+
+#: src/compose.rs:1977
+msgid "Retirer"
+msgstr "Remove"
+
+#: src/compose.rs:1982
+msgid "Retirer les sous-titres : {}"
+msgstr "Remove captions: {}"
+
+#: src/compose.rs:2006
+msgid "Sous-titres WebVTT"
+msgstr "WebVTT captions"
+
+#: src/compose.rs:2012
+msgid "Choisir des sous-titres"
+msgstr "Choose captions"
+
+#: src/compose.rs:2058 src/compose.rs:2097
 msgid "Texte alternatif"
 msgstr "Alternative text"
 
-#: src/compose.rs:1914 src/edit_profile.rs:236 src/lists.rs:433
+#: src/compose.rs:2063 src/edit_profile.rs:236 src/lists.rs:433
 #: src/lists.rs:731
 msgid "Enregistrer"
 msgstr "Save"
 
-#: src/compose.rs:1932
+#: src/compose.rs:2081
 msgid "Vidéo à décrire"
 msgstr "Video to describe"
 
-#: src/compose.rs:1934
+#: src/compose.rs:2083
 msgid "Image à décrire"
 msgstr "Image to describe"
 
-#: src/compose.rs:1952
+#: src/compose.rs:2101
 msgid ""
 "Décrivez ce que montre la vidéo pour les personnes qui ne la voient pas."
 msgstr "Describe what the video shows for people who cannot see it."
 
-#: src/compose.rs:1954
-msgid "Décrivez ce que montre l'image pour les personnes qui ne la voient pas."
+#: src/compose.rs:2103
+msgid ""
+"Décrivez ce que montre l'image pour les personnes qui ne la voient pas."
 msgstr "Describe what the image shows for people who cannot see it."
 
 #: src/desktop.rs:16
@@ -1243,7 +1295,8 @@ msgstr "Search posts, people, feeds…"
 msgid "Rechercher"
 msgstr "Search"
 
-#. Sans recherche : onglets « Pour vous », « Tendances », « Flux », « Starter packs »,
+#. Sans recherche : onglets « Pour vous », « Tendances », « Flux », « Starter
+#. packs »,
 #. « Personnes » (maquette).
 #: src/explore.rs:340 src/explore.rs:344
 msgid "Sujets du moment"
@@ -1316,13 +1369,14 @@ msgid "Aucun flux ne correspond à cette recherche."
 msgstr "No feeds match this search."
 
 #: src/explore.rs:659 src/explore.rs:750 src/explore.rs:778 src/explore.rs:788
-#: src/explore.rs:797 src/explore.rs:904 src/explore.rs:929 src/feed_page.rs:94
-#: src/feed_page.rs:269 src/feed_page.rs:386 src/feeds.rs:443 src/feeds.rs:854
-#: src/feeds.rs:1054 src/lists.rs:1199 src/lists.rs:1333 src/messages.rs:703
-#: src/messages.rs:800 src/messages.rs:1061 src/messages.rs:1261
-#: src/preferences.rs:299 src/preferences.rs:472 src/preferences.rs:577
-#: src/profile.rs:673 src/profile.rs:868 src/profile.rs:985
-#: src/starter_packs.rs:503 src/window.rs:1123
+#: src/explore.rs:797 src/explore.rs:904 src/explore.rs:929
+#: src/feed_page.rs:94 src/feed_page.rs:269 src/feed_page.rs:386
+#: src/feeds.rs:443 src/feeds.rs:854 src/feeds.rs:1054 src/lists.rs:1199
+#: src/lists.rs:1333 src/messages.rs:703 src/messages.rs:800
+#: src/messages.rs:1061 src/messages.rs:1261 src/preferences.rs:299
+#: src/preferences.rs:472 src/preferences.rs:577 src/profile.rs:673
+#: src/profile.rs:868 src/profile.rs:985 src/starter_packs.rs:503
+#: src/window.rs:1123
 msgid "Chargement interrompu."
 msgstr "Loading interrupted."
 
@@ -1649,11 +1703,11 @@ msgstr "Handle"
 
 #: src/login.rs:95
 msgid ""
-"Par exemple : vous.bsky.social. Votre navigateur s'ouvrira pour confirmer la "
-"connexion ; Tsubame ne voit jamais votre mot de passe."
+"Par exemple : vous.bsky.social. Votre navigateur s'ouvrira pour confirmer la"
+" connexion ; Tsubame ne voit jamais votre mot de passe."
 msgstr ""
-"For example: you.bsky.social. Your browser will open to confirm the sign-in; "
-"Tsubame never sees your password."
+"For example: you.bsky.social. Your browser will open to confirm the sign-in;"
+" Tsubame never sees your password."
 
 #: src/login.rs:109
 msgid "Se connecter"
@@ -1796,7 +1850,8 @@ msgid "Messages plus anciens"
 msgstr "Older messages"
 
 #: src/messages.rs:485
-msgid "Demande de message : cette personne ne fait pas partie de vos contacts."
+msgid ""
+"Demande de message : cette personne ne fait pas partie de vos contacts."
 msgstr "Message request: this person is not one of your contacts."
 
 #: src/messages.rs:487
@@ -2179,8 +2234,8 @@ msgid ""
 "Seuls les posts dans ces langues s'affichent dans vos fils. Aucune langue "
 "cochée : toutes."
 msgstr ""
-"Only posts in these languages are shown in your feeds. None selected: all of "
-"them."
+"Only posts in these languages are shown in your feeds. None selected: all of"
+" them."
 
 #: src/preferences.rs:1074
 msgid "Aucune liste"
@@ -2255,7 +2310,8 @@ msgstr "Profile not found"
 msgid "Profil enregistré."
 msgstr "Profile saved."
 
-#: src/profile.rs:545 src/profile.rs:1263 src/window.rs:1248 src/window.rs:1495
+#: src/profile.rs:545 src/profile.rs:1263 src/window.rs:1248
+#: src/window.rs:1495
 msgid "Mode démonstration : rien n'est enregistré."
 msgstr "Demo mode: nothing is saved."
 
@@ -2477,8 +2533,8 @@ msgid ""
 "Le signalement est envoyé au service de modération de Bluesky. La personne "
 "signalée n'en est pas informée."
 msgstr ""
-"The report is sent to the Bluesky moderation service. The reported person is "
-"not told."
+"The report is sent to the Bluesky moderation service. The reported person is"
+" not told."
 
 #: src/report.rs:237
 msgid "Destinataire"
