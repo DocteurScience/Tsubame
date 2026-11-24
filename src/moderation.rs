@@ -642,6 +642,17 @@ fn media_warning_visibility(post: &Post) -> Option<(Visibility, String)> {
     PREFERENCES.with_borrow(|preferences| decide(preferences, &post.labels))
 }
 
+/// Avertissement à mettre sur un profil étiqueté (bannière, avatar, bio),
+/// ou `None`. Une étiquette qui masquerait un post avertit aussi.
+pub fn profile_warning(labels: &[String]) -> Option<String> {
+    if labels.is_empty() {
+        return None;
+    }
+    PREFERENCES
+        .with_borrow(|preferences| decide(preferences, labels))
+        .map(|(_, label)| warning_title(&label))
+}
+
 /// Avertissement à mettre sur les images du post, s'il en faut un.
 pub fn media_warning(post: &Post) -> Option<String> {
     match media_warning_visibility(post) {
@@ -936,6 +947,18 @@ mod tests {
         );
         // Service inconnu : ignoré.
         assert_eq!(decide_with(&p, &[], &labels), None);
+    }
+
+    #[test]
+    fn labeled_profiles_are_warned() {
+        set_preferences(Vec::new());
+        assert_eq!(profile_warning(&[]), None);
+        assert_eq!(
+            profile_warning(&["graphic-media".to_owned()]).as_deref(),
+            Some("Violence graphique")
+        );
+        // Étiquette inconnue (service non suivi) : rien.
+        assert_eq!(profile_warning(&["did:plc:x#y".to_owned()]), None);
     }
 
     #[test]

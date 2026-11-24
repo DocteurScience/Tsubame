@@ -10,7 +10,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 use adw::prelude::*;
-use gettextrs::{gettext, pgettext};
+use gettextrs::{gettext, ngettext, pgettext};
 use gtk::{gdk, gio, glib};
 
 use crate::api::{self, NewImage, NewPost};
@@ -169,6 +169,9 @@ fn track_focus(view: &gtk::TextView, last: &Rc<RefCell<glib::WeakRef<gtk::TextVi
     view.add_controller(focus);
 }
 
+/// Ajoute une case au menu « Qui peut répondre » : nom d'action, choix.
+type AddReplyChoice = Rc<dyn Fn(&str, api::ReplyChoice)>;
+
 /// Posts ajoutés au fil, au plus, après le premier.
 const MAX_FOLLOWUPS: usize = 9;
 
@@ -192,16 +195,31 @@ impl Followup {
 }
 
 /// Langues proposées, sous leur propre nom.
-pub const LANGUAGES: [(&str, &str); 6] = [
+pub const LANGUAGES: [(&str, &str); 22] = [
     ("fr", "Français"),
     ("en", "English"),
     ("es", "Español"),
     ("de", "Deutsch"),
     ("it", "Italiano"),
     ("pt", "Português"),
+    ("nl", "Nederlands"),
+    ("ca", "Català"),
+    ("br", "Brezhoneg"),
+    ("eu", "Euskara"),
+    ("oc", "Occitan"),
+    ("pl", "Polski"),
+    ("sv", "Svenska"),
+    ("fi", "Suomi"),
+    ("tr", "Türkçe"),
+    ("uk", "Українська"),
+    ("ru", "Русский"),
+    ("ar", "العربية"),
+    ("hi", "हिन्दी"),
+    ("zh", "中文"),
+    ("ja", "日本語"),
+    ("ko", "한국어"),
 ];
 
-/// Langue de l'interface si elle est proposée, sinon le français.
 /// Langue proposée : celle choisie dans les préférences, sinon celle du
 /// système, sinon le français.
 fn default_language() -> &'static str {
@@ -501,17 +519,25 @@ pub fn present(
     ))]);
     // Qui peut répondre, et citations : pour un nouveau post seulement (une
     // réponse suit les réglages du début de la discussion).
-    let reply_rule = Rc::new(Cell::new(api::ReplyRule::Everyone));
+    let reply_rule: Rc<RefCell<api::ReplyRule>> = Rc::default();
     let no_quotes = Rc::new(Cell::new(false));
     let gate_menu = gio::Menu::new();
     let rules = gio::Menu::new();
-    for rule in api::ReplyRule::ALL {
-        rules.append(
-            Some(&rule.title()),
-            Some(&format!("compose.replies::{}", rule.id())),
-        );
+    // Choix combinables : une case par groupe, et mes listes ensuite.
+    for (title, action) in [
+        (gettext("Tout le monde"), "compose.reply-everyone"),
+        (
+            gettext("Comptes que vous suivez"),
+            "compose.reply-following",
+        ),
+        (gettext("Vos abonnés"), "compose.reply-followers"),
+        (gettext("Comptes mentionnés"), "compose.reply-mentioned"),
+        (gettext("Personne"), "compose.reply-nobody"),
+    ] {
+        rules.append(Some(&title), Some(action));
     }
     gate_menu.append_section(Some(&gettext("Qui peut répondre")), &rules);
+    let list_rules = gio::Menu::new();
     let quotes_section = gio::Menu::new();
     quotes_section.append(
         Some(&gettext("Autoriser les citations")),
@@ -521,7 +547,7 @@ pub fn present(
     let gate_content = adw::ButtonContent::builder()
         .can_shrink(true)
         .icon_name("mail-reply-sender-symbolic")
-        .label(api::ReplyRule::Everyone.title())
+        .label(api::ReplyRule::default().title())
         .build();
     let gate_button = gtk::MenuButton::builder()
         .child(&gate_content)
@@ -600,25 +626,74 @@ pub fn present(
         });
     }
     actions.add_action(&language_action);
-    let replies_action = gio::SimpleAction::new_stateful(
-        "replies",
-        Some(glib::VariantTy::STRING),
-        &api::ReplyRule::Everyone.id().to_variant(),
-    );
-    {
-        let (reply_rule, gate_content) = (reply_rule.clone(), gate_content.clone());
-        replies_action.connect_change_state(move |action, value| {
-            if let Some(rule) = value
-                .and_then(|v| v.str())
-                .and_then(api::ReplyRule::from_id)
-            {
-                reply_rule.set(rule);
-                gate_content.set_label(&rule.title());
-                action.set_state(&rule.id().to_variant());
+    // Une action à état booléen par choix ; chaque changement recalcule
+    // toutes les cases et le libellé du bouton.
+    let reply_actions: Rc<RefCell<Vec<(api::ReplyChoice, gio::SimpleAction)>>> = Rc::default();
+    let add_reply_choice: AddReplyChoice = {
+        let (actions, reply_actions, reply_rule, gate_content) = (
+            actions.clone(),
+            reply_actions.clone(),
+            reply_rule.clone(),
+            gate_content.clone(),
+        );
+        Rc::new(move |name: &str, choice: api::ReplyChoice| {
+            let action = gio::SimpleAction::new_stateful(
+                name,
+                None,
+                &reply_rule.borrow().has(&choice).to_variant(),
+            );
+            let (registered, reply_rule, gate_content, choice_for) = (
+                reply_actions.clone(),
+                reply_rule.clone(),
+                gate_content.clone(),
+                choice.clone(),
+            );
+            action.connect_activate(move |_, _| {
+                let next = reply_rule.borrow().toggle(&choice_for);
+                for (choice, action) in registered.borrow().iter() {
+                    action.set_state(&next.has(choice).to_variant());
+                }
+                gate_content.set_label(&next.title());
+                reply_rule.replace(next);
+            });
+            actions.add_action(&action);
+            reply_actions.borrow_mut().push((choice, action));
+        })
+    };
+    for (name, choice) in [
+        ("reply-everyone", api::ReplyChoice::Everyone),
+        ("reply-following", api::ReplyChoice::Following),
+        ("reply-followers", api::ReplyChoice::Followers),
+        ("reply-mentioned", api::ReplyChoice::Mentioned),
+        ("reply-nobody", api::ReplyChoice::Nobody),
+    ] {
+        add_reply_choice(name, choice);
+    }
+    // Mes listes de comptes (pas celles de modération).
+    if let (Some(session), false) = (session.clone(), replying) {
+        let me = session.account.did.clone();
+        let task = runtime().spawn(api::lists(session, me));
+        let (list_rules, add_reply_choice, gate_menu) = (
+            list_rules.clone(),
+            add_reply_choice.clone(),
+            gate_menu.clone(),
+        );
+        glib::spawn_future_local(async move {
+            let Ok(Ok(lists)) = task.await else { return };
+            let lists: Vec<_> = lists.into_iter().filter(|l| !l.moderation).collect();
+            if lists.is_empty() {
+                return;
+            }
+            // Section ajoutée seulement s'il y a des listes, après les
+            // groupes.
+            gate_menu.insert_section(1, Some(&gettext("Membres d'une liste")), &list_rules);
+            for (i, list) in lists.iter().enumerate() {
+                let name = format!("reply-list-{i}");
+                add_reply_choice(&name, api::ReplyChoice::List(list.uri.clone()));
+                list_rules.append(Some(&list.name), Some(&format!("compose.{name}")));
             }
         });
     }
-    actions.add_action(&replies_action);
     let quotes_action = gio::SimpleAction::new_stateful("quotes", None, &true.to_variant());
     {
         let no_quotes = no_quotes.clone();
@@ -1228,6 +1303,22 @@ pub fn present(
             busy.set(true);
             publish.set_sensitive(false);
             publish.set_label(&gettext("Publication…"));
+            // Vidéo : l'avancement de l'envoi puis de la conversion
+            // s'affiche dans le bouton, tant que la publication dure.
+            if let Some(progress) = video.as_ref().and_then(|v| v.progress.clone()) {
+                let (publish, busy) = (publish.downgrade(), busy.clone());
+                glib::timeout_add_local(std::time::Duration::from_millis(500), move || {
+                    let Some(publish) = publish.upgrade() else {
+                        return glib::ControlFlow::Break;
+                    };
+                    if !busy.get() {
+                        return glib::ControlFlow::Break;
+                    }
+                    let value = progress.load(std::sync::atomic::Ordering::Relaxed);
+                    publish.set_label(&video_progress_label(value));
+                    glib::ControlFlow::Continue
+                });
+            }
             text.set_editable(false);
             error.set_visible(false);
             let post = NewPost {
@@ -1237,7 +1328,7 @@ pub fn present(
                 images: Vec::new(),
                 quote: quote_ref.clone(),
                 link: link_state.preview.borrow().clone(),
-                reply_rule: reply_rule.get(),
+                reply_rule: reply_rule.borrow().clone(),
                 no_quotes: no_quotes.get(),
                 self_label: *self_label.borrow(),
                 video,
@@ -1277,7 +1368,7 @@ pub fn present(
                         reply: Some((root.clone(), parent.clone())),
                         images,
                         quote: None,
-                        reply_rule: api::ReplyRule::Everyone,
+                        reply_rule: api::ReplyRule::default(),
                         no_quotes: false,
                         self_label: label.filter(|_| has_images),
                         video,
@@ -1391,6 +1482,8 @@ struct Attachment {
     /// Pour une vidéo ou un GIF animé : son type MIME.
     video: Option<String>,
     alt: RefCell<String>,
+    /// Sous-titres d'une vidéo.
+    captions: RefCell<Vec<api::Caption>>,
     tile: gtk::Overlay,
     alt_button: gtk::Button,
 }
@@ -1476,14 +1569,25 @@ fn video_of(attachments: &Rc<RefCell<Vec<Rc<Attachment>>>>) -> Option<api::NewVi
         );
         Some(api::NewVideo {
             bytes: a.bytes.to_vec(),
+            captions: a.captions.borrow().clone(),
             mime: mime.clone(),
             alt: a.alt.borrow().trim().to_owned(),
             size: (width > 0 && height > 0).then_some((width as u32, height as u32)),
             // Un GIF se montre en boucle, sans commandes.
             presentation: (mime == "image/gif").then_some("gif"),
             blob: None,
+            progress: Some(Default::default()),
         })
     })
+}
+
+/// Texte du bouton pendant la publication d'une vidéo.
+fn video_progress_label(value: u8) -> String {
+    match value {
+        api::VIDEO_SENDING => gettext("Envoi de la vidéo…"),
+        0 => gettext("Publication…"),
+        percent => gettext("Conversion de la vidéo : {} %").replace("{}", &percent.to_string()),
+    }
 }
 
 fn has_video(attachments: &Rc<RefCell<Vec<Rc<Attachment>>>>) -> bool {
@@ -1770,6 +1874,7 @@ fn attach(
         paintable,
         video,
         alt: RefCell::default(),
+        captions: RefCell::default(),
         tile: tile.clone(),
         alt_button: alt_button.clone(),
     });
@@ -1800,6 +1905,151 @@ fn attach(
             edit_alt(button, &attachment);
         }
     });
+}
+
+/// Rappel connu une fois construit (une rangée qui reconstruit sa propre liste).
+type LateCallback = Rc<RefCell<Option<Rc<dyn Fn()>>>>;
+
+/// Groupe « Sous-titres » de la boîte du texte alternatif d'une vidéo : la langue, « Ajouter un
+/// fichier… » (WebVTT) et les fichiers choisis, chacun avec « Retirer ». Un nouveau fichier
+/// remplace celui de la même langue.
+fn captions_group(
+    dialog: &adw::Dialog,
+    captions: Rc<RefCell<Vec<api::Caption>>>,
+) -> adw::PreferencesGroup {
+    let group = adw::PreferencesGroup::builder()
+        .title(gettext("Sous-titres"))
+        .description(gettext("Fichiers WebVTT (.vtt), un par langue."))
+        .build();
+    let names: Vec<&str> = LANGUAGES.iter().map(|(_, name)| *name).collect();
+    let language = adw::ComboRow::builder()
+        .title(gettext("Langue des sous-titres"))
+        .model(&gtk::StringList::new(&names))
+        .selected(
+            LANGUAGES
+                .iter()
+                .position(|(code, _)| *code == default_language())
+                .unwrap_or(0) as u32,
+        )
+        .build();
+    let add = gtk::Button::builder()
+        .label(gettext("Ajouter un fichier…"))
+        .valign(gtk::Align::Center)
+        .css_classes(["flat"])
+        .build();
+    let error = gtk::Label::builder()
+        .wrap(true)
+        .xalign(0.0)
+        .visible(false)
+        .accessible_role(gtk::AccessibleRole::Alert)
+        .css_classes(["error", "caption"])
+        .build();
+    group.set_header_suffix(Some(&add));
+    group.add(&language);
+    group.add(&error);
+
+    let rows: Rc<RefCell<Vec<adw::ActionRow>>> = Rc::default();
+    let refill: LateCallback = Rc::default();
+    let fill: Rc<dyn Fn()> = {
+        let (group, captions, rows, add, refill) = (
+            group.downgrade(),
+            captions.clone(),
+            rows.clone(),
+            add.clone(),
+            refill.clone(),
+        );
+        Rc::new(move || {
+            let Some(group) = group.upgrade() else { return };
+            for row in rows.borrow_mut().drain(..) {
+                group.remove(&row);
+            }
+            for caption in captions.borrow().iter() {
+                let name = language_name(&caption.lang);
+                let row = adw::ActionRow::builder()
+                    .title(name)
+                    .subtitle(
+                        ngettext("{} octet", "{} octets", caption.bytes.len() as u32)
+                            .replace("{}", &caption.bytes.len().to_string()),
+                    )
+                    .build();
+                let remove = gtk::Button::builder()
+                    .icon_name("user-trash-symbolic")
+                    .tooltip_text(gettext("Retirer"))
+                    .valign(gtk::Align::Center)
+                    .css_classes(["flat"])
+                    .build();
+                remove.update_property(&[gtk::accessible::Property::Label(
+                    &gettext("Retirer les sous-titres : {}").replace("{}", name),
+                )]);
+                let (lang, captions, refill) =
+                    (caption.lang.clone(), captions.clone(), refill.clone());
+                remove.connect_clicked(move |_| {
+                    captions.borrow_mut().retain(|c| c.lang != lang);
+                    let refill = refill.borrow().clone();
+                    if let Some(refill) = refill {
+                        glib::idle_add_local_once(move || refill());
+                    }
+                });
+                row.add_suffix(&remove);
+                group.add(&row);
+                rows.borrow_mut().push(row);
+            }
+            add.set_sensitive(captions.borrow().len() < api::MAX_CAPTIONS);
+        })
+    };
+    refill.replace(Some(fill.clone()));
+    fill();
+
+    let dialog = dialog.downgrade();
+    add.connect_clicked(move |_| {
+        let filter = gtk::FileFilter::new();
+        filter.set_name(Some(&gettext("Sous-titres WebVTT")));
+        filter.add_mime_type(api::CAPTION_MIME);
+        filter.add_suffix("vtt");
+        let filters = gio::ListStore::new::<gtk::FileFilter>();
+        filters.append(&filter);
+        let chooser = gtk::FileDialog::builder()
+            .title(gettext("Choisir des sous-titres"))
+            .modal(true)
+            .filters(&filters)
+            .default_filter(&filter)
+            .build();
+        let window = dialog
+            .upgrade()
+            .and_then(|d| d.root())
+            .and_downcast::<gtk::Window>();
+        let lang = LANGUAGES
+            .get(language.selected() as usize)
+            .map(|(code, _)| (*code).to_owned())
+            .unwrap_or_default();
+        let (captions, error, fill) = (captions.clone(), error.clone(), fill.clone());
+        chooser.open(window.as_ref(), gio::Cancellable::NONE, move |result| {
+            let Ok(file) = result else { return };
+            glib::spawn_future_local(async move {
+                let bytes = match file.load_bytes_future().await {
+                    Ok((bytes, _)) => bytes.to_vec(),
+                    Err(_) => Vec::new(),
+                };
+                if let Some(refusal) = api::caption_refusal(&bytes) {
+                    error.set_label(&refusal);
+                    error.set_visible(true);
+                    return;
+                }
+                error.set_visible(false);
+                {
+                    let mut captions = captions.borrow_mut();
+                    captions.retain(|c| c.lang != lang);
+                    captions.push(api::Caption {
+                        lang,
+                        bytes,
+                        blob: None,
+                    });
+                }
+                fill();
+            });
+        });
+    });
+    group
 }
 
 /// Boîte du texte alternatif : l'image en grand, le texte, un compteur.
@@ -1872,7 +2122,20 @@ fn edit_alt(parent: &gtk::Button, attachment: &Rc<Attachment>) {
     content.append(&text);
     content.append(&help);
     content.append(&counter);
-    let view = adw::ToolbarView::builder().content(&content).build();
+    // Sous-titres d'une vidéo (pas d'un GIF), enregistrés avec le texte.
+    let captions = Rc::new(RefCell::new(attachment.captions.borrow().clone()));
+    if is_video && attachment.video.as_deref() != Some("image/gif") {
+        content.append(&captions_group(&dialog, captions.clone()));
+    }
+    let view = adw::ToolbarView::builder()
+        .content(
+            &gtk::ScrolledWindow::builder()
+                .hscrollbar_policy(gtk::PolicyType::Never)
+                .propagate_natural_height(true)
+                .child(&content)
+                .build(),
+        )
+        .build();
     view.add_top_bar(&header);
     dialog.set_child(Some(&view));
 
@@ -1901,6 +2164,7 @@ fn edit_alt(parent: &gtk::Button, attachment: &Rc<Attachment>) {
     {
         let (dialog, text, attachment) = (dialog.clone(), text.clone(), attachment.clone());
         save.connect_clicked(move |_| {
+            attachment.captions.replace(captions.borrow().clone());
             let buffer = text.buffer();
             attachment.alt.replace(
                 buffer

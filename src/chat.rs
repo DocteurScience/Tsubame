@@ -148,7 +148,7 @@ fn list_time(then: DateTime<chrono::FixedOffset>, now: DateTime<Utc>) -> String 
     let today = now.with_timezone(&Local).date_naive();
     let day = local.date_naive();
     if day == today {
-        format!("{:02}:{:02}", local.hour(), local.minute())
+        api::clock(local.hour(), local.minute())
     } else if today.pred_opt() == Some(day) {
         gettext("hier")
     } else {
@@ -258,7 +258,7 @@ pub fn message_from_json(message: &Value, me: &str, now: DateTime<Utc>) -> Optio
         time: sent
             .map(|t| {
                 let local = t.with_timezone(&Local);
-                format!("{:02}:{:02}", local.hour(), local.minute())
+                api::clock(local.hour(), local.minute())
             })
             .unwrap_or_default(),
         day: sent.map(|t| day_label(t, now)).unwrap_or_default(),
@@ -638,6 +638,23 @@ fn chat_failed(error: impl std::fmt::Display) -> ApiError {
     request_failed(text)
 }
 
+/// Heure d'une donnée de démonstration (« 14:40 », « hier », « 18 nov. »), dans la langue de
+/// l'interface.
+fn demo_time(text: &str) -> String {
+    if text == "hier" {
+        return gettext("hier");
+    }
+    if let Some((hour, minute)) = text.split_once(':')
+        && let (Ok(hour), Ok(minute)) = (hour.parse(), minute.parse())
+    {
+        return api::clock(hour, minute);
+    }
+    if let Some(day) = text.strip_suffix(" nov.").and_then(|d| d.parse().ok()) {
+        return api::day_month(day, 11);
+    }
+    text.to_owned()
+}
+
 /// Conversations et messages de démonstration, repris de la maquette
 /// `Messages.dc.html`.
 pub fn demo_convos() -> (Vec<Convo>, Vec<Convo>) {
@@ -648,7 +665,7 @@ pub fn demo_convos() -> (Vec<Convo>, Vec<Convo>) {
             handle: handle.map(str::to_owned),
             avatar: None,
             last_text: last.to_owned(),
-            last_time: time.to_owned(),
+            last_time: demo_time(time),
             unread,
             request: false,
             muted: false,
@@ -709,7 +726,7 @@ pub fn demo_messages(convo_id: &str) -> Vec<Message> {
         } else {
             "did:plc:demo".to_owned()
         },
-        time: time.to_owned(),
+        time: demo_time(time),
         day: gettext("Aujourd'hui"),
         failed: false,
         reactions: Vec::new(),

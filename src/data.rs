@@ -60,6 +60,18 @@ pub struct Post {
     pub quote: Option<Box<Post>>,
     /// Lien joint, avec son aperçu.
     pub link: Option<Link>,
+    /// Notification regroupée : les personnes, de la plus récente à la plus
+    /// ancienne, et la clé du groupe (raison, post concerné).
+    pub group: Vec<Person>,
+    pub group_key: Option<(String, String)>,
+}
+
+/// Personne citée dans une notification regroupée.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Person {
+    pub name: String,
+    pub handle: String,
+    pub avatar: Option<String>,
 }
 
 /// Aperçu d'un lien joint à un post (embed `external`).
@@ -113,6 +125,8 @@ impl Post {
             pinned: false,
             quote: None,
             link: None,
+            group: Vec::new(),
+            group_key: None,
         }
     }
 }
@@ -178,20 +192,31 @@ pub struct Topic {
     pub name: String,
     /// Recherche correspondante.
     pub query: String,
+    /// Catégorie (`sports`, `politics`…), pour les tendances.
+    pub category: Option<String>,
+    /// Nombre de posts, s'il est connu.
+    pub posts: u64,
+    /// Tendance en forte hausse.
+    pub hot: bool,
 }
 
 /// Personnes à suivre et sujets du moment de démonstration, repris de la
 /// maquette `Explorer.dc.html`.
 pub fn demo_topics() -> Vec<Topic> {
     [
-        "#GNOME49",
-        "Accessibilité numérique",
-        "Photographie de montagne",
+        ("#GNOME49", "Logiciels libres", 1240, true),
+        ("Accessibilité numérique", "Techno", 860, false),
+        ("Photographie de montagne", "Photo", 540, false),
+        ("Flatpak", "Logiciels libres", 410, false),
+        ("Fête de la science", "Actualité", 320, false),
     ]
     .into_iter()
-    .map(|name| Topic {
+    .map(|(name, category, posts, hot)| Topic {
         name: name.to_owned(),
         query: name.to_owned(),
+        category: Some(category.to_owned()),
+        posts,
+        hot,
     })
     .collect()
 }
@@ -254,6 +279,8 @@ pub struct Profile {
     pub associated: (u64, u64, u64),
     /// Le compte est un service d'étiquetage.
     pub labeler: bool,
+    /// Étiquettes du compte (comme celles des posts).
+    pub labels: Vec<String>,
 }
 
 /// Référence à un post : son adresse et son contenu (CID).
@@ -330,8 +357,8 @@ fn post(
         context: None,
         name: name.into(),
         handle: handle.into(),
-        time: time.into(),
-        date: date.into(),
+        time: demo_moment(time, date).0,
+        date: demo_moment(time, date).1,
         text: text.into(),
         // Les mentions de démonstration ouvrent le profil par identifiant.
         facets: crate::richtext::detect(text),
@@ -347,6 +374,8 @@ fn post(
         pinned: false,
         quote: None,
         link: None,
+        group: Vec::new(),
+        group_key: None,
     }
 }
 
@@ -360,10 +389,62 @@ fn reply(
         avatar: None,
         name: name.into(),
         handle: handle.into(),
-        time: time.into(),
+        time: demo_moment(time, "").0,
         text: text.into(),
         facets: crate::richtext::detect(text),
     }
+}
+
+/// Instant de référence des données de démonstration : le 20 novembre 2026 à 14:59, heure locale.
+pub fn demo_now() -> chrono::DateTime<chrono::Local> {
+    use chrono::TimeZone;
+    chrono::Local
+        .with_ymd_and_hms(2026, 11, 20, 14, 59, 0)
+        .earliest()
+        .unwrap_or_else(chrono::Local::now)
+}
+
+/// Heure relative et date complète d'un post de démonstration, dans la langue de l'interface.
+/// Les données les donnent en français : « 4 min » ou « 2 h », et « 20 nov., 14:55 » (date
+/// vide : aucune). La date, si elle est donnée, fait foi.
+fn demo_moment(time: &str, date: &str) -> (String, String) {
+    use chrono::TimeZone;
+    let now = demo_now();
+    let from_date = date.split_once(" nov., ").and_then(|(day, clock)| {
+        let (hour, minute) = clock.split_once(':')?;
+        chrono::Local
+            .with_ymd_and_hms(
+                2026,
+                11,
+                day.parse().ok()?,
+                hour.parse().ok()?,
+                minute.parse().ok()?,
+                0,
+            )
+            .earliest()
+    });
+    let from_time = || {
+        let (count, unit) = time.split_once(' ')?;
+        let count: i64 = count.parse().ok()?;
+        let elapsed = match unit {
+            "min" => chrono::Duration::minutes(count),
+            "h" => chrono::Duration::hours(count),
+            "j" => chrono::Duration::days(count),
+            _ => return None,
+        };
+        Some(now - elapsed)
+    };
+    let Some(then) = from_date.or_else(from_time) else {
+        return (time.to_owned(), date.to_owned());
+    };
+    let then = then.fixed_offset();
+    let relative = crate::api::relative_time(then, now.to_utc());
+    let full = if date.is_empty() {
+        String::new()
+    } else {
+        crate::api::full_date(then)
+    };
+    (relative, full)
 }
 
 fn lucie_gnome_49() -> Post {
@@ -657,19 +738,35 @@ pub fn notifications() -> Vec<Post> {
                 12,
             ),
         ),
-        notification(
-            "Pierre Delmas et 4 autres ont aimé votre post",
-            post(
-                "Pierre Delmas",
-                "pierre.example.social",
-                "40 min",
-                "20 nov., 14:19",
-                "Rappel : ajoutez un texte alternatif à vos captures d'écran.",
-                1,
-                5,
-                20,
-            ),
-        ),
+        Post {
+            group: [
+                ("Pierre Delmas", "pierre.example.social"),
+                ("Nadia Safi", "nadia.example.social"),
+                ("Romain Bailly", "romain.example.social"),
+                ("Lucie Morel", "lucie.example.social"),
+                ("Aya Koné", "aya.example.social"),
+            ]
+            .into_iter()
+            .map(|(name, handle)| Person {
+                name: name.into(),
+                handle: handle.into(),
+                avatar: None,
+            })
+            .collect(),
+            ..notification(
+                "Pierre Delmas et 4 autres ont aimé votre post",
+                post(
+                    "Pierre Delmas",
+                    "pierre.example.social",
+                    "40 min",
+                    "20 nov., 14:19",
+                    "Rappel : ajoutez un texte alternatif à vos captures d'écran.",
+                    1,
+                    5,
+                    20,
+                ),
+            )
+        },
         notification(
             "a répondu à votre post",
             post(

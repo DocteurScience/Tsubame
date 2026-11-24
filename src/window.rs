@@ -246,6 +246,7 @@ struct State {
     /// Section « comptes » du menu principal, et les comptes qu'elle liste.
     accounts_menu: gio::Menu,
     known_accounts: RefCell<Vec<auth::Account>>,
+    other_sessions: RefCell<Vec<Arc<Session>>>,
 }
 
 impl State {
@@ -541,22 +542,52 @@ impl State {
     /// Section « comptes » du menu principal : passer à un autre compte
     /// gardé dans le trousseau, en ajouter un.
     fn refresh_accounts(self: &Rc<Self>) {
-        let task = runtime().spawn(auth::stored_accounts());
+        let current = self
+            .session
+            .borrow()
+            .as_ref()
+            .map(|s| s.account.did.clone());
+        // Sessions des autres comptes, gardées d'un appel à l'autre pour ne
+        // pas restaurer leurs jetons à chaque fois.
+        let cached: Vec<Arc<Session>> = self.other_sessions.borrow().clone();
+        let task = runtime().spawn(async move {
+            let accounts = auth::stored_accounts().await.unwrap_or_default();
+            let mut sessions = Vec::new();
+            let mut unread = std::collections::HashMap::new();
+            for account in accounts.iter().filter(|a| Some(&a.did) != current.as_ref()) {
+                let session = cached
+                    .iter()
+                    .find(|s| s.account.did == account.did)
+                    .cloned()
+                    .unwrap_or_else(|| auth::session_for(account.clone()));
+                // Non lues d'un compte inactif ; sans réponse, rien.
+                if let Ok(count) = Box::pin(api::unread_count(session.clone())).await {
+                    unread.insert(account.did.clone(), count);
+                }
+                sessions.push(session);
+            }
+            (accounts, sessions, unread, current)
+        });
         let weak = Rc::downgrade(self);
         glib::spawn_future_local(async move {
-            let accounts = task.await.ok().and_then(Result::ok).unwrap_or_default();
+            let Ok((accounts, sessions, unread, current)) = task.await else {
+                return;
+            };
             let Some(state) = weak.upgrade() else { return };
-            let current = state
-                .session
-                .borrow()
-                .as_ref()
-                .map(|s| s.account.did.clone());
+            state.other_sessions.replace(sessions);
             state.accounts_menu.remove_all();
             for account in accounts.iter().filter(|a| Some(&a.did) != current.as_ref()) {
-                let item = gio::MenuItem::new(
-                    Some(&gettext("Passer à @{}").replace("{}", &account.handle)),
-                    None,
-                );
+                let label = match unread.get(&account.did).copied().unwrap_or(0) {
+                    0 => gettext("Passer à @{}").replace("{}", &account.handle),
+                    n => gettextrs::ngettext(
+                        "Passer à @{handle} · {n} non lue",
+                        "Passer à @{handle} · {n} non lues",
+                        n,
+                    )
+                    .replace("{handle}", &account.handle)
+                    .replace("{n}", &n.to_string()),
+                };
+                let item = gio::MenuItem::new(Some(&label), None);
                 item.set_action_and_target_value(
                     Some("win.switch-account"),
                     Some(&account.did.to_variant()),
@@ -1693,6 +1724,8 @@ impl State {
                 return glib::ControlFlow::Break;
             };
             state.poll_unread();
+            // Non lues des autres comptes, dans le menu principal.
+            state.refresh_accounts();
             glib::ControlFlow::Continue
         });
         self.poll.replace(Some(id));
@@ -1915,7 +1948,7 @@ impl State {
 
 /// Nouvel indice d'une colonne glissée depuis `from` et déposée avant ou
 /// après la colonne d'indice `over`, ou `None` si elle ne bouge pas.
-fn drop_index(from: usize, over: usize, after: bool) -> Option<usize> {
+pub(crate) fn drop_index(from: usize, over: usize, after: bool) -> Option<usize> {
     let insert_at = over + usize::from(after);
     // Retirer la colonne décale celles qui la suivent.
     let to = if from < insert_at {
@@ -1928,7 +1961,7 @@ fn drop_index(from: usize, over: usize, after: bool) -> Option<usize> {
 
 /// Trait de dépôt au-dessus (`Some(false)`) ou en dessous (`Some(true)`)
 /// d'une rangée, ou aucun.
-fn show_drop_marker(row: &gtk::Widget, after: Option<bool>) {
+pub(crate) fn show_drop_marker(row: &gtk::Widget, after: Option<bool>) {
     row.set_css_classes(
         &row.css_classes()
             .iter()
@@ -2413,6 +2446,7 @@ pub fn build(app: &adw::Application) -> adw::ApplicationWindow {
         logout_action: gio::SimpleAction::new("logout", None),
         accounts_menu,
         known_accounts: RefCell::default(),
+        other_sessions: RefCell::default(),
         poll: RefCell::default(),
     });
     state.connect_column(&state.compact_notifications, Target::CompactNotifications);

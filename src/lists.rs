@@ -1,19 +1,22 @@
 //! Listes : créer, renommer, supprimer, gérer les membres ; s'abonner aux
 //! listes de modération des autres (masquer ou bloquer leurs comptes).
 
+use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
 
 use adw::prelude::*;
 use atrium_api::types::string::{Nsid, RecordKey};
 use gettextrs::gettext;
-use gtk::{gio, glib};
+use gtk::{gdk, gio, glib};
 use serde_json::{Value, json};
 
 use crate::api::{self, ApiError, invalid_actor, request_failed};
 use crate::auth::Session;
 use crate::data::{self, Actor, List};
+use crate::edit_profile::ImageChange;
 use crate::explore::actor_row;
+use crate::photo::{self, Prepared};
 use crate::profile::Host;
 use crate::runtime::runtime;
 
@@ -77,26 +80,95 @@ fn now() -> String {
         .to_owned()
 }
 
+/// Envoie une image préparée ; rend son blob, à placer dans un enregistrement.
+async fn upload_image(session: &Session, image: &Prepared) -> Result<Value, ApiError> {
+    let api = session.api().await?;
+    let output = api
+        .api
+        .com
+        .atproto
+        .repo
+        .upload_blob(image.bytes.clone())
+        .await
+        .map_err(|e| {
+            ApiError::new(
+                gettext("Une image n'a pas pu être envoyée : {}").replace("{}", &e.to_string()),
+            )
+        })?;
+    serde_json::to_value(&output.data.blob).map_err(|_| invalid_actor())
+}
+
+/// Applique le changement d'image à l'enregistrement d'une liste.
+pub fn apply_avatar(record: &mut Value, avatar: &ImageChange, blob: Option<Value>) {
+    let Some(map) = record.as_object_mut() else {
+        return;
+    };
+    match (avatar, blob) {
+        (ImageChange::Keep, _) => {}
+        (ImageChange::Replace(_), Some(blob)) => {
+            map.insert("avatar".into(), blob);
+        }
+        _ => {
+            map.remove("avatar");
+        }
+    }
+}
+
+async fn avatar_blob(session: &Session, avatar: &ImageChange) -> Result<Option<Value>, ApiError> {
+    match avatar {
+        ImageChange::Replace(image) => Ok(Some(Box::pin(upload_image(session, image)).await?)),
+        _ => Ok(None),
+    }
+}
+
 pub async fn create_list(
     session: Arc<Session>,
     name: String,
     description: String,
     moderation: bool,
+    avatar: ImageChange,
 ) -> Result<String, ApiError> {
-    let record = list_record(&name, &description, moderation, &now());
+    let mut record = list_record(&name, &description, moderation, &now());
+    let blob = Box::pin(avatar_blob(&session, &avatar)).await?;
+    apply_avatar(&mut record, &avatar, blob);
     create_record(&session, LIST, record).await
 }
 
-/// Renomme une liste (ou un starter pack) et change sa description, en gardant le reste de son
-/// enregistrement, s'il n'a pas changé entre-temps.
+/// Renomme une liste (ou un starter pack), change sa description et son image, en gardant le
+/// reste de son enregistrement, s'il n'a pas changé entre-temps.
 pub async fn update_list(
     session: Arc<Session>,
     uri: String,
     name: String,
     description: String,
+    avatar: ImageChange,
+) -> Result<(), ApiError> {
+    let blob = Box::pin(avatar_blob(&session, &avatar)).await?;
+    Box::pin(edit_record(session, uri, move |record| {
+        record["name"] = json!(name);
+        match description.is_empty() {
+            true => {
+                if let Some(map) = record.as_object_mut() {
+                    map.remove("description");
+                    map.remove("descriptionFacets");
+                }
+            }
+            false => record["description"] = json!(description),
+        }
+        apply_avatar(record, &avatar, blob);
+    }))
+    .await
+}
+
+/// Relit un enregistrement de mon dépôt, le modifie avec `edit` et le réécrit, s'il n'a pas
+/// changé entre-temps (`swapRecord`).
+async fn edit_record(
+    session: Arc<Session>,
+    uri: String,
+    edit: impl FnOnce(&mut Value) + Send,
 ) -> Result<(), ApiError> {
     use atrium_api::com::atproto::repo::{get_record, put_record};
-    // Liste ou starter pack : la collection vient de l'adresse.
+    // La collection vient de l'adresse.
     let (repo, collection, rkey) = api::parse_record_uri(&uri).ok_or_else(invalid_actor)?;
     let rkey = RecordKey::new(rkey.to_owned()).map_err(|_| invalid_actor())?;
     let api = session.api().await?;
@@ -117,16 +189,7 @@ pub async fn update_list(
         .await
         .map_err(request_failed)?;
     let mut record = serde_json::to_value(&current.data.value).unwrap_or_default();
-    record["name"] = json!(name);
-    match description.is_empty() {
-        true => {
-            if let Some(map) = record.as_object_mut() {
-                map.remove("description");
-                map.remove("descriptionFacets");
-            }
-        }
-        false => record["description"] = json!(description),
-    }
+    edit(&mut record);
     api.api
         .com
         .atproto
@@ -146,6 +209,38 @@ pub async fn update_list(
         .await
         .map_err(request_failed)?;
     Ok(())
+}
+
+/// Nombre maximal de flux dans un starter pack.
+pub const MAX_PACK_FEEDS: usize = 3;
+
+/// Place les flux `feeds` dans l'enregistrement d'un starter pack (aucun : retire le champ).
+pub fn set_feeds(record: &mut Value, feeds: &[String]) {
+    let Some(map) = record.as_object_mut() else {
+        return;
+    };
+    if feeds.is_empty() {
+        map.remove("feeds");
+    } else {
+        let items: Vec<Value> = feeds
+            .iter()
+            .take(MAX_PACK_FEEDS)
+            .map(|uri| json!({ "uri": uri }))
+            .collect();
+        map.insert("feeds".into(), Value::Array(items));
+    }
+}
+
+/// Remplace les flux d'un starter pack.
+pub async fn update_pack_feeds(
+    session: Arc<Session>,
+    uri: String,
+    feeds: Vec<String>,
+) -> Result<(), ApiError> {
+    Box::pin(edit_record(session, uri, move |record| {
+        set_feeds(record, &feeds)
+    }))
+    .await
 }
 
 const STARTER_PACK: &str = "app.bsky.graph.starterpack";
@@ -506,6 +601,111 @@ fn grapheme_count(text: &str) -> usize {
     crate::richtext::grapheme_count(text)
 }
 
+/// Ligne « Image » de la boîte d'une liste : l'image actuelle, « Choisir » et « Retirer ».
+/// `change` reçoit le choix.
+fn image_row(
+    list: Option<&List>,
+    dialog: &adw::Dialog,
+    change: Rc<RefCell<ImageChange>>,
+) -> (adw::ActionRow, adw::Avatar) {
+    let picture = adw::Avatar::new(48, list.map(|l| l.name.as_str()), true);
+    if let Some(url) = list.and_then(|l| l.avatar.as_deref()) {
+        let picture = picture.downgrade();
+        crate::images::load(url, move |texture| {
+            if let Some(picture) = picture.upgrade() {
+                picture.set_custom_image(Some(texture));
+            }
+        });
+    }
+    let row = adw::ActionRow::builder()
+        .title(gettext("Image"))
+        .subtitle(gettext("Facultative. PNG, JPEG ou WebP."))
+        .build();
+    row.add_prefix(&picture);
+    let choose = gtk::Button::builder()
+        .label(gettext("Choisir…"))
+        .valign(gtk::Align::Center)
+        .build();
+    let remove = gtk::Button::builder()
+        .icon_name("user-trash-symbolic")
+        .tooltip_text(gettext("Retirer l'image"))
+        .valign(gtk::Align::Center)
+        .css_classes(["flat"])
+        .visible(list.is_some_and(|l| l.avatar.is_some()))
+        .build();
+    remove.update_property(&[gtk::accessible::Property::Label(&gettext(
+        "Retirer l'image",
+    ))]);
+    row.add_suffix(&choose);
+    row.add_suffix(&remove);
+    {
+        let (picture, change) = (picture.clone(), change.clone());
+        remove.connect_clicked(move |remove| {
+            picture.set_custom_image(gdk::Paintable::NONE);
+            *change.borrow_mut() = ImageChange::Remove;
+            remove.set_visible(false);
+        });
+    }
+    let dialog = dialog.downgrade();
+    let (weak_row, weak_picture, weak_remove) =
+        (row.downgrade(), picture.downgrade(), remove.downgrade());
+    choose.connect_clicked(move |_| {
+        let filter = gtk::FileFilter::new();
+        filter.set_name(Some(&gettext("Images")));
+        for mime in ["image/png", "image/jpeg", "image/webp"] {
+            filter.add_mime_type(mime);
+        }
+        let filters = gio::ListStore::new::<gtk::FileFilter>();
+        filters.append(&filter);
+        let chooser = gtk::FileDialog::builder()
+            .title(gettext("Choisir une image"))
+            .modal(true)
+            .filters(&filters)
+            .default_filter(&filter)
+            .build();
+        let window = dialog
+            .upgrade()
+            .and_then(|d| d.root())
+            .and_downcast::<gtk::Window>();
+        let (row, picture, remove, change) = (
+            weak_row.clone(),
+            weak_picture.clone(),
+            weak_remove.clone(),
+            change.clone(),
+        );
+        chooser.open(window.as_ref(), gio::Cancellable::NONE, move |result| {
+            let Ok(file) = result else { return };
+            glib::spawn_future_local(async move {
+                let bytes = match file.load_bytes_future().await {
+                    Ok((bytes, _)) => bytes.to_vec(),
+                    Err(_) => Vec::new(),
+                };
+                let prepared = gio::spawn_blocking(move || photo::prepare(&bytes))
+                    .await
+                    .unwrap_or_else(|_| Err(String::new()));
+                let texture = prepared.as_ref().ok().and_then(|image| {
+                    gdk::Texture::from_bytes(&glib::Bytes::from(&image.bytes)).ok()
+                });
+                let (Some(row), Some(picture), Some(remove)) =
+                    (row.upgrade(), picture.upgrade(), remove.upgrade())
+                else {
+                    return;
+                };
+                match (prepared, texture) {
+                    (Ok(image), Some(texture)) => {
+                        picture.set_custom_image(Some(&texture));
+                        *change.borrow_mut() = ImageChange::Replace(image);
+                        remove.set_visible(true);
+                        row.set_subtitle(&gettext("Facultative. PNG, JPEG ou WebP."));
+                    }
+                    _ => row.set_subtitle(&gettext("Ce fichier n'est pas une image lisible.")),
+                }
+            });
+        });
+    });
+    (row, picture)
+}
+
 /// Boîte « Nouvelle liste » ou « Modifier la liste ». `done` reçoit la
 /// liste créée ou modifiée.
 pub fn edit_dialog(
@@ -554,7 +754,14 @@ pub fn edit_dialog(
         name.set_text(&list.name);
         description.set_text(&list.description);
     }
+    let avatar_change: Rc<RefCell<ImageChange>> = Rc::default();
+    let (image_row, picture) = image_row(list, &dialog, avatar_change.clone());
+    {
+        let picture = picture.clone();
+        name.connect_changed(move |row| picture.set_text(Some(&row.text())));
+    }
     let group = adw::PreferencesGroup::new();
+    group.add(&image_row);
     group.add(&name);
     group.add(&description);
     group.add(&moderation);
@@ -613,17 +820,31 @@ pub fn edit_dialog(
         };
         let new_name = name.text().trim().to_owned();
         let new_description = description.text().trim().to_owned();
+        let new_avatar = avatar_change.borrow().clone();
         save.set_sensitive(false);
         let task = match uri.clone() {
             Some(uri) => runtime().spawn(async move {
-                Box::pin(update_list(session, uri, new_name, new_description)).await
+                Box::pin(update_list(
+                    session,
+                    uri,
+                    new_name,
+                    new_description,
+                    new_avatar,
+                ))
+                .await
             }),
             None => {
                 let moderation = moderation.is_active();
                 runtime().spawn(async move {
-                    Box::pin(create_list(session, new_name, new_description, moderation))
-                        .await
-                        .map(|_| ())
+                    Box::pin(create_list(
+                        session,
+                        new_name,
+                        new_description,
+                        moderation,
+                        new_avatar,
+                    ))
+                    .await
+                    .map(|_| ())
                 })
             }
         };
@@ -1117,6 +1338,42 @@ pub fn memberships_dialog(parent: &impl IsA<gtk::Widget>, actor: &str, name: &st
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn starter_pack_feeds_are_set() {
+        let mut record = json!({"name": "Pack", "feeds": [{"uri": "a"}]});
+        let feeds: Vec<String> = ["b", "c", "d", "e"].map(String::from).to_vec();
+        set_feeds(&mut record, &feeds);
+        assert_eq!(
+            record["feeds"],
+            json!([{"uri": "b"}, {"uri": "c"}, {"uri": "d"}])
+        );
+        set_feeds(&mut record, &[]);
+        assert!(record.get("feeds").is_none());
+        assert_eq!(record["name"], "Pack");
+    }
+
+    #[test]
+    fn list_avatar_is_kept_replaced_or_removed() {
+        let mut record = json!({"name": "Amis", "avatar": {"ref": "ancien"}});
+        apply_avatar(&mut record, &ImageChange::Keep, None);
+        assert_eq!(record["avatar"]["ref"], "ancien");
+        let image = Prepared {
+            bytes: vec![1],
+            mime: "image/png",
+            width: 1,
+            height: 1,
+        };
+        apply_avatar(
+            &mut record,
+            &ImageChange::Replace(image),
+            Some(json!({"ref": "nouveau"})),
+        );
+        assert_eq!(record["avatar"]["ref"], "nouveau");
+        apply_avatar(&mut record, &ImageChange::Remove, None);
+        assert!(record.get("avatar").is_none());
+        assert_eq!(record["name"], "Amis");
+    }
 
     #[test]
     fn starter_pack_records_are_valid() {

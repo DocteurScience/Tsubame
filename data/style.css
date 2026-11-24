@@ -77,16 +77,19 @@ columnsview > .column headerbar {
   margin: 0 6px;
 }
 
-/* Glisser-déposer des colonnes dans la barre latérale. */
-.navigation-sidebar > row.dragged {
+/* Glisser-déposer des colonnes dans la barre latérale, et des flux enregistrés. */
+.navigation-sidebar > row.dragged,
+.saved-feeds > row.dragged {
   opacity: 0.4;
 }
 
-.navigation-sidebar > row.drop-before {
+.navigation-sidebar > row.drop-before,
+.saved-feeds > row.drop-before {
   box-shadow: inset 0 2px @accent_color;
 }
 
-.navigation-sidebar > row.drop-after {
+.navigation-sidebar > row.drop-after,
+.saved-feeds > row.drop-after {
   box-shadow: inset 0 -2px @accent_color;
 }
 
@@ -118,7 +121,8 @@ columnsview > .column headerbar {
 .compact .profile-count,
 .compact .avatar-button,
 .compact .compose-add-thread,
-.compact .known-followers {
+.compact .known-followers,
+.compact .group-faces {
   min-height: 44px;
 }
 
@@ -187,6 +191,12 @@ columnsview > .column headerbar {
   padding: 8px 12px;
   border-radius: 8px;
   background-color: alpha(currentColor, 0.08);
+}
+
+/* Avatars d'une notification regroupée. */
+.group-faces {
+  padding: 2px 4px;
+  margin-left: -4px;
 }
 
 /* GIF lu dans une carte : le bouton autour ne change pas l'image. */
@@ -310,8 +320,13 @@ columnsview > .column headerbar {
   font-weight: normal;
 }
 
-button.quote-card:hover {
+.quote-card:hover {
   background-color: alpha(currentColor, 0.05);
+}
+
+.quote-card:focus-visible {
+  outline: 2px solid alpha(@accent_color, 0.5);
+  outline-offset: -2px;
 }
 
 /* Bouton de lecture sur la vignette d'une vidéo. */
@@ -347,4 +362,12 @@ button.quote-card:hover {
 
 .link-card picture {
   border-radius: 8px 8px 0 0;
+}
+
+/* Tendance en forte hausse (Explorer). */
+.trend-hot {
+  padding: 2px 8px;
+  border-radius: 10px;
+  color: @accent_fg_color;
+  background-color: @accent_bg_color;
 }

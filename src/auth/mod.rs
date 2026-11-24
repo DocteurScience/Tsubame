@@ -369,15 +369,16 @@ pub fn session_for(account: Account) -> Arc<Session> {
     Session::new(account)
 }
 
-/// Accès à l'API de Bluesky avec la session OAuth d'un compte.
-pub type Api = Agent<
-    OAuthSession<
-        DefaultHttpClient,
-        CommonDidResolver<DefaultHttpClient>,
-        AtprotoHandleResolver<HickoryDnsTxtResolver, DefaultHttpClient>,
-        KeyringSessionStore,
-    >,
+/// Session OAuth d'un compte.
+pub type RawSession = OAuthSession<
+    DefaultHttpClient,
+    CommonDidResolver<DefaultHttpClient>,
+    AtprotoHandleResolver<HickoryDnsTxtResolver, DefaultHttpClient>,
+    KeyringSessionStore,
 >;
+
+/// Accès à l'API de Bluesky avec la session OAuth d'un compte.
+pub type Api = Agent<RawSession>;
 
 /// Compte connecté et accès à l'API.
 ///
@@ -403,6 +404,19 @@ impl Session {
             account,
             api: tokio::sync::OnceCell::new_with(Some(api)),
         })
+    }
+
+    /// Session OAuth seule, sans l'agent : pour une requête que l'agent ne sait pas faire
+    /// (envoyer un fichier avec son type, comme des sous-titres `text/vtt`).
+    pub async fn raw(&self) -> Result<RawSession, LoginError> {
+        let stored = keyring::stored_accounts()
+            .await?
+            .into_iter()
+            .find(|stored| stored.did == self.account.did)
+            .ok_or(LoginError::Expired)?;
+        let did = Did::new(stored.did.clone()).map_err(|_| LoginError::Expired)?;
+        let client = client(&stored.handle, &stored.redirect_uri)?;
+        Ok(client.restore(&did).await?)
     }
 
     pub async fn api(&self) -> Result<Arc<Api>, LoginError> {

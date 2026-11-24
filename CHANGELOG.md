@@ -14,19 +14,23 @@ Logiciels et Flathub).
 
 ### Compte
 
-- Plusieurs comptes : en ajouter un, passer de l'un à l'autre depuis le menu principal.
+- Plusieurs comptes : en ajouter un, passer de l'un à l'autre depuis le menu principal, qui indique les notifications non lues des autres comptes.
 - Préférences « Compte » : identifiant, lien vers la gestion du compte, export des données, changer d'identifiant, mots de passe d'application.
 
 ### Modération
 
 - Mots masqués pour une durée, ou dans les mots-clics seulement.
 - Signaler un message ; envoyer un signalement à un service d'étiquetage suivi.
-- Le texte d'un post étiqueté sans image se cache sous un avertissement.
+- Le texte d'un post étiqueté sans image se cache sous un avertissement ; un profil étiqueté aussi (bannière, avatar, bio).
 - Préférences : listes de modération suivies.
 - S'abonner à des services d'étiquetage tiers, ou s'en désabonner ; régler chacune de leurs étiquettes.
 
 ### Écrire
 
+- 22 langues proposées pour les posts.
+- Qui peut répondre : plusieurs groupes à la fois, et les membres de vos listes.
+- Vidéo : avancement de l'envoi et de la conversion, limites du compte vérifiées avant l'envoi.
+- Sous-titres d'une vidéo (fichiers WebVTT, un par langue).
 - Émojis, coller une image (Ctrl+V) ou la déposer sur la boîte de rédaction.
 - Étiquette de contenu sur les images (nudité, contenu sexuel, violence).
 - Images dans les posts suivants d'un fil.
@@ -34,15 +38,22 @@ Logiciels et Flathub).
 
 ### Lire
 
+- Mode démonstration : heures et dates dans la langue de l'interface.
+- Heure sur 12 heures en anglais.
+- « À propos du flux » : description, créateur, et aimer un flux.
+- Vidéos en plein écran.
+- Visionneuse : zoom (boutons, +, -, 0) et enregistrement de l'image.
+- Notifications regroupées : avatars et liste des personnes, groupes poursuivis d'une page à l'autre.
 - GIF reçus lus en boucle, sans son, d'un clic.
 - Langue proposée pour les posts, filtre des posts par langue, « Traduire » dans le menu d'un post.
 - Profils : « Suivi par … » (comptes que vous suivez), notifications d'activité d'un compte, onglets Vidéos, Flux, Listes et Starter packs.
 - Messages : actualisation automatique, messages plus anciens, nouvelle conversation, réactions, partage de posts (qui s'ouvrent d'un clic), couper les notifications d'une conversation ou la quitter, choisir qui peut vous écrire, bouton « Envoyer un message » sur les profils.
-- Listes : créer, modifier, supprimer, ajouter ou retirer des comptes ; masquer ou bloquer les comptes d'une liste de modération ; épingler une liste comme colonne.
-- Starter packs dans Explorer : voir leurs comptes et leurs flux, tout suivre ; créer, modifier et supprimer les siens.
+- Listes : créer, modifier (nom, description, image), supprimer, ajouter ou retirer des comptes ; masquer ou bloquer les comptes d'une liste de modération ; épingler une liste comme colonne.
+- Explorer : onglets Pour vous, Tendances (catégorie, nombre de posts, sujets en hausse), Flux, Starter packs et Personnes.
+- Starter packs dans Explorer : voir leurs comptes et leurs flux, tout suivre ; créer, modifier et supprimer les siens, y ajouter des comptes et jusqu'à trois flux.
 - Recherche de flux dans Explorer.
-- Liens, mentions et mots-dièse cliquables dans les posts ; page d'un mot-dièse.
-- Page « Flux » : épingler, réordonner, retirer ses flux ; découvrir et
+- Liens, mentions et mots-dièse cliquables dans les posts, y compris les posts cités ; page d'un mot-dièse.
+- Page « Flux » : épingler, réordonner (boutons ou glisser-déposer), retirer ses flux ; découvrir et
   rechercher des flux, les ouvrir, les ajouter.
 
 ### Intégration continue
