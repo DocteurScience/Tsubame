@@ -531,6 +531,7 @@ fn quote(post: &PostView, now: DateTime<Utc>) -> Option<Box<Post>> {
                 .and_then(serde_json::Value::as_str)
                 .unwrap_or_default()
                 .to_owned();
+            quoted.facets = crate::richtext::from_record(&value);
             quoted.replies = count(record.reply_count);
             quoted.reposts = count(record.repost_count);
             quoted.likes = count(record.like_count);

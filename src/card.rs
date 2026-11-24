@@ -1168,7 +1168,7 @@ fn quote_card(quoted: &Post) -> gtk::Widget {
     header.append(&detail);
     body.append(&header);
     if !quoted.text.is_empty() {
-        let text = label(&quoted.text, &[]);
+        let text = rich_text(&quoted.text, &quoted.facets, &[]);
         text.set_lines(6);
         text.set_ellipsize(gtk::pango::EllipsizeMode::End);
         body.append(&text);
@@ -1179,16 +1179,45 @@ fn quote_card(quoted: &Post) -> gtk::Widget {
     let key = crate::interactions::key(quoted);
     let entry =
         crate::interactions::find(&key).unwrap_or_else(|| crate::interactions::register(quoted));
-    let button = gtk::Button::builder()
-        .child(&body)
+    // Pas un GtkButton : il prendrait le clic avant les liens du texte.
+    // Une boîte qui se comporte en bouton (clic, Entrée, Espace).
+    let button = gtk::Box::builder()
+        .focusable(true)
+        .accessible_role(gtk::AccessibleRole::Button)
+        .cursor(&gtk::gdk::Cursor::from_name("pointer", None).expect("curseur"))
         .css_classes(["quote-card"])
-        .action_name("win.open-post")
-        .action_target(&entry.key.to_variant())
         .build();
+    button.append(&body);
     button.update_property(&[gtk::accessible::Property::Label(&fill(
         gettext("Post cité de {} : {}"),
         &[&quoted.name, &quoted.text],
     ))]);
+    let key = entry.key.clone();
+    let open = move |widget: &gtk::Widget| {
+        let _ = widget.activate_action("win.open-post", Some(&key.to_variant()));
+    };
+    let click = gtk::GestureClick::new();
+    {
+        let open = open.clone();
+        click.connect_released(move |gesture, _, _, _| {
+            if let Some(widget) = gesture.widget() {
+                open(&widget);
+            }
+        });
+    }
+    button.add_controller(click);
+    let keys = gtk::EventControllerKey::new();
+    keys.connect_key_pressed(move |controller, key, _, _| {
+        use gtk::gdk::Key;
+        if matches!(key, Key::Return | Key::KP_Enter | Key::space)
+            && let Some(widget) = controller.widget()
+        {
+            open(&widget);
+            return glib::Propagation::Stop;
+        }
+        glib::Propagation::Proceed
+    });
+    button.add_controller(keys);
     // La carte garde l'entrée en vie, pour que le clic la retrouve.
     button.connect_destroy(move |_| {
         let _ = &entry;
