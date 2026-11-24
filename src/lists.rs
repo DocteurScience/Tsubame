@@ -87,7 +87,7 @@ pub async fn create_list(
     create_record(&session, LIST, record).await
 }
 
-/// Renomme une liste et change sa description, en gardant le reste de son
+/// Renomme une liste (ou un starter pack) et change sa description, en gardant le reste de son
 /// enregistrement, s'il n'a pas changé entre-temps.
 pub async fn update_list(
     session: Arc<Session>,
@@ -96,7 +96,8 @@ pub async fn update_list(
     description: String,
 ) -> Result<(), ApiError> {
     use atrium_api::com::atproto::repo::{get_record, put_record};
-    let (repo, _, rkey) = api::parse_record_uri(&uri).ok_or_else(invalid_actor)?;
+    // Liste ou starter pack : la collection vient de l'adresse.
+    let (repo, collection, rkey) = api::parse_record_uri(&uri).ok_or_else(invalid_actor)?;
     let rkey = RecordKey::new(rkey.to_owned()).map_err(|_| invalid_actor())?;
     let api = session.api().await?;
     let current = api
@@ -107,7 +108,7 @@ pub async fn update_list(
         .get_record(
             get_record::ParametersData {
                 cid: None,
-                collection: Nsid::new(LIST.to_owned()).map_err(|_| invalid_actor())?,
+                collection: Nsid::new(collection.to_owned()).map_err(|_| invalid_actor())?,
                 repo: repo.parse().map_err(|_| invalid_actor())?,
                 rkey: rkey.clone(),
             }
@@ -132,7 +133,7 @@ pub async fn update_list(
         .repo
         .put_record(
             put_record::InputData {
-                collection: Nsid::new(LIST.to_owned()).map_err(|_| invalid_actor())?,
+                collection: Nsid::new(collection.to_owned()).map_err(|_| invalid_actor())?,
                 record: serde_json::from_value(record).map_err(|_| invalid_actor())?,
                 repo: repo.parse().map_err(|_| invalid_actor())?,
                 rkey,
@@ -145,6 +146,226 @@ pub async fn update_list(
         .await
         .map_err(request_failed)?;
     Ok(())
+}
+
+const STARTER_PACK: &str = "app.bsky.graph.starterpack";
+
+/// Enregistrement d'un starter pack, qui renvoie à sa liste de comptes.
+pub fn starter_pack_record(name: &str, description: &str, list: &str, created_at: &str) -> Value {
+    let mut record = json!({
+        "$type": STARTER_PACK,
+        "name": name,
+        "list": list,
+        "createdAt": created_at,
+    });
+    if !description.is_empty() {
+        record["description"] = json!(description);
+    }
+    record
+}
+
+/// Crée un starter pack : sa liste de comptes (« liste de référence », qui
+/// n'apparaît pas parmi les listes), puis l'enregistrement qui la cite.
+/// Rend l'adresse du starter pack.
+pub async fn create_starter_pack(
+    session: Arc<Session>,
+    name: String,
+    description: String,
+) -> Result<String, ApiError> {
+    let created_at = now();
+    let mut list = list_record(&name, "", false, &created_at);
+    list["purpose"] = json!("app.bsky.graph.defs#referencelist");
+    let list = create_record(&session, LIST, list).await?;
+    let record = starter_pack_record(&name, &description, &list, &created_at);
+    create_record(&session, STARTER_PACK, record).await
+}
+
+/// Supprime un starter pack et sa liste de comptes.
+pub async fn delete_starter_pack(
+    session: Arc<Session>,
+    uri: String,
+    list: Option<String>,
+) -> Result<(), ApiError> {
+    api::delete(session.clone(), uri).await?;
+    if let Some(list) = list {
+        api::delete(session, list).await?;
+    }
+    Ok(())
+}
+
+/// Boîte de recherche d'un compte ; `on_pick` reçoit celui choisi.
+pub fn pick_account(
+    parent: &impl IsA<gtk::Widget>,
+    title: &str,
+    session: Option<Arc<Session>>,
+    on_pick: impl Fn(Actor) + 'static,
+) {
+    let dialog = adw::Dialog::builder()
+        .title(title)
+        .content_width(420)
+        .content_height(480)
+        .build();
+    let entry = gtk::SearchEntry::builder()
+        .placeholder_text(gettext("Rechercher un compte"))
+        .search_delay(300)
+        .build();
+    entry.update_property(&[gtk::accessible::Property::Label(&gettext(
+        "Rechercher un compte",
+    ))]);
+    let results = gtk::ListBox::builder()
+        .selection_mode(gtk::SelectionMode::None)
+        .valign(gtk::Align::Start)
+        .visible(false)
+        .css_classes(["boxed-list"])
+        .build();
+    results.update_property(&[gtk::accessible::Property::Label(&gettext("Comptes"))]);
+    let content = gtk::Box::builder()
+        .orientation(gtk::Orientation::Vertical)
+        .spacing(12)
+        .margin_top(12)
+        .margin_bottom(12)
+        .margin_start(12)
+        .margin_end(12)
+        .build();
+    content.append(&entry);
+    content.append(&results);
+    let view = adw::ToolbarView::builder()
+        .content(
+            &gtk::ScrolledWindow::builder()
+                .hscrollbar_policy(gtk::PolicyType::Never)
+                .child(&content)
+                .build(),
+        )
+        .build();
+    view.add_top_bar(&adw::HeaderBar::new());
+    dialog.set_child(Some(&view));
+
+    let found: Rc<std::cell::RefCell<Vec<Actor>>> = Rc::default();
+    let show = {
+        let (results, found) = (results.clone(), found.clone());
+        Rc::new(move |actors: Vec<Actor>| {
+            results.remove_all();
+            for actor in &actors {
+                results.append(
+                    &adw::ActionRow::builder()
+                        .title(&actor.name)
+                        .subtitle(format!("@{}", actor.handle))
+                        .use_markup(false)
+                        .activatable(true)
+                        .build(),
+                );
+            }
+            results.set_visible(!actors.is_empty());
+            found.replace(actors);
+        })
+    };
+    entry.connect_search_changed(move |entry| {
+        let query = entry.text().trim().to_owned();
+        if query.is_empty() {
+            show(Vec::new());
+            return;
+        }
+        let Some(session) = session.clone() else {
+            let lower = query.to_lowercase();
+            show(
+                data::demo_actors()
+                    .into_iter()
+                    .filter(|a| a.name.to_lowercase().contains(&lower) || a.handle.contains(&lower))
+                    .collect(),
+            );
+            return;
+        };
+        let task = runtime().spawn(api::typeahead(session, query.clone()));
+        let (show, entry) = (show.clone(), entry.downgrade());
+        glib::spawn_future_local(async move {
+            let Ok(Ok(actors)) = task.await else { return };
+            if entry.upgrade().map(|e| e.text().trim() == query) == Some(true) {
+                show(actors);
+            }
+        });
+    });
+    let closing = dialog.downgrade();
+    results.connect_row_activated(move |_, row| {
+        let actor = found.borrow().get(row.index() as usize).cloned();
+        if let Some(actor) = actor {
+            if let Some(dialog) = closing.upgrade() {
+                dialog.close();
+            }
+            on_pick(actor);
+        }
+    });
+    dialog.present(Some(parent));
+    entry.grab_focus();
+}
+
+/// Boîte « Nouveau starter pack » ou « Modifier le starter pack » : nom
+/// et description. `save` reçoit les deux.
+pub fn starter_pack_dialog(
+    parent: &impl IsA<gtk::Widget>,
+    current: Option<(&str, &str)>,
+    save: impl Fn(String, String) + 'static,
+) {
+    let alert = adw::AlertDialog::new(
+        Some(&if current.is_some() {
+            gettext("Modifier le starter pack")
+        } else {
+            gettext("Nouveau starter pack")
+        }),
+        Some(&gettext(
+            "Une sélection de comptes à suivre d'un coup. Ajoutez-y des comptes ensuite.",
+        )),
+    );
+    let name = adw::EntryRow::builder().title(gettext("Nom")).build();
+    let description = adw::EntryRow::builder()
+        .title(gettext("Description"))
+        .build();
+    if let Some((n, d)) = current {
+        name.set_text(n);
+        description.set_text(d);
+    }
+    let rows = gtk::ListBox::builder()
+        .selection_mode(gtk::SelectionMode::None)
+        .css_classes(["boxed-list"])
+        .build();
+    rows.append(&name);
+    rows.append(&description);
+    alert.set_extra_child(Some(&rows));
+    alert.add_responses(&[
+        ("cancel", &gettext("Annuler")),
+        (
+            "save",
+            &if current.is_some() {
+                gettext("Enregistrer")
+            } else {
+                gettext("Créer")
+            },
+        ),
+    ]);
+    alert.set_response_appearance("save", adw::ResponseAppearance::Suggested);
+    alert.set_close_response("cancel");
+    let valid = |name: &adw::EntryRow| {
+        let n = grapheme_count(name.text().trim());
+        n > 0 && n <= MAX_NAME
+    };
+    alert.set_response_enabled("save", valid(&name));
+    {
+        let alert = alert.downgrade();
+        name.connect_changed(move |name| {
+            if let Some(alert) = alert.upgrade() {
+                alert.set_response_enabled("save", valid(name));
+            }
+        });
+    }
+    alert.connect_response(Some("save"), move |_, _| {
+        let description: String = description
+            .text()
+            .trim()
+            .chars()
+            .take(MAX_DESCRIPTION)
+            .collect();
+        save(name.text().trim().to_owned(), description);
+    });
+    alert.present(Some(parent));
 }
 
 /// Ajoute un compte à une liste ; rend l'adresse de l'élément.
@@ -896,6 +1117,19 @@ pub fn memberships_dialog(parent: &impl IsA<gtk::Widget>, actor: &str, name: &st
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn starter_pack_records_are_valid() {
+        let record = starter_pack_record(
+            "GNOME",
+            "",
+            "at://did:plc:a/app.bsky.graph.list/l",
+            "2026-11-23T10:00:00.000Z",
+        );
+        assert!(record.get("description").is_none());
+        let _: atrium_api::app::bsky::graph::starterpack::Record =
+            serde_json::from_value(record).unwrap();
+    }
 
     #[test]
     fn list_records_are_valid() {

@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use adw::prelude::*;
 use gettextrs::{gettext, ngettext};
-use gtk::glib;
+use gtk::{gio, glib};
 
 use crate::api::{self, ApiError, Source};
 use crate::auth::Session;
@@ -26,6 +26,8 @@ pub struct StarterPack {
     pub description: String,
     /// Nom de la personne qui l'a créé.
     pub creator: String,
+    /// Son DID.
+    pub creator_did: String,
     /// Nombre de comptes, s'il est connu.
     pub members: Option<usize>,
     /// Liste des comptes (`app.bsky.graph.list`).
@@ -57,6 +59,7 @@ fn from_view(view: &atrium_api::app::bsky::graph::defs::StarterPackView) -> Star
         name: record_field(&record, "name"),
         description: record_field(&record, "description"),
         creator: creator_name(&view.creator),
+        creator_did: view.creator.did.as_str().to_owned(),
         members: view.list.as_ref().and_then(|l| l.list_item_count),
         list: view.list.as_ref().map(|l| l.uri.clone()),
         feeds: view.feeds.iter().flatten().map(info_from_view).collect(),
@@ -70,6 +73,7 @@ fn from_basic(view: &atrium_api::app::bsky::graph::defs::StarterPackViewBasic) -
         name: record_field(&record, "name"),
         description: record_field(&record, "description"),
         creator: creator_name(&view.creator),
+        creator_did: view.creator.did.as_str().to_owned(),
         members: view.list_item_count,
         list: None,
         feeds: Vec::new(),
@@ -137,11 +141,15 @@ pub async fn by_actor(session: Arc<Session>, actor: String) -> Result<Vec<Starte
     Ok(output.data.starter_packs.iter().map(from_basic).collect())
 }
 
+/// Compte d'un starter pack, avec l'élément qui l'y place (pour le
+/// retirer).
+pub type Member = (Actor, Option<String>);
+
 /// Un starter pack et ses comptes (`getStarterPack`, puis `getList`).
 pub async fn load(
     session: Arc<Session>,
     uri: String,
-) -> Result<(StarterPack, Vec<Actor>), ApiError> {
+) -> Result<(StarterPack, Vec<Member>), ApiError> {
     let api = session.api().await?;
     let output = api
         .api
@@ -156,7 +164,11 @@ pub async fn load(
         .map_err(api::request_failed)?;
     let pack = from_view(&output.data.starter_pack);
     let members = match &pack.list {
-        Some(list) => api::list_members(session.clone(), list.clone()).await?,
+        Some(list) => crate::lists::items(session.clone(), list.clone())
+            .await?
+            .into_iter()
+            .map(|(actor, item)| (actor, Some(item)))
+            .collect(),
         None => Vec::new(),
     };
     Ok((pack, members))
@@ -189,6 +201,7 @@ pub fn demo_packs() -> Vec<StarterPack> {
             description: "Contributrices et contributeurs de GNOME qui publient en français."
                 .into(),
             creator: "Lucie Morel".into(),
+            creator_did: String::new(),
             members: Some(24),
             list: None,
             feeds: crate::feeds::demo_feeds().into_iter().take(1).collect(),
@@ -198,6 +211,7 @@ pub fn demo_packs() -> Vec<StarterPack> {
             name: "Photographes de nature".into(),
             description: "Montagne, forêts et lumière du matin.".into(),
             creator: "Aya Koné".into(),
+            creator_did: String::new(),
             members: Some(40),
             list: None,
             feeds: Vec::new(),
@@ -256,7 +270,12 @@ pub struct StarterPackPage {
     feeds_title: gtk::Label,
     feeds: gtk::ListBox,
     people: gtk::ListBox,
-    members: RefCell<Vec<Actor>>,
+    members: RefCell<Vec<Member>>,
+    /// Le starter pack chargé (sa liste, son auteur).
+    pack: RefCell<StarterPack>,
+    /// Menu de l'auteur : ajouter des comptes, modifier, supprimer.
+    menu: gtk::MenuButton,
+    weak: RefCell<std::rc::Weak<Self>>,
 }
 
 fn heading(text: &str) -> gtk::Label {
@@ -314,6 +333,23 @@ impl StarterPackPage {
                     .build(),
             )
             .build();
+        let menu_model = gio::Menu::new();
+        menu_model.append(Some(&gettext("Ajouter un compte…")), Some("pack.add"));
+        menu_model.append(Some(&gettext("Modifier…")), Some("pack.edit"));
+        menu_model.append(
+            Some(&gettext("Supprimer le starter pack…")),
+            Some("pack.delete"),
+        );
+        let menu = gtk::MenuButton::builder()
+            .icon_name("view-more-symbolic")
+            .tooltip_text(gettext("Options du starter pack"))
+            .menu_model(&menu_model)
+            .visible(false)
+            .build();
+        menu.update_property(&[gtk::accessible::Property::Label(&gettext(
+            "Options du starter pack",
+        ))]);
+        header.pack_end(&menu);
         let root = adw::ToolbarView::builder().content(&scroll).build();
         root.add_top_bar(&header);
         let page = Rc::new(Self {
@@ -327,7 +363,27 @@ impl StarterPackPage {
             feeds,
             people,
             members: RefCell::default(),
+            pack: RefCell::new(pack.clone()),
+            menu,
+            weak: RefCell::default(),
         });
+        page.weak.replace(Rc::downgrade(&page));
+        let actions = gio::SimpleActionGroup::new();
+        for (name, handler) in [
+            ("add", Self::add_member as fn(&Rc<Self>)),
+            ("edit", Self::edit),
+            ("delete", Self::confirm_delete),
+        ] {
+            let action = gio::SimpleAction::new(name, None);
+            let weak = Rc::downgrade(&page);
+            action.connect_activate(move |_, _| {
+                if let Some(page) = weak.upgrade() {
+                    handler(&page);
+                }
+            });
+            actions.add_action(&action);
+        }
+        page.root.insert_action_group("pack", Some(&actions));
         page.show(pack, None);
         let weak = Rc::downgrade(&page);
         page.follow_all.connect_clicked(move |_| {
@@ -368,7 +424,15 @@ impl StarterPackPage {
         page
     }
 
-    fn show(&self, pack: &StarterPack, members: Option<Vec<Actor>>) {
+    /// Mon starter pack : je peux le modifier.
+    fn mine(&self) -> bool {
+        let pack = self.pack.borrow();
+        !pack.creator_did.is_empty() && self.host.me.as_deref() == Some(pack.creator_did.as_str())
+    }
+
+    fn show(&self, pack: &StarterPack, members: Option<Vec<Member>>) {
+        self.pack.replace(pack.clone());
+        self.menu.set_visible(self.mine());
         self.title.set_title(&pack.name);
         self.description.set_label(&pack.description);
         self.description.set_visible(!pack.description.is_empty());
@@ -393,7 +457,10 @@ impl StarterPackPage {
                 .into_iter()
                 .find(|p| p.uri == self.uri)
                 .unwrap_or_default();
-            self.show(&pack, Some(data::demo_actors()));
+            self.show(
+                &pack,
+                Some(data::demo_actors().into_iter().map(|a| (a, None)).collect()),
+            );
             return;
         };
         let task = runtime().spawn(load(session, self.uri.clone()));
@@ -422,7 +489,12 @@ impl StarterPackPage {
             return;
         };
         self.follow_all.set_sensitive(false);
-        let members = self.members.borrow().clone();
+        let members = self
+            .members
+            .borrow()
+            .iter()
+            .map(|(a, _)| a.clone())
+            .collect();
         let task = runtime().spawn(follow_all(session, members));
         let weak = Rc::downgrade(self);
         glib::spawn_future_local(async move {
@@ -446,7 +518,7 @@ impl StarterPackPage {
             page.host.toasts.add_toast(adw::Toast::new(&message));
             // Les rangées affichent le nouvel état.
             let mut members = page.members.borrow().clone();
-            for actor in &mut members {
+            for (actor, _) in &mut members {
                 if let Some((_, record)) = done.iter().find(|(did, _)| *did == actor.did) {
                     actor.following = Some(record.clone());
                 }
@@ -455,23 +527,186 @@ impl StarterPackPage {
         });
     }
 
-    /// Les comptes, et « Tout suivre » s'il en reste à suivre.
-    fn show_members(&self, members: Vec<Actor>) {
+    /// Les comptes, et « Tout suivre » s'il en reste à suivre. Sur mon
+    /// starter pack, chaque compte a « Retirer du starter pack ».
+    fn show_members(&self, members: Vec<Member>) {
         while let Some(row) = self.people.first_child() {
             self.people.remove(&row);
         }
-        for actor in &members {
-            self.people.append(&actor_row(
-                actor,
-                self.host.session.clone(),
-                &self.host.toasts,
-            ));
+        let mine = self.mine();
+        for (actor, item) in &members {
+            let row = actor_row(actor, self.host.session.clone(), &self.host.toasts);
+            if let (true, Some(item), Some(session)) = (mine, item, self.host.session.clone()) {
+                let remove = gtk::Button::builder()
+                    .icon_name("list-remove-symbolic")
+                    .tooltip_text(gettext("Retirer du starter pack"))
+                    .valign(gtk::Align::Center)
+                    .css_classes(["flat"])
+                    .build();
+                remove.update_property(&[gtk::accessible::Property::Label(
+                    &gettext("Retirer {} du starter pack").replace("{}", &actor.name),
+                )]);
+                let (item, weak) = (item.clone(), self.this());
+                remove.connect_clicked(move |_| {
+                    let task = runtime().spawn(api::delete(session.clone(), item.clone()));
+                    let weak = weak.clone();
+                    glib::spawn_future_local(async move {
+                        let result = task.await.unwrap_or_else(|_| {
+                            Err(ApiError::new(gettext("Requête interrompue.")))
+                        });
+                        let Some(page) = weak.upgrade() else { return };
+                        match result {
+                            Ok(()) => page.load(),
+                            Err(error) => {
+                                page.host.toasts.add_toast(adw::Toast::new(&error.message))
+                            }
+                        }
+                    });
+                });
+                row.add_suffix(&remove);
+            }
+            self.people.append(&row);
         }
         self.follow_all.set_sensitive(
             members
                 .iter()
-                .any(|a| a.following.is_none() && Some(&a.did) != self.host.me.as_ref()),
+                .any(|(a, _)| a.following.is_none() && Some(&a.did) != self.host.me.as_ref()),
         );
         self.members.replace(members);
+    }
+
+    /// Référence faible à la page, pour les rappels des rangées.
+    fn this(&self) -> std::rc::Weak<Self> {
+        self.weak.borrow().clone()
+    }
+
+    fn add_member(self: &Rc<Self>) {
+        let Some(list) = self.pack.borrow().list.clone() else {
+            return;
+        };
+        let (session, weak) = (self.host.session.clone(), Rc::downgrade(self));
+        crate::lists::pick_account(
+            &self.root,
+            &gettext("Ajouter un compte"),
+            session.clone(),
+            move |actor| {
+                let (Some(session), Some(page)) = (session.clone(), weak.upgrade()) else {
+                    return;
+                };
+                let task = runtime().spawn(crate::lists::add_member(
+                    session,
+                    list.clone(),
+                    actor.did.clone(),
+                ));
+                let weak = Rc::downgrade(&page);
+                glib::spawn_future_local(async move {
+                    let result = task
+                        .await
+                        .unwrap_or_else(|_| Err(ApiError::new(gettext("Requête interrompue."))));
+                    let Some(page) = weak.upgrade() else { return };
+                    match result {
+                        Ok(_) => {
+                            page.host.toasts.add_toast(adw::Toast::new(
+                                &gettext("@{} ajouté au starter pack.")
+                                    .replace("{}", &actor.handle),
+                            ));
+                            page.load();
+                        }
+                        Err(error) => page.host.toasts.add_toast(adw::Toast::new(&error.message)),
+                    }
+                });
+            },
+        );
+    }
+
+    fn edit(self: &Rc<Self>) {
+        let pack = self.pack.borrow().clone();
+        let weak = Rc::downgrade(self);
+        crate::lists::starter_pack_dialog(
+            &self.root,
+            Some((&pack.name, &pack.description)),
+            move |name, description| {
+                let Some(page) = weak.upgrade() else { return };
+                let Some(session) = page.host.session.clone() else {
+                    return;
+                };
+                let (uri, list) = (pack.uri.clone(), pack.list.clone());
+                let task = runtime().spawn(async move {
+                    Box::pin(crate::lists::update_list(
+                        session.clone(),
+                        uri,
+                        name.clone(),
+                        description,
+                    ))
+                    .await?;
+                    // La liste porte le même nom.
+                    if let Some(list) = list {
+                        Box::pin(crate::lists::update_list(
+                            session,
+                            list,
+                            name,
+                            String::new(),
+                        ))
+                        .await?;
+                    }
+                    Ok::<_, ApiError>(())
+                });
+                let weak = Rc::downgrade(&page);
+                glib::spawn_future_local(async move {
+                    let result = task
+                        .await
+                        .unwrap_or_else(|_| Err(ApiError::new(gettext("Requête interrompue."))));
+                    let Some(page) = weak.upgrade() else { return };
+                    match result {
+                        Ok(()) => page.load(),
+                        Err(error) => page.host.toasts.add_toast(adw::Toast::new(&error.message)),
+                    }
+                });
+            },
+        );
+    }
+
+    fn confirm_delete(self: &Rc<Self>) {
+        let confirm = adw::AlertDialog::new(
+            Some(&gettext("Supprimer ce starter pack ?")),
+            Some(&gettext(
+                "Il disparaîtra pour tout le monde. Ses comptes ne sont pas prévenus.",
+            )),
+        );
+        confirm.add_responses(&[
+            ("cancel", &gettext("Annuler")),
+            ("delete", &gettext("Supprimer")),
+        ]);
+        confirm.set_response_appearance("delete", adw::ResponseAppearance::Destructive);
+        confirm.set_default_response(Some("cancel"));
+        confirm.set_close_response("cancel");
+        let weak = Rc::downgrade(self);
+        confirm.connect_response(Some("delete"), move |_, _| {
+            let Some(page) = weak.upgrade() else { return };
+            let Some(session) = page.host.session.clone() else {
+                return;
+            };
+            let pack = page.pack.borrow().clone();
+            let task = runtime().spawn(crate::lists::delete_starter_pack(
+                session, pack.uri, pack.list,
+            ));
+            let weak = Rc::downgrade(&page);
+            glib::spawn_future_local(async move {
+                let result = task
+                    .await
+                    .unwrap_or_else(|_| Err(ApiError::new(gettext("Requête interrompue."))));
+                let Some(page) = weak.upgrade() else { return };
+                match result {
+                    Ok(()) => {
+                        page.host
+                            .toasts
+                            .add_toast(adw::Toast::new(&gettext("Starter pack supprimé.")));
+                        let _ = page.root.activate_action("navigation.pop", None);
+                    }
+                    Err(error) => page.host.toasts.add_toast(adw::Toast::new(&error.message)),
+                }
+            });
+        });
+        confirm.present(Some(&self.root));
     }
 }

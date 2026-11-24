@@ -1350,32 +1350,6 @@ pub async fn lists(session: Arc<Session>, actor: String) -> Result<Vec<List>, Ap
     Ok(output.data.lists.iter().map(list_from_view).collect())
 }
 
-/// Membres d'une liste.
-pub async fn list_members(session: Arc<Session>, uri: String) -> Result<Vec<Actor>, ApiError> {
-    let api = session.api().await?;
-    let output = api
-        .api
-        .app
-        .bsky
-        .graph
-        .get_list(
-            atrium_api::app::bsky::graph::get_list::ParametersData {
-                cursor: None,
-                limit: 100.try_into().ok(),
-                list: uri,
-            }
-            .into(),
-        )
-        .await
-        .map_err(request_failed)?;
-    Ok(output
-        .data
-        .items
-        .iter()
-        .map(|item| actor_from_view(&item.subject))
-        .collect())
-}
-
 /// Liste de comptes : abonnés ou abonnements d'un compte (DID ou
 /// identifiant), comptes qui ont aimé ou reposté un post (adresse).
 #[derive(Debug, Clone, PartialEq, Eq)]

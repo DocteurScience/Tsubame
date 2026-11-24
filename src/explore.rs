@@ -249,6 +249,13 @@ impl ExplorePage {
         discover.append(&suggested);
         discover.append(&heading(&gettext("Starter packs")));
         discover.append(&packs);
+        let create_pack = gtk::Button::builder()
+            .label(gettext("Créer un starter pack…"))
+            .halign(gtk::Align::Start)
+            .visible(host.session.is_some())
+            .css_classes(["pill"])
+            .build();
+        discover.append(&create_pack);
         let discover_scroll = gtk::ScrolledWindow::builder()
             .hscrollbar_policy(gtk::PolicyType::Never)
             .child(
@@ -443,6 +450,12 @@ impl ExplorePage {
                 page.search(&query);
             }
         });
+        let weak = Rc::downgrade(&page);
+        create_pack.connect_clicked(move |button| {
+            if let Some(page) = weak.upgrade() {
+                page.create_pack(button);
+            }
+        });
         for list in [&page.packs, &page.pack_results] {
             let weak = Rc::downgrade(&page);
             list.connect_row_activated(move |_, row| {
@@ -509,6 +522,43 @@ impl ExplorePage {
                 return;
             }
             page.show_feeds(result);
+        });
+    }
+
+    /// Nouveau starter pack : nom et description, puis sa page, pour y
+    /// ajouter des comptes.
+    fn create_pack(self: &Rc<Self>, button: &gtk::Button) {
+        let weak = Rc::downgrade(self);
+        crate::lists::starter_pack_dialog(button, None, move |name, description| {
+            let Some(page) = weak.upgrade() else { return };
+            let Some(session) = page.host.session.clone() else {
+                return;
+            };
+            let task = runtime().spawn(Box::pin(crate::lists::create_starter_pack(
+                session,
+                name.clone(),
+                description.clone(),
+            )));
+            let weak = Rc::downgrade(&page);
+            glib::spawn_future_local(async move {
+                let result = task
+                    .await
+                    .unwrap_or_else(|_| Err(ApiError::new(gettext("Requête interrompue."))));
+                let Some(page) = weak.upgrade() else { return };
+                match result {
+                    Ok(uri) => {
+                        let pack = StarterPack {
+                            uri,
+                            name,
+                            description,
+                            ..StarterPack::default()
+                        };
+                        let pack_page = StarterPackPage::new(&pack, page.host.clone());
+                        (page.host.push)(pack_page.navigation_page());
+                    }
+                    Err(error) => page.host.toasts.add_toast(adw::Toast::new(&error.message)),
+                }
+            });
         });
     }
 
