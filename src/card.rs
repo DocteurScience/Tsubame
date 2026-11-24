@@ -358,8 +358,105 @@ fn add_play_button(overlay: &gtk::Overlay, playlist: &str, description: &str, he
         }
         overlay.set_child(Some(&video));
         play.set_visible(false);
+        // Plein écran : la même vidéo, reprise au même moment.
+        let full = gtk::Button::builder()
+            .icon_name("view-fullscreen-symbolic")
+            .tooltip_text(gettext("Plein écran"))
+            .halign(gtk::Align::End)
+            .valign(gtk::Align::Start)
+            .margin_top(6)
+            .margin_end(6)
+            .css_classes(["circular", "osd"])
+            .build();
+        full.update_property(&[gtk::accessible::Property::Label(&gettext("Plein écran"))]);
+        let (playlist, description, small) =
+            (playlist.clone(), description.clone(), video.downgrade());
+        full.connect_clicked(move |button| {
+            let start = small
+                .upgrade()
+                .and_then(|v| v.media_stream())
+                .map(|stream| {
+                    stream.pause();
+                    stream.timestamp()
+                });
+            fullscreen_video(button, &playlist, &description, start.unwrap_or(0));
+        });
+        overlay.add_overlay(&full);
         video.grab_focus();
     });
+}
+
+/// Fenêtre plein écran pour une vidéo, à partir de `start` (µs) ; Échap ou
+/// « Quitter le plein écran » la ferme.
+fn fullscreen_video(parent: &impl IsA<gtk::Widget>, playlist: &str, description: &str, start: i64) {
+    let video = gtk::Video::builder().autoplay(true).build();
+    video.update_property(&[gtk::accessible::Property::Label(description)]);
+    video.set_file(Some(&gio::File::for_uri(playlist)));
+    if let Some(stream) = video.media_stream()
+        && start > 0
+    {
+        // La position n'est réglable qu'une fois le flux prêt.
+        let handler: Rc<std::cell::RefCell<Option<glib::SignalHandlerId>>> = Rc::default();
+        let id = {
+            let handler = handler.clone();
+            stream.connect_prepared_notify(move |stream| {
+                if stream.is_prepared() {
+                    stream.seek(start);
+                    if let Some(id) = handler.take() {
+                        stream.disconnect(id);
+                    }
+                }
+            })
+        };
+        handler.replace(Some(id));
+    }
+    let leave = gtk::Button::builder()
+        .icon_name("view-restore-symbolic")
+        .tooltip_text(gettext("Quitter le plein écran"))
+        .halign(gtk::Align::End)
+        .valign(gtk::Align::Start)
+        .margin_top(12)
+        .margin_end(12)
+        .css_classes(["circular", "osd"])
+        .build();
+    leave.update_property(&[gtk::accessible::Property::Label(&gettext(
+        "Quitter le plein écran",
+    ))]);
+    let stage = gtk::Overlay::builder().child(&video).build();
+    stage.add_overlay(&leave);
+    let window = gtk::Window::builder()
+        .title(gettext("Vidéo"))
+        .modal(true)
+        .child(&stage)
+        .build();
+    if let Some(root) = parent.root().and_downcast::<gtk::Window>() {
+        window.set_transient_for(Some(&root));
+    }
+    {
+        let window = window.downgrade();
+        leave.connect_clicked(move |_| {
+            if let Some(window) = window.upgrade() {
+                window.close();
+            }
+        });
+    }
+    let keys = gtk::EventControllerKey::new();
+    {
+        let window = window.downgrade();
+        keys.connect_key_pressed(move |_, key, _, _| {
+            if key == gtk::gdk::Key::Escape
+                && let Some(window) = window.upgrade()
+            {
+                window.close();
+                return glib::Propagation::Stop;
+            }
+            glib::Propagation::Proceed
+        });
+    }
+    window.add_controller(keys);
+    window.fullscreen();
+    window.present();
+    video.grab_focus();
 }
 
 /// GIF (vidéo `presentation: gif`) : « Lire le GIF » ; un clic le lit en

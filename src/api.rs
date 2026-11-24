@@ -1782,7 +1782,13 @@ pub struct NewVideo {
     pub presentation: Option<&'static str>,
     /// Blob de la vidéo, une fois traitée par le service vidéo.
     pub blob: Option<serde_json::Value>,
+    /// Avancement, lu par l'interface : `VIDEO_SENDING` pendant l'envoi,
+    /// puis le pourcentage de la conversion (0 à 100).
+    pub progress: Option<std::sync::Arc<std::sync::atomic::AtomicU8>>,
 }
+
+/// Valeur de `NewVideo::progress` pendant l'envoi du fichier.
+pub const VIDEO_SENDING: u8 = u8::MAX;
 
 /// Service qui reçoit et convertit les vidéos de Bluesky.
 const VIDEO_SERVICE: &str = "https://video.bsky.app";
@@ -2099,6 +2105,17 @@ async fn upload_video(
         .data
         .token;
     let client = reqwest::Client::new();
+    let report = |value: u8| {
+        if let Some(progress) = &video.progress {
+            progress.store(value, std::sync::atomic::Ordering::Relaxed);
+        }
+    };
+    // Limites du compte (nombre et taille des vidéos du jour) : vérifiées
+    // avant d'envoyer, quand le service répond.
+    if let Some(refusal) = upload_refusal(api, &client).await {
+        return Err(ApiError::new(refusal));
+    }
+    report(VIDEO_SENDING);
     let name = format!("{}.mp4", chrono::Utc::now().timestamp_millis());
     let response = client
         .post(format!(
@@ -2121,6 +2138,11 @@ async fn upload_video(
     for _ in 0..300 {
         if let Some(blob) = job.get("blob") {
             return Ok(blob.clone());
+        }
+        if let Some(percent) = job.get("progress").and_then(serde_json::Value::as_u64) {
+            report(percent.min(100) as u8);
+        } else {
+            report(0);
         }
         match job["state"].as_str() {
             Some("JOB_STATE_FAILED") => {
@@ -2149,6 +2171,57 @@ async fn upload_video(
     Err(ApiError::new(gettext(
         "La conversion de la vidéo prend trop de temps.",
     )))
+}
+
+/// Raison du refus d'envoyer une vidéo maintenant (`getUploadLimits`), ou
+/// `None` si l'envoi est permis ou si le service ne répond pas.
+async fn upload_refusal(api: &crate::auth::Api, client: &reqwest::Client) -> Option<String> {
+    use atrium_api::com::atproto::server::get_service_auth;
+    use atrium_api::types::string::Nsid;
+    let token = api
+        .api
+        .com
+        .atproto
+        .server
+        .get_service_auth(
+            get_service_auth::ParametersData {
+                aud: "did:web:video.bsky.app".to_owned(),
+                exp: Some(chrono::Utc::now().timestamp() + 5 * 60),
+                lxm: Nsid::new("app.bsky.video.getUploadLimits".to_owned()).ok(),
+            }
+            .into(),
+        )
+        .await
+        .ok()?
+        .data
+        .token;
+    let body = client
+        .get(format!(
+            "{VIDEO_SERVICE}/xrpc/app.bsky.video.getUploadLimits"
+        ))
+        .bearer_auth(token)
+        .send()
+        .await
+        .ok()?
+        .bytes()
+        .await
+        .ok()?;
+    upload_limits_refusal(&serde_json::from_slice(&body).ok()?)
+}
+
+/// D'après la réponse de `getUploadLimits` : le message à montrer si l'envoi
+/// n'est pas permis.
+pub fn upload_limits_refusal(limits: &serde_json::Value) -> Option<String> {
+    if limits.get("canUpload").and_then(serde_json::Value::as_bool) != Some(false) {
+        return None;
+    }
+    Some(
+        limits
+            .get("message")
+            .and_then(serde_json::Value::as_str)
+            .map(str::to_owned)
+            .unwrap_or_else(|| gettext("Vous ne pouvez plus envoyer de vidéo aujourd'hui.")),
+    )
 }
 
 /// L'état d'une tâche du service vidéo, sous `jobStatus` ou à la racine.
@@ -2738,6 +2811,22 @@ mod tests {
         assert_eq!(record["embed"]["aspectRatio"]["width"], 1920);
         assert_eq!(record["embed"]["presentation"], "gif");
         let _: atrium_api::app::bsky::feed::post::Record = serde_json::from_value(record).unwrap();
+    }
+
+    #[test]
+    fn upload_limits_explain_refusals() {
+        assert_eq!(
+            upload_limits_refusal(&serde_json::json!({"canUpload": true})),
+            None
+        );
+        assert_eq!(upload_limits_refusal(&serde_json::json!({})), None);
+        assert_eq!(
+            upload_limits_refusal(
+                &serde_json::json!({"canUpload": false, "message": "Limite atteinte"})
+            )
+            .as_deref(),
+            Some("Limite atteinte")
+        );
     }
 
     #[test]

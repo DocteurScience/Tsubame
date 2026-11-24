@@ -27,6 +27,7 @@ Logiciels et Flathub).
 
 ### Écrire
 
+- Vidéo : avancement de l'envoi et de la conversion, limites du compte vérifiées avant l'envoi.
 - Émojis, coller une image (Ctrl+V) ou la déposer sur la boîte de rédaction.
 - Étiquette de contenu sur les images (nudité, contenu sexuel, violence).
 - Images dans les posts suivants d'un fil.
@@ -34,6 +35,7 @@ Logiciels et Flathub).
 
 ### Lire
 
+- Vidéos en plein écran.
 - Visionneuse : zoom (boutons, +, -, 0) et enregistrement de l'image.
 - Notifications regroupées : avatars et liste des personnes, groupes poursuivis d'une page à l'autre.
 - GIF reçus lus en boucle, sans son, d'un clic.

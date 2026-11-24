@@ -1228,6 +1228,22 @@ pub fn present(
             busy.set(true);
             publish.set_sensitive(false);
             publish.set_label(&gettext("Publication…"));
+            // Vidéo : l'avancement de l'envoi puis de la conversion
+            // s'affiche dans le bouton, tant que la publication dure.
+            if let Some(progress) = video.as_ref().and_then(|v| v.progress.clone()) {
+                let (publish, busy) = (publish.downgrade(), busy.clone());
+                glib::timeout_add_local(std::time::Duration::from_millis(500), move || {
+                    let Some(publish) = publish.upgrade() else {
+                        return glib::ControlFlow::Break;
+                    };
+                    if !busy.get() {
+                        return glib::ControlFlow::Break;
+                    }
+                    let value = progress.load(std::sync::atomic::Ordering::Relaxed);
+                    publish.set_label(&video_progress_label(value));
+                    glib::ControlFlow::Continue
+                });
+            }
             text.set_editable(false);
             error.set_visible(false);
             let post = NewPost {
@@ -1482,8 +1498,18 @@ fn video_of(attachments: &Rc<RefCell<Vec<Rc<Attachment>>>>) -> Option<api::NewVi
             // Un GIF se montre en boucle, sans commandes.
             presentation: (mime == "image/gif").then_some("gif"),
             blob: None,
+            progress: Some(Default::default()),
         })
     })
+}
+
+/// Texte du bouton pendant la publication d'une vidéo.
+fn video_progress_label(value: u8) -> String {
+    match value {
+        api::VIDEO_SENDING => gettext("Envoi de la vidéo…"),
+        0 => gettext("Publication…"),
+        percent => gettext("Conversion de la vidéo : {} %").replace("{}", &percent.to_string()),
+    }
 }
 
 fn has_video(attachments: &Rc<RefCell<Vec<Rc<Attachment>>>>) -> bool {

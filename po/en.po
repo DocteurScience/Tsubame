@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: tsubame\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-24 11:09+0000\n"
+"POT-Creation-Date: 2026-11-24 11:12+0000\n"
 "PO-Revision-Date: 2026-11-22\n"
 "Last-Translator: \n"
 "Language-Team: English\n"
@@ -119,7 +119,7 @@ msgid "Nouvel identifiant"
 msgstr "New handle"
 
 #. En-tête : Annuler, titre, Publier.
-#: src/account.rs:158 src/compose.rs:263 src/compose.rs:1811
+#: src/account.rs:158 src/compose.rs:263 src/compose.rs:1837
 #: src/edit_profile.rs:234 src/lists.rs:334 src/lists.rs:526 src/lists.rs:848
 #: src/login.rs:160 src/messages.rs:910 src/profile.rs:1280 src/report.rs:185
 #: src/starter_packs.rs:677 src/window.rs:640 src/window.rs:1278
@@ -351,103 +351,107 @@ msgstr "Mentioned accounts"
 msgid "Personne"
 msgstr "No one"
 
-#: src/api.rs:1958 src/edit_profile.rs:198
+#: src/api.rs:1964 src/edit_profile.rs:198
 msgid "Une image n'a pas pu être envoyée : {}"
 msgstr "An image could not be uploaded: {}"
 
-#: src/api.rs:2072
+#: src/api.rs:2078
 msgid "La vidéo n'a pas pu être envoyée."
 msgstr "The video could not be uploaded."
 
-#: src/api.rs:2130
+#: src/api.rs:2152
 msgid "La vidéo a été refusée : {}"
 msgstr "The video was rejected: {}"
 
-#: src/api.rs:2131
+#: src/api.rs:2153
 msgid "La vidéo n'a pas pu être convertie."
 msgstr "The video could not be processed."
 
-#: src/api.rs:2150
+#: src/api.rs:2172
 msgid "La conversion de la vidéo prend trop de temps."
 msgstr "Processing the video is taking too long."
 
-#: src/api.rs:2165
+#: src/api.rs:2223
+msgid "Vous ne pouvez plus envoyer de vidéo aujourd'hui."
+msgstr "You cannot upload more videos today."
+
+#: src/api.rs:2238
 msgid "janv."
 msgstr "Jan"
 
-#: src/api.rs:2166
+#: src/api.rs:2239
 msgid "févr."
 msgstr "Feb"
 
-#: src/api.rs:2167
+#: src/api.rs:2240
 msgid "mars"
 msgstr "Mar"
 
-#: src/api.rs:2168
+#: src/api.rs:2241
 msgid "avr."
 msgstr "Apr"
 
-#: src/api.rs:2169
+#: src/api.rs:2242
 msgid "mai"
 msgstr "May"
 
-#: src/api.rs:2170
+#: src/api.rs:2243
 msgid "juin"
 msgstr "Jun"
 
-#: src/api.rs:2171
+#: src/api.rs:2244
 msgid "juil."
 msgstr "Jul"
 
-#: src/api.rs:2172
+#: src/api.rs:2245
 msgid "août"
 msgstr "Aug"
 
-#: src/api.rs:2173
+#: src/api.rs:2246
 msgid "sept."
 msgstr "Sep"
 
-#: src/api.rs:2174
+#: src/api.rs:2247
 msgid "oct."
 msgstr "Oct"
 
-#: src/api.rs:2175
+#: src/api.rs:2248
 msgid "nov."
 msgstr "Nov"
 
-#: src/api.rs:2176
+#: src/api.rs:2249
 msgid "déc."
 msgstr "Dec"
 
-#: src/api.rs:2186
+#: src/api.rs:2259
 msgid "à l'instant"
 msgstr "now"
 
-#: src/api.rs:2188
+#: src/api.rs:2261
 msgid "{} min"
 msgstr "{} min"
 
-#: src/api.rs:2190
+#: src/api.rs:2263
 msgid "{} h"
 msgstr "{} h"
 
-#: src/api.rs:2193
+#: src/api.rs:2266
 msgid "{} j"
 msgid_plural "{} j"
 msgstr[0] "{} d"
 msgstr[1] "{} d"
 
-#: src/api.rs:2200
+#: src/api.rs:2273
 msgctxt "jour, mois abrégé et année"
 msgid "{day} {month} {year}"
 msgstr "{month} {day}, {year}"
 
-#: src/api.rs:2211
+#: src/api.rs:2284
 msgctxt "date et heure d'un post"
 msgid "{day} {month} {year}, {time}"
 msgstr "{month} {day}, {year}, {time}"
 
-#: src/api.rs:2223
+#: src/api.rs:2296
 msgctxt "jour et mois abrégé"
 msgid "{day} {month}"
 msgstr "{month} {day}"
@@ -505,7 +509,7 @@ msgstr "unknown account identity"
 msgid "Voir le profil de {}"
 msgstr "View the profile of {}"
 
-#: src/card.rs:122 src/card.rs:265 src/compose.rs:1421
+#: src/card.rs:122 src/card.rs:265 src/compose.rs:1437
 msgid "Image sans texte alternatif"
 msgstr "Image without alternative text"
 
@@ -539,184 +543,196 @@ msgstr "Play video"
 msgid "Cette vidéo ne peut pas être lue."
 msgstr "This video cannot be played."
 
-#: src/card.rs:370 src/compose.rs:1735
+#: src/card.rs:364 src/card.rs:371
+msgid "Plein écran"
+msgstr "Full screen"
+
+#: src/card.rs:415 src/card.rs:423
+msgid "Quitter le plein écran"
+msgstr "Leave full screen"
+
+#: src/card.rs:428
+msgid "Vidéo"
+msgstr "Video"
+
+#: src/card.rs:467 src/compose.rs:1761
 msgid "GIF"
 msgstr "GIF"
 
-#: src/card.rs:371
+#: src/card.rs:468
 msgid "GIF animé"
 msgstr "Animated GIF"
 
-#: src/card.rs:377 src/card.rs:382
+#: src/card.rs:474 src/card.rs:479
 msgid "Lire le GIF"
 msgstr "Play GIF"
 
-#: src/card.rs:402
+#: src/card.rs:499
 msgid "Mettre en pause ou reprendre le GIF"
 msgstr "Pause or resume the GIF"
 
-#: src/card.rs:406
+#: src/card.rs:503
 msgid "GIF : {}"
 msgstr "GIF: {}"
 
-#: src/card.rs:483
+#: src/card.rs:580
 msgid "Voir les {} personnes"
 msgid_plural "Voir les {} personnes"
 msgstr[0] "See the {} person"
 msgstr[1] "See the {} people"
 
-#: src/card.rs:517 src/card.rs:585
+#: src/card.rs:614 src/card.rs:682
 msgctxt "voir une image floutée"
 msgid "Afficher"
 msgstr "Show"
 
-#: src/card.rs:652
+#: src/card.rs:749
 msgid "Répondre, {} réponse"
 msgid_plural "Répondre, {} réponses"
 msgstr[0] "Reply, {} reply"
 msgstr[1] "Reply, {} replies"
 
-#: src/card.rs:679 src/profile.rs:1017
+#: src/card.rs:776 src/profile.rs:1017
 msgid "Copier le lien"
 msgstr "Copy link"
 
-#: src/card.rs:681
+#: src/card.rs:778
 msgid "Envoyer en message…"
 msgstr "Send in a message…"
 
-#: src/card.rs:684
+#: src/card.rs:781
 msgid "Traduire"
 msgstr "Translate"
 
-#: src/card.rs:691
+#: src/card.rs:788
 msgid "Retirer du haut du profil"
 msgstr "Unpin from profile"
 
-#: src/card.rs:693
+#: src/card.rs:790
 msgid "Épingler sur le profil"
 msgstr "Pin to profile"
 
-#: src/card.rs:698
+#: src/card.rs:795
 msgid "Supprimer le post…"
 msgstr "Delete post…"
 
-#: src/card.rs:703
+#: src/card.rs:800
 msgid "Signaler le post…"
 msgstr "Report post…"
 
-#: src/card.rs:708
+#: src/card.rs:805
 msgid "Masquer @{}"
 msgstr "Mute @{}"
 
-#: src/card.rs:713
+#: src/card.rs:810
 msgid "Bloquer @{}"
 msgstr "Block @{}"
 
-#: src/card.rs:719
+#: src/card.rs:816
 msgid "Signaler @{}…"
 msgstr "Report @{}…"
 
-#: src/card.rs:728 src/card.rs:731 src/profile.rs:187 src/profile.rs:190
+#: src/card.rs:825 src/card.rs:828 src/profile.rs:187 src/profile.rs:190
 msgid "Plus d'actions"
 msgstr "More actions"
 
-#: src/card.rs:739
+#: src/card.rs:836
 msgid "Aimer, {} j'aime"
 msgid_plural "Aimer, {} j'aime"
 msgstr[0] "Like, {} like"
 msgstr[1] "Like, {} likes"
 
-#: src/card.rs:741
+#: src/card.rs:838
 msgid "Ne plus aimer, {} j'aime"
 msgid_plural "Ne plus aimer, {} j'aime"
 msgstr[0] "Unlike, {} like"
 msgstr[1] "Unlike, {} likes"
 
-#: src/card.rs:746
+#: src/card.rs:843
 msgid "Reposter ou citer, {} repost"
 msgid_plural "Reposter ou citer, {} reposts"
 msgstr[0] "Repost or quote, {} repost"
 msgstr[1] "Repost or quote, {} reposts"
 
-#: src/card.rs:751
+#: src/card.rs:848
 msgid "Annuler le repost ou citer, {} repost"
 msgid_plural "Annuler le repost ou citer, {} reposts"
 msgstr[0] "Undo repost or quote, {} repost"
 msgstr[1] "Undo repost or quote, {} reposts"
 
-#: src/card.rs:755
+#: src/card.rs:852
 msgid "Ajouter aux signets"
 msgstr "Add to bookmarks"
 
-#: src/card.rs:756
+#: src/card.rs:853
 msgid "Retirer des signets"
 msgstr "Remove from bookmarks"
 
-#: src/card.rs:764
+#: src/card.rs:861
 msgid "J'aime · {}"
 msgstr "Like · {}"
 
-#: src/card.rs:765
+#: src/card.rs:862
 msgid "Aimé · {}"
 msgstr "Liked · {}"
 
-#: src/card.rs:766
+#: src/card.rs:863
 msgid "Reposter · {}"
 msgstr "Repost · {}"
 
-#: src/card.rs:767
+#: src/card.rs:864
 msgid "Reposté · {}"
 msgstr "Reposted · {}"
 
-#: src/card.rs:768
+#: src/card.rs:865
 msgid "Signet"
 msgstr "Bookmark"
 
-#: src/card.rs:769
+#: src/card.rs:866
 msgid "Dans les signets"
 msgstr "Bookmarked"
 
-#: src/card.rs:786
+#: src/card.rs:883
 msgid "Annuler le repost"
 msgstr "Undo repost"
 
-#: src/card.rs:788
+#: src/card.rs:885
 msgid "Reposter"
 msgstr "Repost"
 
-#: src/card.rs:792
+#: src/card.rs:889
 msgid "Citer…"
 msgstr "Quote…"
 
-#: src/card.rs:1017
+#: src/card.rs:1114
 msgid "Ouvrir le lien : {}"
 msgstr "Open link: {}"
 
-#: src/card.rs:1092
+#: src/card.rs:1189
 msgid "Post cité de {} : {}"
 msgstr "Quoted post by {}: {}"
 
-#: src/card.rs:1165 src/feeds.rs:340
+#: src/card.rs:1262 src/feeds.rs:340
 msgid "{} j'aime"
 msgid_plural "{} j'aime"
 msgstr[0] "{} like"
 msgstr[1] "{} likes"
 
-#: src/card.rs:1166
+#: src/card.rs:1263
 msgid "Voir qui a aimé"
 msgstr "See who liked"
 
-#: src/card.rs:1169
+#: src/card.rs:1266
 msgid "{} repost"
 msgid_plural "{} reposts"
 msgstr[0] "{} repost"
 msgstr[1] "{} reposts"
 
-#: src/card.rs:1170
+#: src/card.rs:1267
 msgid "Voir qui a reposté"
 msgstr "See who reposted"
 
-#: src/card.rs:1222 src/compose.rs:252
+#: src/card.rs:1319 src/compose.rs:252
 msgid "Répondre"
 msgstr "Reply"
 
@@ -843,7 +859,7 @@ msgstr "Quote"
 msgid "Nouveau post"
 msgstr "New post"
 
-#: src/compose.rs:265 src/compose.rs:1347
+#: src/compose.rs:265 src/compose.rs:1363
 msgid "Publier"
 msgstr "Post"
 
@@ -877,7 +893,7 @@ msgstr "Add a post to the thread"
 msgid "Langue du post"
 msgstr "Post language"
 
-#: src/compose.rs:496 src/compose.rs:500 src/compose.rs:1608
+#: src/compose.rs:496 src/compose.rs:500 src/compose.rs:1634
 msgid "Ajouter des images ou une vidéo"
 msgstr "Add images or a video"
 
@@ -954,111 +970,119 @@ msgstr "The draft could not be saved."
 msgid "Mode démonstration : rien n'est publié."
 msgstr "Demo mode: nothing is posted."
 
-#: src/compose.rs:1230
+#: src/compose.rs:1230 src/compose.rs:1510
 msgid "Publication…"
 msgstr "Posting…"
 
-#: src/compose.rs:1314
+#: src/compose.rs:1330
 msgid "La publication a été interrompue."
 msgstr "Posting was interrupted."
 
-#: src/compose.rs:1322
+#: src/compose.rs:1338
 msgid "Fil publié en partie : {} posts sur {}."
 msgstr "Thread partly posted: {} posts out of {}."
 
-#: src/compose.rs:1327
+#: src/compose.rs:1343
 msgid ""
 "Post publié, mais ses réglages de réponse et de citation n'ont pas été "
 "enregistrés."
 msgstr "Post published, but its reply and quote settings were not saved."
 
-#: src/compose.rs:1330
+#: src/compose.rs:1346
 msgid "Fil publié."
 msgstr "Thread posted."
 
-#: src/compose.rs:1332
+#: src/compose.rs:1348
 msgid "Réponse publiée."
 msgstr "Reply posted."
 
-#: src/compose.rs:1334
+#: src/compose.rs:1350
 msgid "Post publié."
 msgstr "Post published."
 
-#: src/compose.rs:1404
+#: src/compose.rs:1420
 msgid "ALT ✓"
 msgstr "ALT ✓"
 
-#: src/compose.rs:1406
+#: src/compose.rs:1422
 msgid "+ ALT"
 msgstr "+ ALT"
 
-#: src/compose.rs:1410
+#: src/compose.rs:1426
 msgid "Modifier le texte alternatif"
 msgstr "Edit alternative text"
 
-#: src/compose.rs:1415
+#: src/compose.rs:1431
 msgid "Ajouter un texte alternatif"
 msgstr "Add alternative text"
 
-#: src/compose.rs:1417
+#: src/compose.rs:1433
 msgid "GIF sans texte alternatif"
 msgstr "GIF without alternative text"
 
-#: src/compose.rs:1419
+#: src/compose.rs:1435
 msgid "Vidéo sans texte alternatif"
 msgstr "Video without alternative text"
 
-#: src/compose.rs:1503
+#: src/compose.rs:1509
+msgid "Envoi de la vidéo…"
+msgstr "Uploading video…"
+
+#: src/compose.rs:1511
+msgid "Conversion de la vidéo : {} %"
+msgstr "Processing video: {}%"
+
+#: src/compose.rs:1529
 msgid "Une image n'a pas pu être préparée : {}"
 msgstr "An image could not be prepared: {}"
 
-#: src/compose.rs:1531
+#: src/compose.rs:1557
 msgid "Ce fichier n'a pas pu être lu."
 msgstr "This file could not be read."
 
-#: src/compose.rs:1544 src/compose.rs:1548
+#: src/compose.rs:1570 src/compose.rs:1574
 msgid "Une vidéo se publie seule, sans images."
 msgstr "A video is posted on its own, without images."
 
-#: src/compose.rs:1546
+#: src/compose.rs:1572
 msgid "Cette vidéo dépasse 100 Mo."
 msgstr "This video is larger than 100 MB."
 
-#: src/compose.rs:1574 src/edit_profile.rs:491
+#: src/compose.rs:1600 src/edit_profile.rs:491
 msgid "Ce fichier n'est pas une image lisible."
 msgstr "This file is not a readable image."
 
-#: src/compose.rs:1592
+#: src/compose.rs:1618
 msgid "Images et vidéos"
 msgstr "Images and videos"
 
-#: src/compose.rs:1708 src/compose.rs:1712
+#: src/compose.rs:1734 src/compose.rs:1738
 msgid "Retirer l'image"
 msgstr "Remove image"
 
-#: src/compose.rs:1808 src/compose.rs:1847
+#: src/compose.rs:1834 src/compose.rs:1873
 msgid "Texte alternatif"
 msgstr "Alternative text"
 
-#: src/compose.rs:1813 src/edit_profile.rs:236 src/lists.rs:338
+#: src/compose.rs:1839 src/edit_profile.rs:236 src/lists.rs:338
 #: src/lists.rs:531
 msgid "Enregistrer"
 msgstr "Save"
 
-#: src/compose.rs:1831
+#: src/compose.rs:1857
 msgid "Vidéo à décrire"
 msgstr "Video to describe"
 
-#: src/compose.rs:1833
+#: src/compose.rs:1859
 msgid "Image à décrire"
 msgstr "Image to describe"
 
-#: src/compose.rs:1851
+#: src/compose.rs:1877
 msgid ""
 "Décrivez ce que montre la vidéo pour les personnes qui ne la voient pas."
 msgstr "Describe what the video shows for people who cannot see it."
 
-#: src/compose.rs:1853
+#: src/compose.rs:1879
 msgid ""
 "Décrivez ce que montre l'image pour les personnes qui ne la voient pas."
 msgstr "Describe what the image shows for people who cannot see it."
