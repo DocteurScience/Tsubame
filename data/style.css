@@ -90,7 +90,7 @@ columnsview > .column headerbar {
   box-shadow: inset 0 -2px @accent_color;
 }
 
-/* Palier compact : cibles tactiles d'au moins 44 px (voir CLAUDE.md). */
+/* Palier compact : cibles tactiles d'au moins 44 px (principes d'accessibilité). */
 /* GTK compte min-width sans le rembourrage : les boutons des cartes ont
    donc 4 px de côté et 36 px de contenu, 44 px en tout, pour que cinq
    boutons tiennent dans une carte de 360 px de large. */
