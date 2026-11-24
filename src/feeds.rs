@@ -557,6 +557,146 @@ fn icon_button(icon: &str, label: &str) -> gtk::Button {
     button
 }
 
+/// Boîte « Ajouter un flux » : mes flux enregistrés, ou ceux d'une recherche. `exclude` : les
+/// flux déjà choisis, qui ne sont pas proposés. `on_pick` reçoit le flux choisi.
+pub fn pick_feed(
+    parent: &impl IsA<gtk::Widget>,
+    session: Option<Arc<Session>>,
+    exclude: Vec<String>,
+    on_pick: impl Fn(FeedInfo) + 'static,
+) {
+    let dialog = adw::Dialog::builder()
+        .title(gettext("Ajouter un flux"))
+        .content_width(420)
+        .content_height(480)
+        .build();
+    let entry = gtk::SearchEntry::builder()
+        .placeholder_text(gettext("Rechercher des flux"))
+        .search_delay(300)
+        .build();
+    entry.update_property(&[gtk::accessible::Property::Label(&gettext(
+        "Rechercher des flux",
+    ))]);
+    let title = gtk::Label::builder()
+        .label(gettext("Mes flux"))
+        .xalign(0.0)
+        .css_classes(["heading"])
+        .accessible_role(gtk::AccessibleRole::Heading)
+        .build();
+    let results = gtk::ListBox::builder()
+        .selection_mode(gtk::SelectionMode::None)
+        .valign(gtk::Align::Start)
+        .css_classes(["boxed-list"])
+        .build();
+    results.update_property(&[gtk::accessible::Property::Label(&gettext("Flux"))]);
+    let empty = gtk::Label::builder()
+        .label(gettext("Aucun flux."))
+        .wrap(true)
+        .visible(false)
+        .css_classes(["dim-label"])
+        .build();
+    let content = gtk::Box::builder()
+        .orientation(gtk::Orientation::Vertical)
+        .spacing(12)
+        .margin_top(12)
+        .margin_bottom(12)
+        .margin_start(12)
+        .margin_end(12)
+        .build();
+    content.append(&entry);
+    content.append(&title);
+    content.append(&results);
+    content.append(&empty);
+    let view = adw::ToolbarView::builder()
+        .content(
+            &gtk::ScrolledWindow::builder()
+                .hscrollbar_policy(gtk::PolicyType::Never)
+                .child(&content)
+                .build(),
+        )
+        .build();
+    view.add_top_bar(&adw::HeaderBar::new());
+    dialog.set_child(Some(&view));
+
+    let found: Rc<RefCell<Vec<FeedInfo>>> = Rc::default();
+    let show = {
+        let (results, empty, found) = (results.clone(), empty.clone(), found.clone());
+        Rc::new(move |feeds: Vec<FeedInfo>| {
+            results.remove_all();
+            let feeds: Vec<FeedInfo> = feeds
+                .into_iter()
+                .filter(|feed| !exclude.contains(&feed.uri))
+                .collect();
+            for feed in &feeds {
+                results.append(&feed_row(feed));
+            }
+            results.set_visible(!feeds.is_empty());
+            empty.set_visible(feeds.is_empty());
+            found.replace(feeds);
+        })
+    };
+    // Sans recherche : mes flux enregistrés ; avec : les flux trouvés.
+    let fill = {
+        let (show, title, empty) = (show.clone(), title.clone(), empty.clone());
+        Rc::new(move |query: String| {
+            title.set_label(&if query.is_empty() {
+                gettext("Mes flux")
+            } else {
+                gettext("Résultats")
+            });
+            let Some(session) = session.clone() else {
+                let query = query.to_lowercase();
+                show(
+                    demo_feeds()
+                        .into_iter()
+                        .filter(|feed| feed.name.to_lowercase().contains(&query))
+                        .collect(),
+                );
+                return;
+            };
+            let task = runtime().spawn(async move {
+                if query.is_empty() {
+                    Box::pin(load_saved(session))
+                        .await
+                        .map(|feeds| feeds.into_iter().map(|(_, info)| info).collect())
+                } else {
+                    Box::pin(discover(session, Some(query))).await
+                }
+            });
+            let (show, empty) = (show.clone(), empty.clone());
+            glib::spawn_future_local(async move {
+                match task
+                    .await
+                    .unwrap_or_else(|_| Err(ApiError::new(gettext("Requête interrompue."))))
+                {
+                    Ok(feeds) => show(feeds),
+                    Err(error) => {
+                        show(Vec::new());
+                        empty.set_label(&error.message);
+                    }
+                }
+            });
+        })
+    };
+    fill(String::new());
+    entry.connect_search_changed(move |entry| {
+        fill(entry.text().trim().to_owned());
+    });
+    let weak = dialog.downgrade();
+    results.connect_row_activated(move |_, row| {
+        let feed = usize::try_from(row.index())
+            .ok()
+            .and_then(|i| found.borrow().get(i).cloned());
+        if let Some(feed) = feed {
+            if let Some(dialog) = weak.upgrade() {
+                dialog.close();
+            }
+            on_pick(feed);
+        }
+    });
+    dialog.present(Some(parent));
+}
+
 pub(crate) fn feed_row(info: &FeedInfo) -> adw::ActionRow {
     let mut subtitle = gettext("par @{}").replace("{}", &info.creator);
     if info.likes > 0 {

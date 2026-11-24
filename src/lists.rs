@@ -143,8 +143,32 @@ pub async fn update_list(
     description: String,
     avatar: ImageChange,
 ) -> Result<(), ApiError> {
+    let blob = Box::pin(avatar_blob(&session, &avatar)).await?;
+    Box::pin(edit_record(session, uri, move |record| {
+        record["name"] = json!(name);
+        match description.is_empty() {
+            true => {
+                if let Some(map) = record.as_object_mut() {
+                    map.remove("description");
+                    map.remove("descriptionFacets");
+                }
+            }
+            false => record["description"] = json!(description),
+        }
+        apply_avatar(record, &avatar, blob);
+    }))
+    .await
+}
+
+/// Relit un enregistrement de mon dépôt, le modifie avec `edit` et le réécrit, s'il n'a pas
+/// changé entre-temps (`swapRecord`).
+async fn edit_record(
+    session: Arc<Session>,
+    uri: String,
+    edit: impl FnOnce(&mut Value) + Send,
+) -> Result<(), ApiError> {
     use atrium_api::com::atproto::repo::{get_record, put_record};
-    // Liste ou starter pack : la collection vient de l'adresse.
+    // La collection vient de l'adresse.
     let (repo, collection, rkey) = api::parse_record_uri(&uri).ok_or_else(invalid_actor)?;
     let rkey = RecordKey::new(rkey.to_owned()).map_err(|_| invalid_actor())?;
     let api = session.api().await?;
@@ -165,18 +189,7 @@ pub async fn update_list(
         .await
         .map_err(request_failed)?;
     let mut record = serde_json::to_value(&current.data.value).unwrap_or_default();
-    record["name"] = json!(name);
-    match description.is_empty() {
-        true => {
-            if let Some(map) = record.as_object_mut() {
-                map.remove("description");
-                map.remove("descriptionFacets");
-            }
-        }
-        false => record["description"] = json!(description),
-    }
-    let blob = Box::pin(avatar_blob(&session, &avatar)).await?;
-    apply_avatar(&mut record, &avatar, blob);
+    edit(&mut record);
     api.api
         .com
         .atproto
@@ -196,6 +209,38 @@ pub async fn update_list(
         .await
         .map_err(request_failed)?;
     Ok(())
+}
+
+/// Nombre maximal de flux dans un starter pack.
+pub const MAX_PACK_FEEDS: usize = 3;
+
+/// Place les flux `feeds` dans l'enregistrement d'un starter pack (aucun : retire le champ).
+pub fn set_feeds(record: &mut Value, feeds: &[String]) {
+    let Some(map) = record.as_object_mut() else {
+        return;
+    };
+    if feeds.is_empty() {
+        map.remove("feeds");
+    } else {
+        let items: Vec<Value> = feeds
+            .iter()
+            .take(MAX_PACK_FEEDS)
+            .map(|uri| json!({ "uri": uri }))
+            .collect();
+        map.insert("feeds".into(), Value::Array(items));
+    }
+}
+
+/// Remplace les flux d'un starter pack.
+pub async fn update_pack_feeds(
+    session: Arc<Session>,
+    uri: String,
+    feeds: Vec<String>,
+) -> Result<(), ApiError> {
+    Box::pin(edit_record(session, uri, move |record| {
+        set_feeds(record, &feeds)
+    }))
+    .await
 }
 
 const STARTER_PACK: &str = "app.bsky.graph.starterpack";
@@ -1293,6 +1338,20 @@ pub fn memberships_dialog(parent: &impl IsA<gtk::Widget>, actor: &str, name: &st
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn starter_pack_feeds_are_set() {
+        let mut record = json!({"name": "Pack", "feeds": [{"uri": "a"}]});
+        let feeds: Vec<String> = ["b", "c", "d", "e"].map(String::from).to_vec();
+        set_feeds(&mut record, &feeds);
+        assert_eq!(
+            record["feeds"],
+            json!([{"uri": "b"}, {"uri": "c"}, {"uri": "d"}])
+        );
+        set_feeds(&mut record, &[]);
+        assert!(record.get("feeds").is_none());
+        assert_eq!(record["name"], "Pack");
+    }
 
     #[test]
     fn list_avatar_is_kept_replaced_or_removed() {

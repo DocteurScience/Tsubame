@@ -272,8 +272,10 @@ pub struct StarterPackPage {
     members: RefCell<Vec<Member>>,
     /// Le starter pack chargé (sa liste, son auteur).
     pack: RefCell<StarterPack>,
-    /// Menu de l'auteur : ajouter des comptes, modifier, supprimer.
+    /// Menu de l'auteur : ajouter des comptes ou des flux, modifier, supprimer.
     menu: gtk::MenuButton,
+    /// « Ajouter un flux… », possible tant qu'il y a moins de trois flux.
+    add_feed_action: gio::SimpleAction,
     weak: RefCell<std::rc::Weak<Self>>,
 }
 
@@ -334,6 +336,7 @@ impl StarterPackPage {
             .build();
         let menu_model = gio::Menu::new();
         menu_model.append(Some(&gettext("Ajouter un compte…")), Some("pack.add"));
+        menu_model.append(Some(&gettext("Ajouter un flux…")), Some("pack.add-feed"));
         menu_model.append(Some(&gettext("Modifier…")), Some("pack.edit"));
         menu_model.append(
             Some(&gettext("Supprimer le starter pack…")),
@@ -364,6 +367,7 @@ impl StarterPackPage {
             members: RefCell::default(),
             pack: RefCell::new(pack.clone()),
             menu,
+            add_feed_action: gio::SimpleAction::new("add-feed", None),
             weak: RefCell::default(),
         });
         page.weak.replace(Rc::downgrade(&page));
@@ -381,6 +385,15 @@ impl StarterPackPage {
                 }
             });
             actions.add_action(&action);
+        }
+        {
+            let weak = Rc::downgrade(&page);
+            page.add_feed_action.connect_activate(move |_, _| {
+                if let Some(page) = weak.upgrade() {
+                    page.add_feed();
+                }
+            });
+            actions.add_action(&page.add_feed_action);
         }
         page.root.insert_action_group("pack", Some(&actions));
         page.show(pack, None);
@@ -432,11 +445,37 @@ impl StarterPackPage {
         while let Some(row) = self.feeds.first_child() {
             self.feeds.remove(&row);
         }
+        let mine = self.mine();
         for info in &pack.feeds {
             let row = feed_row(info);
             row.set_widget_name(&info.uri);
+            if mine {
+                let remove = gtk::Button::builder()
+                    .icon_name("list-remove-symbolic")
+                    .tooltip_text(gettext("Retirer du starter pack"))
+                    .valign(gtk::Align::Center)
+                    .css_classes(["flat"])
+                    .build();
+                remove.update_property(&[gtk::accessible::Property::Label(
+                    &gettext("Retirer {} du starter pack").replace("{}", &info.name),
+                )]);
+                let (uri, weak) = (info.uri.clone(), self.this());
+                remove.connect_clicked(move |_| {
+                    if let Some(page) = weak.upgrade() {
+                        let feeds = page
+                            .feed_uris()
+                            .into_iter()
+                            .filter(|feed| *feed != uri)
+                            .collect();
+                        page.set_feeds(feeds, gettext("Flux retiré du starter pack."));
+                    }
+                });
+                row.add_suffix(&remove);
+            }
             self.feeds.append(&row);
         }
+        self.add_feed_action
+            .set_enabled(pack.feeds.len() < crate::lists::MAX_PACK_FEEDS);
         self.feeds.set_visible(!pack.feeds.is_empty());
         self.feeds_title.set_visible(!pack.feeds.is_empty());
         if let Some(members) = members {
@@ -571,6 +610,63 @@ impl StarterPackPage {
     /// Référence faible à la page, pour les rappels des rangées.
     fn this(&self) -> std::rc::Weak<Self> {
         self.weak.borrow().clone()
+    }
+
+    fn feed_uris(&self) -> Vec<String> {
+        self.pack
+            .borrow()
+            .feeds
+            .iter()
+            .map(|feed| feed.uri.clone())
+            .collect()
+    }
+
+    /// Remplace les flux du starter pack, puis le recharge.
+    fn set_feeds(self: &Rc<Self>, feeds: Vec<String>, success: String) {
+        let Some(session) = self.host.session.clone() else {
+            self.host.toasts.add_toast(adw::Toast::new(&gettext(
+                "Mode démonstration : rien n'est publié.",
+            )));
+            return;
+        };
+        let task = runtime().spawn(Box::pin(crate::lists::update_pack_feeds(
+            session,
+            self.uri.clone(),
+            feeds,
+        )));
+        let weak = Rc::downgrade(self);
+        glib::spawn_future_local(async move {
+            let result = task
+                .await
+                .unwrap_or_else(|_| Err(ApiError::new(gettext("Requête interrompue."))));
+            let Some(page) = weak.upgrade() else { return };
+            match result {
+                Ok(()) => {
+                    page.host.toasts.add_toast(adw::Toast::new(&success));
+                    page.load();
+                }
+                Err(error) if error.expired => (page.host.expired)(error.message),
+                Err(error) => page.host.toasts.add_toast(adw::Toast::new(&error.message)),
+            }
+        });
+    }
+
+    fn add_feed(self: &Rc<Self>) {
+        let weak = Rc::downgrade(self);
+        crate::feeds::pick_feed(
+            &self.root,
+            self.host.session.clone(),
+            self.feed_uris(),
+            move |info| {
+                let Some(page) = weak.upgrade() else { return };
+                let mut feeds = page.feed_uris();
+                feeds.push(info.uri.clone());
+                page.set_feeds(
+                    feeds,
+                    gettext("« {} » ajouté au starter pack.").replace("{}", &info.name),
+                );
+            },
+        );
     }
 
     fn add_member(self: &Rc<Self>) {
