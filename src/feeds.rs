@@ -116,12 +116,35 @@ pub enum Change {
     Pin(String, bool),
     /// Déplacer d'un cran parmi les flux (-1 : vers le haut).
     Move(String, i32),
+    /// Épingler une liste (son fil devient une colonne), ou la retirer.
+    PinList(String, bool),
+}
+
+/// La liste `uri` est-elle épinglée ?
+pub fn list_pinned(preferences: &[Value], uri: &str) -> bool {
+    saved_items(preferences).iter().any(|item| {
+        item.get("type").and_then(Value::as_str) == Some("list")
+            && item.get("value").and_then(Value::as_str) == Some(uri)
+            && item.get("pinned").and_then(Value::as_bool) == Some(true)
+    })
 }
 
 impl Change {
     pub fn apply(&self, preferences: &mut Vec<Value>) {
         let items = saved_pref(preferences);
         match self {
+            Change::PinList(uri, pinned) => {
+                let is_list = |item: &Value| {
+                    item.get("type").and_then(Value::as_str) == Some("list")
+                        && item.get("value").and_then(Value::as_str) == Some(uri.as_str())
+                };
+                items.retain(|item| !is_list(item));
+                if *pinned {
+                    items.push(
+                        json!({"id": new_id(), "type": "list", "value": uri, "pinned": true}),
+                    );
+                }
+            }
             Change::Save(uri, pinned) => {
                 if !items.iter().any(|item| is_feed(item, uri)) {
                     items.push(
@@ -696,6 +719,8 @@ impl FeedsPage {
                     }
                 }
                 Change::Remove(uri) => saved.retain(|(f, _)| &f.uri != uri),
+                // Les listes ne sont pas affichées sur cette page.
+                Change::PinList(..) => {}
                 Change::Pin(uri, pinned) => {
                     for (feed, _) in saved.iter_mut().filter(|(f, _)| &f.uri == uri) {
                         feed.pinned = *pinned;
@@ -814,6 +839,20 @@ mod tests {
         Change::Remove(x).apply(&mut p);
         assert_eq!(saved_feeds(&p).len(), 2);
         assert_eq!(p[0]["$type"], "app.bsky.actor.defs#adultContentPref");
+    }
+
+    #[test]
+    fn lists_can_be_pinned() {
+        let mut p = Vec::new();
+        let uri = "at://did:plc:a/app.bsky.graph.list/l";
+        Change::PinList(uri.into(), true).apply(&mut p);
+        Change::PinList(uri.into(), true).apply(&mut p);
+        assert!(list_pinned(&p, uri));
+        assert_eq!(saved_items(&p).len(), 2);
+        let preferences = Value::Array(p.clone());
+        assert_eq!(crate::api::pinned_feed_uris(&preferences), [uri]);
+        Change::PinList(uri.into(), false).apply(&mut p);
+        assert!(!list_pinned(&p, uri));
     }
 
     #[test]

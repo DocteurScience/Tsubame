@@ -481,6 +481,49 @@ pub fn menu_button(list: &List, host: &Host, changed: Rc<dyn Fn()>) -> gtk::Menu
         action.connect_activate(move |_, _| handler());
         actions.add_action(&action);
     };
+    if !list.moderation && host.session.is_some() {
+        let pinned =
+            crate::feeds::list_pinned(&crate::moderation::current_preferences(), &list.uri);
+        menu.append(
+            Some(&if pinned {
+                gettext("Retirer des colonnes")
+            } else {
+                gettext("Épingler comme colonne")
+            }),
+            Some("list.pin"),
+        );
+        let (list, host, button) = (list.clone(), host.clone(), button.clone());
+        add(
+            "pin",
+            Box::new(move || {
+                let Some(session) = host.session.clone() else {
+                    return;
+                };
+                let uri = list.uri.clone();
+                let button = button.downgrade();
+                run(
+                    &host,
+                    async move {
+                        crate::moderation::update_preferences(session, move |p| {
+                            crate::feeds::Change::PinList(uri, !pinned).apply(p)
+                        })
+                        .await
+                    },
+                    if pinned {
+                        gettext("Liste retirée des colonnes.")
+                    } else {
+                        gettext("Liste épinglée : « Ajouter une colonne » la propose.")
+                    },
+                    move |preferences| {
+                        crate::moderation::set_preferences(preferences);
+                        if let Some(button) = button.upgrade() {
+                            let _ = button.activate_action("win.reload-pinned", None);
+                        }
+                    },
+                );
+            }),
+        );
+    }
     if !list.moderation {
         menu.append(Some(&gettext("Membres")), Some("list.members"));
         let (list, host) = (list.clone(), host.clone());

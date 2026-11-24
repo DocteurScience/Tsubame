@@ -1019,9 +1019,9 @@ pub struct PinnedFeed {
 }
 
 /// Adresses des fils épinglés, dans l'ordre, d'après les préférences
-/// (format `savedFeedsPrefV2`, ou l'ancien `savedFeedsPref`). Les listes et
-/// le fil Following, qui ne sont pas des générateurs de fil, sont laissés
-/// de côté.
+/// (format `savedFeedsPrefV2`, ou l'ancien `savedFeedsPref`) : fils et
+/// listes (format récent seulement). Le fil Following, qui a déjà sa
+/// colonne, est laissé de côté.
 pub fn pinned_feed_uris(preferences: &serde_json::Value) -> Vec<String> {
     let items = preferences.as_array().cloned().unwrap_or_default();
     let of_type = |name: &str| {
@@ -1037,7 +1037,10 @@ pub fn pinned_feed_uris(preferences: &serde_json::Value) -> Vec<String> {
             .flatten()
             .filter(|item| {
                 item.get("pinned").and_then(|p| p.as_bool()) == Some(true)
-                    && item.get("type").and_then(|t| t.as_str()) == Some("feed")
+                    && matches!(
+                        item.get("type").and_then(|t| t.as_str()),
+                        Some("feed" | "list")
+                    )
             })
             .filter_map(|item| item.get("value")?.as_str().map(str::to_owned))
             .collect();
@@ -1049,6 +1052,11 @@ pub fn pinned_feed_uris(preferences: &serde_json::Value) -> Vec<String> {
         .filter_map(|uri| uri.as_str().map(str::to_owned))
         .filter(|uri| uri.contains("/app.bsky.feed.generator/"))
         .collect()
+}
+
+/// Adresse d'une liste (et non d'un générateur de fil) ?
+pub fn is_list_uri(uri: &str) -> bool {
+    uri.contains("/app.bsky.graph.list/")
 }
 
 /// Fils épinglés du compte, avec leurs noms.
@@ -1067,32 +1075,53 @@ pub async fn pinned_feeds(session: Arc<Session>) -> Result<Vec<PinnedFeed>, ApiE
     if uris.is_empty() {
         return Ok(Vec::new());
     }
-    let output = api
-        .api
-        .app
-        .bsky
-        .feed
-        .get_feed_generators(
-            atrium_api::app::bsky::feed::get_feed_generators::ParametersData {
-                feeds: uris.clone(),
-            }
-            .into(),
-        )
-        .await
-        .map_err(request_failed)?;
-    let names: HashMap<&str, &str> = output
-        .data
-        .feeds
-        .iter()
-        .map(|feed| (feed.uri.as_str(), feed.display_name.as_str()))
-        .collect();
+    let generators: Vec<String> = uris.iter().filter(|u| !is_list_uri(u)).cloned().collect();
+    let mut names: HashMap<String, String> = HashMap::new();
+    if !generators.is_empty() {
+        let output = api
+            .api
+            .app
+            .bsky
+            .feed
+            .get_feed_generators(
+                atrium_api::app::bsky::feed::get_feed_generators::ParametersData {
+                    feeds: generators,
+                }
+                .into(),
+            )
+            .await
+            .map_err(request_failed)?;
+        for feed in &output.data.feeds {
+            names.insert(feed.uri.clone(), feed.display_name.clone());
+        }
+    }
+    // Listes épinglées : leur nom (`getList`, sans les membres).
+    for uri in uris.iter().filter(|u| is_list_uri(u)) {
+        if let Ok(output) = api
+            .api
+            .app
+            .bsky
+            .graph
+            .get_list(
+                atrium_api::app::bsky::graph::get_list::ParametersData {
+                    cursor: None,
+                    limit: 1.try_into().ok(),
+                    list: uri.clone(),
+                }
+                .into(),
+            )
+            .await
+        {
+            names.insert(uri.clone(), output.data.list.name.clone());
+        }
+    }
     // Dans l'ordre des préférences ; un fil disparu depuis est ignoré.
     Ok(uris
         .iter()
         .filter_map(|uri| {
             names.get(uri.as_str()).map(|name| PinnedFeed {
                 uri: uri.clone(),
-                name: (*name).to_owned(),
+                name: name.clone(),
             })
         })
         .collect())
@@ -3094,6 +3123,8 @@ mod tests {
             pinned_feed_uris(&preferences),
             vec![
                 "at://did:plc:a/app.bsky.feed.generator/linux",
+                // Les listes épinglées deviennent aussi des colonnes.
+                "at://did:plc:a/app.bsky.graph.list/l",
                 "at://did:plc:b/app.bsky.feed.generator/photo",
             ]
         );

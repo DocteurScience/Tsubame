@@ -2090,6 +2090,14 @@ fn install_actions(window: &adw::ApplicationWindow, state: &Rc<State>) {
         }
     });
     window.add_action(&open_post_uri);
+    let reload_pinned = gio::SimpleAction::new("reload-pinned", None);
+    let weak = Rc::downgrade(state);
+    reload_pinned.connect_activate(move |_, _| {
+        if let Some(state) = weak.upgrade() {
+            state.load_pinned_feeds();
+        }
+    });
+    window.add_action(&reload_pinned);
 
     for (name, which) in [
         ("toggle-like", Interaction::Like),

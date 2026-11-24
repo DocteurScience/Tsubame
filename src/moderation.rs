@@ -454,6 +454,11 @@ pub async fn labeler_details(
         .collect())
 }
 
+/// Préférences du compte connecté, telles que chargées.
+pub fn current_preferences() -> Vec<Value> {
+    PREFERENCES.with_borrow(Clone::clone)
+}
+
 /// Services d'étiquetage du compte connecté (préférences chargées).
 pub fn subscribed_labelers() -> Vec<String> {
     PREFERENCES.with_borrow(|p| labelers(p))

@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: tsubame\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-24 08:18+0000\n"
+"POT-Creation-Date: 2026-11-24 08:21+0000\n"
 "PO-Revision-Date: 2026-11-22\n"
 "Last-Translator: \n"
 "Language-Team: English\n"
@@ -173,172 +173,172 @@ msgstr "reposted your repost"
 msgid "a rejoint Bluesky avec votre starter pack"
 msgstr "joined Bluesky with your starter pack"
 
-#: src/api.rs:1102 src/feeds.rs:229 src/moderation.rs:727 src/report.rs:155
+#: src/api.rs:1131 src/feeds.rs:252 src/moderation.rs:732 src/report.rs:155
 msgid "Ce compte n'existe pas."
 msgstr "This account does not exist."
 
-#: src/api.rs:1363
+#: src/api.rs:1392
 msgid "Abonnés"
 msgstr "Followers"
 
-#: src/api.rs:1364
+#: src/api.rs:1393
 msgid "Abonnements"
 msgstr "Following"
 
-#: src/api.rs:1365
+#: src/api.rs:1394
 msgctxt "comptes qui ont aimé un post"
 msgid "J'aime"
 msgstr "Likes"
 
-#: src/api.rs:1366
+#: src/api.rs:1395
 msgid "Reposts"
 msgstr "Reposts"
 
-#: src/api.rs:1367
+#: src/api.rs:1396
 msgid "Abonnés que vous connaissez"
 msgstr "Followers you know"
 
-#: src/api.rs:1373
+#: src/api.rs:1402
 msgid "Aucun abonné pour l'instant."
 msgstr "No followers yet."
 
-#: src/api.rs:1374
+#: src/api.rs:1403
 msgid "Aucun abonnement pour l'instant."
 msgstr "Not following anyone yet."
 
-#: src/api.rs:1375
+#: src/api.rs:1404
 msgid "Personne n'a encore aimé ce post."
 msgstr "No one has liked this post yet."
 
-#: src/api.rs:1376
+#: src/api.rs:1405
 msgid "Personne n'a encore reposté ce post."
 msgstr "No one has reposted this post yet."
 
-#: src/api.rs:1377
+#: src/api.rs:1406
 msgid "Aucun compte que vous suivez ne suit ce compte."
 msgstr "No account you follow follows this account."
 
-#: src/api.rs:1510
+#: src/api.rs:1539
 msgid "Ce post ne peut pas être modifié."
 msgstr "This post cannot be changed."
 
-#: src/api.rs:1652 src/preferences.rs:867
+#: src/api.rs:1681 src/preferences.rs:867
 msgid "Tout le monde"
 msgstr "Everyone"
 
-#: src/api.rs:1653 src/preferences.rs:868
+#: src/api.rs:1682 src/preferences.rs:868
 msgid "Comptes que vous suivez"
 msgstr "Accounts you follow"
 
-#: src/api.rs:1654
+#: src/api.rs:1683
 msgid "Vos abonnés"
 msgstr "Your followers"
 
-#: src/api.rs:1655
+#: src/api.rs:1684
 msgid "Comptes mentionnés"
 msgstr "Mentioned accounts"
 
-#: src/api.rs:1656
+#: src/api.rs:1685
 msgid "Personne"
 msgstr "No one"
 
-#: src/api.rs:1928 src/edit_profile.rs:198
+#: src/api.rs:1957 src/edit_profile.rs:198
 msgid "Une image n'a pas pu être envoyée : {}"
 msgstr "An image could not be uploaded: {}"
 
-#: src/api.rs:2042
+#: src/api.rs:2071
 msgid "La vidéo n'a pas pu être envoyée."
 msgstr "The video could not be uploaded."
 
-#: src/api.rs:2100
+#: src/api.rs:2129
 msgid "La vidéo a été refusée : {}"
 msgstr "The video was rejected: {}"
 
-#: src/api.rs:2101
+#: src/api.rs:2130
 msgid "La vidéo n'a pas pu être convertie."
 msgstr "The video could not be processed."
 
-#: src/api.rs:2120
+#: src/api.rs:2149
 msgid "La conversion de la vidéo prend trop de temps."
 msgstr "Processing the video is taking too long."
 
-#: src/api.rs:2135
+#: src/api.rs:2164
 msgid "janv."
 msgstr "Jan"
 
-#: src/api.rs:2136
+#: src/api.rs:2165
 msgid "févr."
 msgstr "Feb"
 
-#: src/api.rs:2137
+#: src/api.rs:2166
 msgid "mars"
 msgstr "Mar"
 
-#: src/api.rs:2138
+#: src/api.rs:2167
 msgid "avr."
 msgstr "Apr"
 
-#: src/api.rs:2139
+#: src/api.rs:2168
 msgid "mai"
 msgstr "May"
 
-#: src/api.rs:2140
+#: src/api.rs:2169
 msgid "juin"
 msgstr "Jun"
 
-#: src/api.rs:2141
+#: src/api.rs:2170
 msgid "juil."
 msgstr "Jul"
 
-#: src/api.rs:2142
+#: src/api.rs:2171
 msgid "août"
 msgstr "Aug"
 
-#: src/api.rs:2143
+#: src/api.rs:2172
 msgid "sept."
 msgstr "Sep"
 
-#: src/api.rs:2144
+#: src/api.rs:2173
 msgid "oct."
 msgstr "Oct"
 
-#: src/api.rs:2145
+#: src/api.rs:2174
 msgid "nov."
 msgstr "Nov"
 
-#: src/api.rs:2146
+#: src/api.rs:2175
 msgid "déc."
 msgstr "Dec"
 
-#: src/api.rs:2156
+#: src/api.rs:2185
 msgid "à l'instant"
 msgstr "now"
 
-#: src/api.rs:2158
+#: src/api.rs:2187
 msgid "{} min"
 msgstr "{} min"
 
-#: src/api.rs:2160
+#: src/api.rs:2189
 msgid "{} h"
 msgstr "{} h"
 
-#: src/api.rs:2163
+#: src/api.rs:2192
 msgid "{} j"
 msgid_plural "{} j"
 msgstr[0] "{} d"
 msgstr[1] "{} d"
 
-#: src/api.rs:2170
+#: src/api.rs:2199
 msgctxt "jour, mois abrégé et année"
 msgid "{day} {month} {year}"
 msgstr "{month} {day}, {year}"
 
-#: src/api.rs:2181
+#: src/api.rs:2210
 msgctxt "date et heure d'un post"
 msgid "{day} {month} {year}, {time}"
 msgstr "{month} {day}, {year}, {time}"
 
-#: src/api.rs:2193
+#: src/api.rs:2222
 msgctxt "jour et mois abrégé"
 msgid "{day} {month}"
 msgstr "{month} {day}"
@@ -561,7 +561,7 @@ msgstr "Open link: {}"
 msgid "Post cité de {} : {}"
 msgstr "Quoted post by {}: {}"
 
-#: src/card.rs:978 src/feeds.rs:317
+#: src/card.rs:978 src/feeds.rs:340
 msgid "{} j'aime"
 msgid_plural "{} j'aime"
 msgstr[0] "{} like"
@@ -621,48 +621,48 @@ msgstr ""
 msgid "Linux et libre"
 msgstr "Linux and free software"
 
-#: src/column.rs:113 src/preferences.rs:184 src/window.rs:2215
+#: src/column.rs:113 src/preferences.rs:184 src/window.rs:2223
 msgid "Notifications"
 msgstr "Notifications"
 
-#: src/column.rs:174
+#: src/column.rs:177
 msgid "Cette colonne n'est pas encore reliée à Bluesky."
 msgstr "This column is not connected to Bluesky yet."
 
-#: src/column.rs:191
+#: src/column.rs:194
 msgid "Changer de colonne"
 msgstr "Switch column"
 
-#: src/column.rs:203 src/column.rs:206 src/column.rs:236
+#: src/column.rs:206 src/column.rs:209 src/column.rs:239
 msgid "Fermer la colonne"
 msgstr "Close column"
 
-#: src/column.rs:212 src/column.rs:214 src/column.rs:228 src/feed_page.rs:33
+#: src/column.rs:215 src/column.rs:217 src/column.rs:231 src/feed_page.rs:33
 #: src/feed_page.rs:35 src/messages.rs:370 src/messages.rs:372
 msgid "Actualiser"
 msgstr "Refresh"
 
-#: src/column.rs:243 src/column.rs:246
+#: src/column.rs:246 src/column.rs:249
 msgid "Options de la colonne"
 msgstr "Column options"
 
-#: src/column.rs:269
+#: src/column.rs:272
 msgid "Notifications à afficher"
 msgstr "Notifications to show"
 
-#: src/column.rs:271
+#: src/column.rs:274
 msgid "Toutes"
 msgstr "All"
 
-#: src/column.rs:271
+#: src/column.rs:274
 msgid "Mentions"
 msgstr "Mentions"
 
-#: src/column.rs:384
+#: src/column.rs:387
 msgid "Déplacer vers la gauche"
 msgstr "Move left"
 
-#: src/column.rs:390
+#: src/column.rs:393
 msgid "Déplacer vers la droite"
 msgstr "Move right"
 
@@ -703,14 +703,14 @@ msgctxt "titre de la boîte de rédaction"
 msgid "Citer"
 msgstr "Quote"
 
-#: src/compose.rs:256 src/window.rs:2259 src/window.rs:2262 src/window.rs:2308
-#: src/window.rs:2311
+#: src/compose.rs:256 src/window.rs:2267 src/window.rs:2270 src/window.rs:2316
+#: src/window.rs:2319
 msgid "Nouveau post"
 msgstr "New post"
 
 #. En-tête : Annuler, titre, Publier.
 #: src/compose.rs:263 src/compose.rs:1811 src/edit_profile.rs:234
-#: src/lists.rs:305 src/lists.rs:584 src/login.rs:160 src/messages.rs:910
+#: src/lists.rs:305 src/lists.rs:627 src/login.rs:160 src/messages.rs:910
 #: src/profile.rs:1280 src/report.rs:180 src/window.rs:640 src/window.rs:1272
 #: src/window.rs:1447
 msgid "Annuler"
@@ -822,7 +822,7 @@ msgstr "Keep as draft"
 msgid "Le brouillon n'a pas pu être enregistré."
 msgstr "The draft could not be saved."
 
-#: src/compose.rs:1223 src/lists.rs:388 src/lists.rs:594 src/messages.rs:1501
+#: src/compose.rs:1223 src/lists.rs:388 src/lists.rs:637 src/messages.rs:1501
 #: src/starter_packs.rs:420
 msgid "Mode démonstration : rien n'est publié."
 msgstr "Demo mode: nothing is posted."
@@ -991,8 +991,8 @@ msgstr "Display name"
 msgid "Bio"
 msgstr "Bio"
 
-#: src/edit_profile.rs:393 src/feed_page.rs:332 src/lists.rs:626
-#: src/lists.rs:737 src/profile.rs:811
+#: src/edit_profile.rs:393 src/feed_page.rs:332 src/lists.rs:669
+#: src/lists.rs:780 src/profile.rs:811
 msgid "Chargement…"
 msgstr "Loading…"
 
@@ -1012,7 +1012,7 @@ msgstr "Choose a banner"
 msgid "Choisir un avatar"
 msgstr "Choose an avatar"
 
-#: src/edit_profile.rs:576 src/explore.rs:182 src/feeds.rs:734
+#: src/edit_profile.rs:576 src/explore.rs:182 src/feeds.rs:759
 #: src/lists.rs:419 src/lists.rs:449 src/messages.rs:1022
 #: src/preferences.rs:435 src/preferences.rs:526 src/preferences.rs:641
 #: src/preferences.rs:948 src/profile.rs:987 src/profile.rs:1106
@@ -1064,7 +1064,7 @@ msgstr "People to follow"
 msgid "Starter packs"
 msgstr "Starter packs"
 
-#: src/explore.rs:271 src/feeds.rs:551
+#: src/explore.rs:271 src/feeds.rs:574
 msgid "Résultats"
 msgstr "Results"
 
@@ -1076,7 +1076,7 @@ msgstr "Posts"
 msgid "Personnes"
 msgstr "People"
 
-#: src/explore.rs:281 src/feeds.rs:398 src/profile.rs:53
+#: src/explore.rs:281 src/feeds.rs:421 src/profile.rs:53
 #: src/starter_packs.rs:290 src/window.rs:76
 msgid "Flux"
 msgstr "Feeds"
@@ -1103,8 +1103,8 @@ msgstr "No feeds match this search."
 
 #: src/explore.rs:506 src/explore.rs:560 src/explore.rs:583 src/explore.rs:592
 #: src/explore.rs:687 src/explore.rs:712 src/feed_page.rs:94
-#: src/feed_page.rs:269 src/feed_page.rs:386 src/feeds.rs:450 src/feeds.rs:571
-#: src/lists.rs:714 src/lists.rs:848 src/messages.rs:703 src/messages.rs:800
+#: src/feed_page.rs:269 src/feed_page.rs:386 src/feeds.rs:473 src/feeds.rs:594
+#: src/lists.rs:757 src/lists.rs:891 src/messages.rs:703 src/messages.rs:800
 #: src/messages.rs:1061 src/messages.rs:1261 src/preferences.rs:299
 #: src/preferences.rs:472 src/preferences.rs:577 src/profile.rs:657
 #: src/profile.rs:830 src/profile.rs:953 src/starter_packs.rs:404
@@ -1134,7 +1134,7 @@ msgid_plural "{} membres"
 msgstr[0] "{} member"
 msgstr[1] "{} members"
 
-#: src/feed_page.rs:180 src/lists.rs:326 src/lists.rs:788
+#: src/feed_page.rs:180 src/lists.rs:326 src/lists.rs:831
 msgid "Liste de modération"
 msgstr "Moderation list"
 
@@ -1142,7 +1142,7 @@ msgstr "Moderation list"
 msgid "Mes listes"
 msgstr "My lists"
 
-#: src/feed_page.rs:219 src/lists.rs:724 src/profile.rs:54 src/window.rs:88
+#: src/feed_page.rs:219 src/lists.rs:767 src/profile.rs:54 src/window.rs:88
 msgid "Listes"
 msgstr "Lists"
 
@@ -1150,79 +1150,79 @@ msgstr "Lists"
 msgid "Nouvelle liste"
 msgstr "New list"
 
-#: src/feed_page.rs:290 src/lists.rs:833
+#: src/feed_page.rs:290 src/lists.rs:876
 msgid "Vous n'avez pas encore de liste."
 msgstr "You have no lists yet."
 
-#: src/feeds.rs:312
+#: src/feeds.rs:335
 msgid "par @{}"
 msgstr "by @{}"
 
-#: src/feeds.rs:355 src/feeds.rs:359
+#: src/feeds.rs:378 src/feeds.rs:382
 msgid "Rechercher des flux"
 msgstr "Search feeds"
 
-#: src/feeds.rs:361 src/feeds.rs:364
+#: src/feeds.rs:384 src/feeds.rs:387
 msgid "Mes flux"
 msgstr "My feeds"
 
-#: src/feeds.rs:362
+#: src/feeds.rs:385
 msgid "Flux à découvrir"
 msgstr "Feeds to discover"
 
-#: src/feeds.rs:366
+#: src/feeds.rs:389
 msgid "Les flux épinglés peuvent s'ouvrir en colonne sur l'accueil."
 msgstr "Pinned feeds can open as columns on the home page."
 
-#: src/feeds.rs:371 src/feeds.rs:549
+#: src/feeds.rs:394 src/feeds.rs:572
 msgid "Flux populaires"
 msgstr "Popular feeds"
 
-#: src/feeds.rs:470
+#: src/feeds.rs:493
 msgid "Aucun flux enregistré."
 msgstr "No saved feeds."
 
-#: src/feeds.rs:486
+#: src/feeds.rs:509
 msgid "Désépingler {}"
 msgstr "Unpin {}"
 
-#: src/feeds.rs:488
+#: src/feeds.rs:511
 msgid "Épingler {}"
 msgstr "Pin {}"
 
-#: src/feeds.rs:495
+#: src/feeds.rs:518
 msgid "Monter {}"
 msgstr "Move {} up"
 
-#: src/feeds.rs:500
+#: src/feeds.rs:523
 msgid "Descendre {}"
 msgstr "Move {} down"
 
-#: src/feeds.rs:505
+#: src/feeds.rs:528
 msgid "Retirer {}"
 msgstr "Remove {}"
 
-#: src/feeds.rs:592
+#: src/feeds.rs:615
 msgid "Aucun flux trouvé."
 msgstr "No feeds found."
 
-#: src/feeds.rs:647
+#: src/feeds.rs:670
 msgid "Ajouté"
 msgstr "Added"
 
-#: src/feeds.rs:649
+#: src/feeds.rs:672
 msgid "Ajouter"
 msgstr "Add"
 
-#: src/feeds.rs:653
+#: src/feeds.rs:676
 msgid "{} est dans vos flux"
 msgstr "{} is in your feeds"
 
-#: src/feeds.rs:655
+#: src/feeds.rs:678
 msgid "Ajouter {} à vos flux"
 msgstr "Add {} to your feeds"
 
-#: src/feeds.rs:742
+#: src/feeds.rs:767
 msgid "La liste des flux n'a pas été enregistrée."
 msgstr "The feed list was not saved."
 
@@ -1254,99 +1254,115 @@ msgstr "List saved."
 msgid "Options de la liste"
 msgstr "List options"
 
-#: src/lists.rs:485 src/lists.rs:650
+#: src/lists.rs:489
+msgid "Retirer des colonnes"
+msgstr "Remove from columns"
+
+#: src/lists.rs:491
+msgid "Épingler comme colonne"
+msgstr "Pin as a column"
+
+#: src/lists.rs:513
+msgid "Liste retirée des colonnes."
+msgstr "List removed from columns."
+
+#: src/lists.rs:515
+msgid "Liste épinglée : « Ajouter une colonne » la propose."
+msgstr "List pinned: “Add a column” now offers it."
+
+#: src/lists.rs:528 src/lists.rs:693
 msgid "Membres"
 msgstr "Members"
 
-#: src/lists.rs:493
+#: src/lists.rs:536
 msgid "Modifier la liste…"
 msgstr "Edit list…"
 
-#: src/lists.rs:494
+#: src/lists.rs:537
 msgid "Supprimer la liste…"
 msgstr "Delete list…"
 
-#: src/lists.rs:514
+#: src/lists.rs:557
 msgid "Ne plus masquer ces comptes"
 msgstr "Unmute these accounts"
 
-#: src/lists.rs:516
+#: src/lists.rs:559
 msgid "Masquer ces comptes"
 msgstr "Mute these accounts"
 
-#: src/lists.rs:520
+#: src/lists.rs:563
 msgid "Ne plus bloquer ces comptes"
 msgstr "Unblock these accounts"
 
-#: src/lists.rs:522
+#: src/lists.rs:565
 msgid "Bloquer ces comptes"
 msgstr "Block these accounts"
 
-#: src/lists.rs:539
+#: src/lists.rs:582
 msgid "Les comptes de cette liste sont masqués."
 msgstr "Accounts in this list are muted."
 
-#: src/lists.rs:541
+#: src/lists.rs:584
 msgid "Les comptes de cette liste ne sont plus masqués."
 msgstr "Accounts in this list are no longer muted."
 
-#: src/lists.rs:560
+#: src/lists.rs:603
 msgid "Les comptes de cette liste ne sont plus bloqués."
 msgstr "Accounts in this list are no longer blocked."
 
-#: src/lists.rs:566
+#: src/lists.rs:609
 msgid "Les comptes de cette liste sont bloqués."
 msgstr "Accounts in this list are blocked."
 
-#: src/lists.rs:578
+#: src/lists.rs:621
 msgid "Supprimer cette liste ?"
 msgstr "Delete this list?"
 
-#: src/lists.rs:580
+#: src/lists.rs:623
 msgid "Elle disparaîtra pour tout le monde. Ses comptes ne sont pas prévenus."
 msgstr "It will disappear for everyone. Its accounts are not notified."
 
-#: src/lists.rs:585 src/window.rs:1273
+#: src/lists.rs:628 src/window.rs:1273
 msgid "Supprimer"
 msgstr "Delete"
 
-#: src/lists.rs:602
+#: src/lists.rs:645
 msgid "Liste supprimée."
 msgstr "List deleted."
 
-#: src/lists.rs:672
+#: src/lists.rs:715
 msgid "Retirer de la liste"
 msgstr "Remove from list"
 
-#: src/lists.rs:677
+#: src/lists.rs:720
 msgid "Retirer {} de la liste"
 msgstr "Remove {} from the list"
 
-#: src/lists.rs:685
+#: src/lists.rs:728
 msgid "Compte retiré de la liste."
 msgstr "Account removed from the list."
 
-#: src/lists.rs:699
+#: src/lists.rs:742
 msgid "Cette liste est vide."
 msgstr "This list is empty."
 
-#: src/lists.rs:734
+#: src/lists.rs:777
 msgid "Listes de {}"
 msgstr "Lists for {}"
 
-#: src/lists.rs:761
+#: src/lists.rs:804
 msgid "Ajouter à une liste"
 msgstr "Add to a list"
 
-#: src/lists.rs:790
+#: src/lists.rs:833
 msgid "Liste de comptes"
 msgstr "List of accounts"
 
-#: src/lists.rs:809
+#: src/lists.rs:852
 msgid "Ajouté à « {} »."
 msgstr "Added to “{}”."
 
-#: src/lists.rs:820
+#: src/lists.rs:863
 msgid "Retiré de « {} »."
 msgstr "Removed from “{}”."
 
@@ -1391,11 +1407,11 @@ msgstr "Reopen the browser"
 msgid "Ouverture de la session…"
 msgstr "Opening session…"
 
-#: src/login.rs:179 src/window.rs:2289
+#: src/login.rs:179 src/window.rs:2297
 msgid "À propos de Tsubame"
 msgstr "About Tsubame"
 
-#: src/login.rs:184 src/login.rs:187 src/window.rs:2295 src/window.rs:2297
+#: src/login.rs:184 src/login.rs:187 src/window.rs:2303 src/window.rs:2305
 msgid "Menu principal"
 msgstr "Main menu"
 
@@ -1640,11 +1656,11 @@ msgctxt "réglage d'une étiquette de contenu"
 msgid "Masquer"
 msgstr "Hide"
 
-#: src/moderation.rs:592
+#: src/moderation.rs:597
 msgid "Contenu signalé par la modération"
 msgstr "Content flagged by moderation"
 
-#: src/moderation.rs:666
+#: src/moderation.rs:671
 msgid "Préférences illisibles."
 msgstr "Unreadable preferences."
 
@@ -1656,7 +1672,7 @@ msgstr "Nothing to show yet"
 msgid "Pas encore disponible"
 msgstr "Not available yet"
 
-#: src/preferences.rs:107 src/window.rs:2285
+#: src/preferences.rs:107 src/window.rs:2293
 msgid "Préférences"
 msgstr "Preferences"
 
@@ -2279,7 +2295,7 @@ msgstr "No post open"
 msgid "Choisissez un post pour afficher la discussion."
 msgstr "Choose a post to show the conversation."
 
-#: src/thread.rs:84 src/window.rs:1106 src/window.rs:2165
+#: src/thread.rs:84 src/window.rs:1106 src/window.rs:2173
 msgid "Discussion"
 msgstr "Conversation"
 
@@ -2439,26 +2455,26 @@ msgstr "The post was not added to bookmarks."
 msgid "Le post n'a pas été retiré des signets."
 msgstr "The post was not removed from bookmarks."
 
-#: src/window.rs:2183
+#: src/window.rs:2191
 msgid "Aucune colonne ouverte"
 msgstr "No columns open"
 
-#: src/window.rs:2193
+#: src/window.rs:2201
 msgid "Accueil"
 msgstr "Home"
 
-#: src/window.rs:2280
+#: src/window.rs:2288
 msgid "Navigation"
 msgstr "Navigation"
 
-#: src/window.rs:2286
+#: src/window.rs:2294
 msgid "Se déconnecter…"
 msgstr "Sign out…"
 
-#: src/window.rs:2456
+#: src/window.rs:2464
 msgid "Colonnes ouvertes"
 msgstr "Open columns"
 
-#: src/window.rs:2458
+#: src/window.rs:2466
 msgid "Ailleurs"
 msgstr "Elsewhere"

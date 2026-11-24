@@ -138,6 +138,9 @@ impl ColumnKind {
             ColumnKind::Feed(Feed::Following) => Some(Source::Timeline),
             ColumnKind::Feed(Feed::Discover) => Some(Source::Feed(DISCOVER_FEED.to_owned())),
             ColumnKind::Notifications => Some(Source::Notifications),
+            ColumnKind::Custom(feed) if crate::api::is_list_uri(&feed.uri()) => {
+                Some(Source::List(feed.uri()))
+            }
             ColumnKind::Custom(feed) => Some(Source::Feed(feed.uri())),
             // « Linux et libre » est le fil fictif des maquettes.
             ColumnKind::Feed(Feed::LinuxEtLibre) => None,
