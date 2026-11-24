@@ -87,6 +87,85 @@ pub fn detect(text: &str) -> Vec<Facet> {
     facets
 }
 
+/// Adresse interne d'un lien vers un mot-dièse.
+pub const TAG_LINK: &str = "tsubame-tag:";
+/// Adresse interne d'un lien vers un profil (DID ou identifiant).
+pub const PROFILE_LINK: &str = "tsubame-profile:";
+
+/// Facettes d'un post reçu (champ `facets` de son enregistrement). Les
+/// mentions portent le DID du compte.
+pub fn from_record(record: &serde_json::Value) -> Vec<Facet> {
+    let Some(facets) = record.get("facets").and_then(|f| f.as_array()) else {
+        return Vec::new();
+    };
+    facets
+        .iter()
+        .filter_map(|facet| {
+            let index = facet.get("index")?;
+            let start = usize::try_from(index.get("byteStart")?.as_u64()?).ok()?;
+            let end = usize::try_from(index.get("byteEnd")?.as_u64()?).ok()?;
+            let feature = facet.get("features")?.as_array()?.first()?;
+            let feature = match feature.get("$type")?.as_str()? {
+                "app.bsky.richtext.facet#link" => {
+                    Feature::Link(feature.get("uri")?.as_str()?.to_owned())
+                }
+                "app.bsky.richtext.facet#tag" => {
+                    Feature::Tag(feature.get("tag")?.as_str()?.to_owned())
+                }
+                "app.bsky.richtext.facet#mention" => {
+                    Feature::Mention(feature.get("did")?.as_str()?.to_owned())
+                }
+                _ => return None,
+            };
+            Some(Facet {
+                start,
+                end,
+                feature,
+            })
+        })
+        .collect()
+}
+
+/// Texte en balisage Pango, les facettes devenant des liens : adresse web,
+/// ou adresse interne (`TAG_LINK`, `PROFILE_LINK`). Une facette mal placée
+/// (hors du texte, au milieu d'un caractère, chevauchant une autre) reste
+/// du texte simple.
+pub fn markup(text: &str, facets: &[Facet]) -> String {
+    use gtk::glib::markup_escape_text as escape;
+
+    let mut facets: Vec<&Facet> = facets.iter().collect();
+    facets.sort_by_key(|f| f.start);
+    let mut out = String::new();
+    let mut at = 0;
+    for facet in facets {
+        if facet.start < at
+            || facet.end <= facet.start
+            || facet.end > text.len()
+            || !text.is_char_boundary(facet.start)
+            || !text.is_char_boundary(facet.end)
+        {
+            continue;
+        }
+        let href = match &facet.feature {
+            Feature::Link(uri) if uri.starts_with("https://") || uri.starts_with("http://") => {
+                uri.clone()
+            }
+            Feature::Link(_) => continue,
+            Feature::Tag(tag) => format!("{TAG_LINK}{tag}"),
+            Feature::Mention(actor) => format!("{PROFILE_LINK}{actor}"),
+        };
+        out.push_str(&escape(&text[at..facet.start]));
+        out.push_str(&format!(
+            "<a href=\"{}\">{}</a>",
+            escape(&href),
+            escape(&text[facet.start..facet.end])
+        ));
+        at = facet.end;
+    }
+    out.push_str(&escape(&text[at..]));
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -141,5 +220,39 @@ mod tests {
     fn ignores_what_is_not_a_tag_or_mention() {
         assert!(detect("C#, prix #12 et adresse@exemple.fr").is_empty());
         assert!(detect("#").is_empty());
+    }
+
+    #[test]
+    fn received_facets_become_links() {
+        let text = "Salut @lucie ! #GNOME <3 https://gnome.org";
+        let record = serde_json::json!({"text": text, "facets": [
+            {"index": {"byteStart": 6, "byteEnd": 12},
+             "features": [{"$type": "app.bsky.richtext.facet#mention", "did": "did:plc:lucie"}]},
+            {"index": {"byteStart": 15, "byteEnd": 21},
+             "features": [{"$type": "app.bsky.richtext.facet#tag", "tag": "GNOME"}]},
+            {"index": {"byteStart": 25, "byteEnd": 42},
+             "features": [{"$type": "app.bsky.richtext.facet#link", "uri": "https://gnome.org"}]},
+            {"index": {"byteStart": 8, "byteEnd": 14},
+             "features": [{"$type": "app.bsky.richtext.facet#link", "uri": "https://chevauche.example"}]},
+        ]});
+        let facets = from_record(&record);
+        assert_eq!(facets.len(), 4);
+        assert_eq!(
+            markup(text, &facets),
+            "Salut <a href=\"tsubame-profile:did:plc:lucie\">@lucie</a> ! \
+             <a href=\"tsubame-tag:GNOME\">#GNOME</a> &lt;3 \
+             <a href=\"https://gnome.org\">https://gnome.org</a>"
+        );
+    }
+
+    #[test]
+    fn bad_facets_stay_text() {
+        let text = "é";
+        let facets = [Facet {
+            start: 1,
+            end: 2,
+            feature: Feature::Link("javascript:alert(1)".into()),
+        }];
+        assert_eq!(markup(text, &facets), "é");
     }
 }

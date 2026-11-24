@@ -32,6 +32,31 @@ fn label(text: &str, classes: &[&str]) -> gtk::Label {
     label
 }
 
+/// Texte d'un post, avec ses liens, mentions et mots-dièse cliquables. Les
+/// adresses web s'ouvrent dans le navigateur ; mentions et mots-dièse
+/// passent par les actions `win.open-profile` et `win.open-tag`.
+fn rich_text(text: &str, facets: &[crate::richtext::Facet], classes: &[&str]) -> gtk::Label {
+    use crate::richtext::{PROFILE_LINK, TAG_LINK, markup};
+
+    let label = label(text, classes);
+    if facets.is_empty() {
+        return label;
+    }
+    label.set_markup(&markup(text, facets));
+    label.connect_activate_link(|label, uri| {
+        let (action, value) = if let Some(tag) = uri.strip_prefix(TAG_LINK) {
+            ("win.open-tag", tag)
+        } else if let Some(actor) = uri.strip_prefix(PROFILE_LINK) {
+            ("win.open-profile", actor)
+        } else {
+            return glib::Propagation::Proceed;
+        };
+        let _ = label.activate_action(action, Some(&value.to_variant()));
+        glib::Propagation::Stop
+    });
+    label
+}
+
 /// Ligne « nom · heure » en haut d'une carte.
 /// Ouvre le profil de `handle` au clic.
 fn link_to_profile(button: &gtk::Button, name: &str, handle: &str) {
@@ -171,8 +196,10 @@ fn media(media: &Media, warning: Option<String>) -> gtk::Widget {
             gtk::Align::Start,
         ));
     }
-    if let Some(playlist) = &media.video {
-        add_play_button(&overlay, playlist, &description, height);
+    match &media.video {
+        Some(playlist) if media.gif => add_gif_button(&overlay, playlist, &description, height),
+        Some(playlist) => add_play_button(&overlay, playlist, &description, height),
+        None => {}
     }
     if let Some(warning) = warning {
         add_warning(&overlay, &content, &warning);
@@ -335,6 +362,112 @@ fn add_play_button(overlay: &gtk::Overlay, playlist: &str, description: &str, he
     });
 }
 
+/// GIF (vidéo `presentation: gif`) : « Lire le GIF » ; un clic le lit en
+/// boucle, sans son ni commandes ; un autre clic le met en pause. Pas de
+/// lecture automatique : rien ne bouge sans le demander.
+fn add_gif_button(overlay: &gtk::Overlay, playlist: &str, description: &str, height: i32) {
+    overlay.add_overlay(&badge(
+        &gettext("GIF"),
+        &gettext("GIF animé"),
+        gtk::Align::Start,
+        gtk::Align::End,
+    ));
+    let play = gtk::Button::builder()
+        .icon_name("media-playback-start-symbolic")
+        .tooltip_text(gettext("Lire le GIF"))
+        .halign(gtk::Align::Center)
+        .valign(gtk::Align::Center)
+        .css_classes(["circular", "osd", "video-play"])
+        .build();
+    play.update_property(&[gtk::accessible::Property::Label(&gettext("Lire le GIF"))]);
+    overlay.add_overlay(&play);
+    let (playlist, description) = (playlist.to_owned(), description.to_owned());
+    let weak = overlay.downgrade();
+    play.connect_clicked(move |play| {
+        let Some(overlay) = weak.upgrade() else {
+            return;
+        };
+        let media = gtk::MediaFile::for_file(&gio::File::for_uri(&playlist));
+        media.set_loop(true);
+        media.set_muted(true);
+        let picture = gtk::Picture::builder()
+            .paintable(&media)
+            .height_request(height)
+            .content_fit(gtk::ContentFit::Cover)
+            .build();
+        picture.update_property(&[gtk::accessible::Property::Label(&description)]);
+        // Pause et reprise au clic, ou avec Espace sur le bouton qui l'entoure.
+        let toggle = gtk::Button::builder()
+            .child(&picture)
+            .tooltip_text(gettext("Mettre en pause ou reprendre le GIF"))
+            .css_classes(["flat", "gif-toggle"])
+            .build();
+        toggle.update_property(&[gtk::accessible::Property::Label(
+            &gettext("GIF : {}").replace("{}", &description),
+        )]);
+        let playing = media.clone();
+        toggle.connect_clicked(move |_| {
+            if playing.is_playing() {
+                playing.pause();
+            } else {
+                playing.play();
+            }
+        });
+        media.play();
+        overlay.set_child(Some(&toggle));
+        play.set_visible(false);
+        toggle.grab_focus();
+    });
+}
+
+/// Texte d'un post sans image, caché sous un avertissement : une ligne
+/// « ⚠ étiquette » et « Afficher », qui révèle le texte.
+fn warned_text(text: gtk::Label, warning: &str) -> gtk::Widget {
+    let bar = gtk::Box::builder()
+        .spacing(8)
+        .css_classes(["text-warning"])
+        .build();
+    bar.append(&decorative_icon("dialog-warning-symbolic"));
+    bar.append(
+        &gtk::Label::builder()
+            .label(warning)
+            .wrap(true)
+            .xalign(0.0)
+            .hexpand(true)
+            .css_classes(["heading"])
+            .build(),
+    );
+    let show = gtk::Button::builder()
+        .label(pgettext("voir une image floutée", "Afficher"))
+        .valign(gtk::Align::Center)
+        .css_classes(["pill"])
+        .build();
+    show.update_property(&[gtk::accessible::Property::Description(warning)]);
+    bar.append(&show);
+    let revealer = gtk::Revealer::builder().child(&text).build();
+    let holder = gtk::Box::builder()
+        .orientation(gtk::Orientation::Vertical)
+        .spacing(6)
+        .build();
+    holder.append(&bar);
+    holder.append(&revealer);
+    show.connect_clicked(move |show| {
+        revealer.set_reveal_child(true);
+        show.set_visible(false);
+    });
+    holder.upcast()
+}
+
+/// Texte du post, caché sous l'avertissement d'une étiquette s'il n'a pas
+/// d'image à flouter.
+fn post_text(post: &Post, classes: &[&str]) -> gtk::Widget {
+    let text = rich_text(&post.text, &post.facets, classes);
+    match crate::moderation::media_warning(post) {
+        Some(warning) if post.media.is_none() => warned_text(text, &warning),
+        _ => text.upcast(),
+    }
+}
+
 /// Image floutée sous un avertissement, avec « Afficher » pour la voir.
 fn add_warning(overlay: &gtk::Overlay, content: &gtk::Widget, warning: &str) {
     content.add_css_class("media-blurred");
@@ -468,6 +601,12 @@ fn more_menu(post: &Post, key: &str) -> gtk::MenuButton {
     let menu = gio::Menu::new();
     let sharing = gio::Menu::new();
     sharing.append_item(&item(gettext("Copier le lien"), "win.copy-link", key));
+    if post.uri.is_some() {
+        sharing.append_item(&item(gettext("Envoyer en message…"), "win.send-post", key));
+    }
+    if !post.text.trim().is_empty() {
+        sharing.append_item(&item(gettext("Traduire"), "win.translate", key));
+    }
     menu.append_section(None, &sharing);
     if crate::interactions::is_mine(post) {
         let mine = gio::Menu::new();
@@ -721,7 +860,7 @@ pub fn post_card(post: &Post) -> gtk::Box {
     }
     body.append(&meta(&post.name, &post.handle, &post.time));
     if !post.text.is_empty() {
-        body.append(&label(&post.text, &[]));
+        body.append(&post_text(post, &[]));
     }
     if let Some(m) = &post.media {
         body.append(&media(m, crate::moderation::media_warning(post)));
@@ -891,7 +1030,7 @@ pub fn reply_card(reply: &Reply) -> gtk::Box {
     );
     card.set_tooltip_text(Some(&format!("@{}", reply.handle)));
     body.append(&meta(&reply.name, &reply.handle, &reply.time));
-    body.append(&label(&reply.text, &[]));
+    body.append(&rich_text(&reply.text, &reply.facets, &[]));
     card
 }
 
@@ -980,7 +1119,7 @@ pub fn post_detail(post: &Post) -> gtk::Box {
         &format!("@{} · {}", post.handle, post.date),
         &["dim-label", "caption"],
     ));
-    body.append(&label(&post.text, &["post-detail-text"]));
+    body.append(&post_text(post, &["post-detail-text"]));
     if let Some(m) = &post.media {
         body.append(&media(m, crate::moderation::media_warning(post)));
     }

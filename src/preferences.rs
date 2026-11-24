@@ -2,13 +2,14 @@
 //! « Modération » : comptes masqués et bloqués, mots masqués, contenu
 //! sensible, services d'étiquetage.
 
+use chrono::Datelike;
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
 
 use adw::prelude::*;
-use gettextrs::gettext;
-use gtk::glib;
+use gettextrs::{gettext, pgettext};
+use gtk::{gio, glib};
 use serde_json::Value;
 
 use crate::api::{self, ApiError};
@@ -22,8 +23,13 @@ use crate::runtime::runtime;
 enum Change {
     Adult(bool),
     Label(&'static str, Visibility),
-    AddWord(String),
+    /// Mot, mots-clics seulement, durée en heures (`None` : toujours).
+    AddWord(String, bool, Option<i64>),
     RemoveWord(String),
+    /// Se désabonner d'un service d'étiquetage.
+    DropLabeler(String),
+    /// Réglage d'une étiquette d'un service tiers : service, étiquette.
+    LabelerLabel(String, String, Visibility),
 }
 
 impl Change {
@@ -33,8 +39,17 @@ impl Change {
             Change::Label(label, visibility) => {
                 moderation::set_label_visibility(preferences, label, *visibility)
             }
-            Change::AddWord(word) => moderation::add_muted_word(preferences, word),
+            Change::AddWord(word, tags_only, hours) => moderation::add_muted_word_with(
+                preferences,
+                word,
+                *tags_only,
+                hours.map(|h| chrono::Utc::now() + chrono::Duration::hours(h)),
+            ),
             Change::RemoveWord(word) => moderation::remove_muted_word(preferences, word),
+            Change::DropLabeler(did) => moderation::set_labeler(preferences, did, false),
+            Change::LabelerLabel(did, label, visibility) => {
+                moderation::set_labeler_label_visibility(preferences, did, label, *visibility)
+            }
         }
     }
 }
@@ -105,9 +120,14 @@ pub fn present(
     let muted_row = link_row(&gettext("Comptes masqués"), &muted_count);
     let blocked_row = link_row(&gettext("Comptes bloqués"), &blocked_count);
     let words_row = link_row(&gettext("Mots et mots-clics masqués"), &words_count);
+    let lists_row = link_row(
+        &gettext("Listes de modération suivies"),
+        &gtk::Label::new(None),
+    );
     accounts.add(&muted_row);
     accounts.add(&blocked_row);
     accounts.add(&words_row);
+    accounts.add(&lists_row);
     page.add(&accounts);
 
     // Contenu sensible.
@@ -153,6 +173,12 @@ pub fn present(
     page.add(&labelers);
     dialog.add(&page);
 
+    // Langues, réglages de cet ordinateur (GSettings).
+    dialog.add(&languages_page());
+    if let Some(session) = &session {
+        dialog.add(&account_page(session.clone(), &dialog));
+    }
+
     // Notifications du bureau, réglage de cet ordinateur (GSettings).
     let notifications = adw::PreferencesPage::builder()
         .title(gettext("Notifications"))
@@ -187,7 +213,12 @@ pub fn present(
         adult,
         labels,
         labelers,
-        rows: vec![muted_row.clone(), blocked_row.clone(), words_row.clone()],
+        rows: vec![
+            muted_row.clone(),
+            blocked_row.clone(),
+            words_row.clone(),
+            lists_row.clone(),
+        ],
         filling: std::cell::Cell::new(false),
     });
 
@@ -221,6 +252,12 @@ pub fn present(
         }
     });
     let weak = Rc::downgrade(&this);
+    lists_row.connect_activated(move |_| {
+        if let Some(this) = weak.upgrade() {
+            this.show_lists();
+        }
+    });
+    let weak = Rc::downgrade(&this);
     words_row.connect_activated(move |_| {
         if let Some(this) = weak.upgrade() {
             this.show_words();
@@ -246,9 +283,13 @@ impl Dialog {
             let preferences = moderation::preferences(session.clone()).await?;
             let mutes = moderation::mutes(session.clone()).await?.len();
             let blocks = moderation::blocks(session.clone()).await?.len();
-            let names = moderation::labeler_names(session, moderation::labelers(&preferences))
-                .await
-                .unwrap_or_default();
+            let names = moderation::labeler_details(
+                session,
+                moderation::labelers(&preferences),
+                moderation::interface_language(),
+            )
+            .await
+            .unwrap_or_default();
             Ok::<_, ApiError>((preferences, mutes, blocks, names))
         });
         let weak = Rc::downgrade(self);
@@ -267,11 +308,11 @@ impl Dialog {
     }
 
     fn fill(
-        &self,
+        self: &Rc<Self>,
         preferences: Vec<Value>,
         mutes: usize,
         blocks: usize,
-        labelers: Vec<(String, String)>,
+        labelers: Vec<(String, String, Vec<moderation::LabelDefinition>)>,
     ) {
         self.filling.set(true);
         self.adult
@@ -288,14 +329,64 @@ impl Dialog {
         self.blocked_count.set_label(&blocks.to_string());
         self.words_count
             .set_label(&moderation::muted_words(&preferences).len().to_string());
-        for (_, name) in labelers {
-            self.labelers.add(
-                &adw::ActionRow::builder()
-                    .title(&name)
-                    .subtitle(gettext("Abonnement actif"))
+        let choices = gtk::StringList::new(&[]);
+        for visibility in Visibility::ALL {
+            choices.append(&visibility.title());
+        }
+        for (did, name, definitions) in labelers {
+            // Une rangée par service, ouverte sur le réglage de chacune de
+            // ses étiquettes (les informatives n'en ont pas).
+            let row = adw::ExpanderRow::builder()
+                .title(&name)
+                .subtitle(gettext("Abonnement actif"))
+                .use_markup(false)
+                .build();
+            for definition in definitions.iter().filter(|d| !d.inform_only) {
+                let combo = adw::ComboRow::builder()
+                    .title(&definition.name)
                     .use_markup(false)
-                    .build(),
-            );
+                    .model(&choices)
+                    .build();
+                let visibility = moderation::labeler_label_visibility(&preferences, definition);
+                let index = Visibility::ALL
+                    .iter()
+                    .position(|v| *v == visibility)
+                    .unwrap_or(1);
+                combo.set_selected(index as u32);
+                let weak = Rc::downgrade(self);
+                let (did, value) = (did.clone(), definition.value.clone());
+                combo.connect_selected_notify(move |combo| {
+                    if let (Some(this), Some(visibility)) = (
+                        weak.upgrade(),
+                        Visibility::ALL.get(combo.selected() as usize),
+                    ) {
+                        this.change(Change::LabelerLabel(
+                            did.clone(),
+                            value.clone(),
+                            *visibility,
+                        ));
+                    }
+                });
+                row.add_row(&combo);
+            }
+            let drop = gtk::Button::builder()
+                .label(gettext("Se désabonner"))
+                .valign(gtk::Align::Center)
+                .build();
+            drop.update_property(&[gtk::accessible::Property::Label(
+                &gettext("Se désabonner de {}").replace("{}", &name),
+            )]);
+            let weak = Rc::downgrade(self);
+            drop.connect_clicked(move |button| {
+                if let Some(this) = weak.upgrade() {
+                    this.change(Change::DropLabeler(did.clone()));
+                    if let Some(row) = button.ancestor(adw::ActionRow::static_type()) {
+                        row.set_visible(false);
+                    }
+                }
+            });
+            row.add_suffix(&drop);
+            self.labelers.add(&row);
         }
         self.preferences.replace(preferences);
         self.adult.set_sensitive(true);
@@ -329,8 +420,13 @@ impl Dialog {
             return;
         };
         let task = runtime().spawn(async move {
-            moderation::update_preferences(session, move |preferences| change.apply(preferences))
-                .await
+            let preferences = moderation::update_preferences(session.clone(), move |preferences| {
+                change.apply(preferences)
+            })
+            .await?;
+            // Les étiquettes suivent les services encore choisis.
+            moderation::configure_labelers(session, moderation::labelers(&preferences)).await;
+            Ok::<_, ApiError>(preferences)
         });
         let weak = Rc::downgrade(self);
         glib::spawn_future_local(async move {
@@ -348,6 +444,100 @@ impl Dialog {
                         "La préférence n'a pas été enregistrée.",
                     )));
                 }
+            }
+        });
+    }
+
+    /// Listes de modération suivies, avec « Ne plus masquer » ou « Ne plus
+    /// bloquer ».
+    fn show_lists(self: &Rc<Self>) {
+        let group = adw::PreferencesGroup::builder()
+            .description(gettext(
+                "Les comptes de ces listes sont masqués ou bloqués pour vous.",
+            ))
+            .build();
+        let page = adw::PreferencesPage::new();
+        page.add(&group);
+        self.dialog
+            .push_subpage(&subpage(&gettext("Listes de modération suivies"), &page));
+        let Some(session) = self.session.clone() else {
+            group.add(&empty_list_row());
+            return;
+        };
+        let task = runtime().spawn(crate::lists::subscribed(session.clone()));
+        let weak = Rc::downgrade(self);
+        glib::spawn_future_local(async move {
+            let result = task
+                .await
+                .unwrap_or_else(|_| Err(ApiError::new(gettext("Chargement interrompu."))));
+            let Some(this) = weak.upgrade() else { return };
+            let lists = match result {
+                Ok(lists) => lists,
+                Err(error) => {
+                    this.dialog.add_toast(adw::Toast::new(&error.message));
+                    return;
+                }
+            };
+            if lists.is_empty() {
+                group.add(&empty_list_row());
+            }
+            for list in lists {
+                let mut state = Vec::new();
+                if list.muted {
+                    state.push(gettext("Comptes masqués"));
+                }
+                if list.blocked.is_some() {
+                    state.push(gettext("Comptes bloqués"));
+                }
+                let row = adw::ActionRow::builder()
+                    .title(&list.name)
+                    .subtitle(state.join(" · "))
+                    .use_markup(false)
+                    .build();
+                let undo = gtk::Button::builder()
+                    .label(if list.blocked.is_some() {
+                        gettext("Ne plus bloquer")
+                    } else {
+                        gettext("Ne plus masquer")
+                    })
+                    .valign(gtk::Align::Center)
+                    .build();
+                undo.update_property(&[gtk::accessible::Property::Label(
+                    &gettext("Ne plus suivre la liste {}").replace("{}", &list.name),
+                )]);
+                let (session, weak) = (session.clone(), Rc::downgrade(&this));
+                undo.connect_clicked(move |button| {
+                    let (session, list) = (session.clone(), list.clone());
+                    // Ne plus masquer, ni bloquer : la liste n'agit plus.
+                    let task = runtime().spawn(async move {
+                        if list.muted {
+                            crate::lists::set_muted(session.clone(), list.uri.clone(), false)
+                                .await?;
+                        }
+                        if let Some(record) = list.blocked {
+                            api::delete(session, record).await?;
+                        }
+                        Ok::<_, ApiError>(())
+                    });
+                    let (weak, row) =
+                        (weak.clone(), button.ancestor(adw::ActionRow::static_type()));
+                    glib::spawn_future_local(async move {
+                        let result = task.await.unwrap_or_else(|_| {
+                            Err(ApiError::new(gettext("Requête interrompue.")))
+                        });
+                        let Some(this) = weak.upgrade() else { return };
+                        match result {
+                            Ok(()) => {
+                                if let Some(row) = row {
+                                    row.set_visible(false);
+                                }
+                            }
+                            Err(error) => this.dialog.add_toast(adw::Toast::new(&error.message)),
+                        }
+                    });
+                });
+                row.add_suffix(&undo);
+                group.add(&row);
             }
         });
     }
@@ -483,6 +673,27 @@ impl Dialog {
             ))
             .build();
         adding.add(&add);
+        // Durées proposées, en heures (0 : toujours).
+        const DURATIONS: [i64; 4] = [0, 24, 24 * 7, 24 * 30];
+        let durations = gtk::StringList::new(&[]);
+        for hours in DURATIONS {
+            durations.append(&match hours {
+                0 => gettext("Toujours"),
+                24 => gettext("24 heures"),
+                168 => gettext("7 jours"),
+                _ => gettext("30 jours"),
+            });
+        }
+        let duration = adw::ComboRow::builder()
+            .title(gettext("Durée"))
+            .model(&durations)
+            .build();
+        let tags_only = adw::SwitchRow::builder()
+            .title(gettext("Mots-clics seulement"))
+            .subtitle(gettext("Ne pas chercher le mot dans le texte des posts."))
+            .build();
+        adding.add(&duration);
+        adding.add(&tags_only);
         let words = adw::PreferencesGroup::new();
         let page = adw::PreferencesPage::new();
         page.add(&adding);
@@ -491,56 +702,378 @@ impl Dialog {
             .push_subpage(&subpage(&gettext("Mots et mots-clics masqués"), &page));
 
         let rows: Rc<RefCell<Vec<adw::ActionRow>>> = Rc::default();
-        let refill: Rc<dyn Fn()> = {
-            let (weak, words, rows) = (Rc::downgrade(self), words.clone(), rows.clone());
-            Rc::new(move || {
-                let Some(this) = weak.upgrade() else { return };
-                for row in rows.borrow_mut().drain(..) {
-                    words.remove(&row);
-                }
-                for word in moderation::muted_words(&this.preferences.borrow()) {
-                    let row = adw::ActionRow::builder()
-                        .title(&word)
-                        .use_markup(false)
-                        .build();
-                    let remove = gtk::Button::builder()
-                        .icon_name("user-trash-symbolic")
-                        .valign(gtk::Align::Center)
-                        .tooltip_text(gettext("Retirer « {} »").replace("{}", &word))
-                        .css_classes(["flat"])
-                        .build();
-                    remove.update_property(&[gtk::accessible::Property::Label(
-                        &gettext("Retirer « {} »").replace("{}", &word),
-                    )]);
-                    row.add_suffix(&remove);
-                    let weak = Rc::downgrade(&this);
-                    let word = word.clone();
-                    remove.connect_clicked(move |button| {
-                        if let Some(this) = weak.upgrade() {
-                            this.change(Change::RemoveWord(word.clone()));
-                            if let Some(row) = button.ancestor(adw::ActionRow::static_type()) {
-                                row.set_visible(false);
-                            }
+        let refill: Rc<dyn Fn()> =
+            {
+                let (weak, words, rows) = (Rc::downgrade(self), words.clone(), rows.clone());
+                Rc::new(move || {
+                    let Some(this) = weak.upgrade() else { return };
+                    for row in rows.borrow_mut().drain(..) {
+                        words.remove(&row);
+                    }
+                    let now = chrono::Utc::now();
+                    for item in moderation::muted_word_items(&this.preferences.borrow()) {
+                        let word = item.value.clone();
+                        let mut details = Vec::new();
+                        if item.tags_only {
+                            details.push(gettext("Mots-clics seulement"));
                         }
-                    });
-                    words.add(&row);
-                    rows.borrow_mut().push(row);
-                }
-            })
-        };
+                        match item.expires {
+                            Some(end) if end <= now => details.push(gettext("Expiré")),
+                            Some(end) => {
+                                let local = end.with_timezone(&chrono::Local);
+                                details.push(gettext("Jusqu'au {}").replace(
+                                    "{}",
+                                    &crate::api::day_month(local.day(), local.month()),
+                                ));
+                            }
+                            None => {}
+                        }
+                        let row = adw::ActionRow::builder()
+                            .title(&word)
+                            .subtitle(details.join(" · "))
+                            .use_markup(false)
+                            .build();
+                        let remove = gtk::Button::builder()
+                            .icon_name("user-trash-symbolic")
+                            .valign(gtk::Align::Center)
+                            .tooltip_text(gettext("Retirer « {} »").replace("{}", &word))
+                            .css_classes(["flat"])
+                            .build();
+                        remove.update_property(&[gtk::accessible::Property::Label(
+                            &gettext("Retirer « {} »").replace("{}", &word),
+                        )]);
+                        row.add_suffix(&remove);
+                        let weak = Rc::downgrade(&this);
+                        let word = word.clone();
+                        remove.connect_clicked(move |button| {
+                            if let Some(this) = weak.upgrade() {
+                                this.change(Change::RemoveWord(word.clone()));
+                                if let Some(row) = button.ancestor(adw::ActionRow::static_type()) {
+                                    row.set_visible(false);
+                                }
+                            }
+                        });
+                        words.add(&row);
+                        rows.borrow_mut().push(row);
+                    }
+                })
+            };
         refill();
         let weak = Rc::downgrade(self);
+        let (duration, tags_only) = (duration.clone(), tags_only.clone());
         add.connect_apply(move |entry| {
             let word = entry.text().trim().to_owned();
             if let Some(this) = weak.upgrade()
                 && !word.is_empty()
             {
-                this.change(Change::AddWord(word));
+                let hours = DURATIONS
+                    .get(duration.selected() as usize)
+                    .copied()
+                    .filter(|h| *h > 0);
+                this.change(Change::AddWord(word, tags_only.is_active(), hours));
                 entry.set_text("");
                 refill();
             }
         });
     }
+}
+
+/// Page « Compte » : identité, gestion sur le site de Bluesky (adresse
+/// e-mail, mot de passe, désactivation), export des données.
+fn account_page(session: Arc<Session>, dialog: &adw::PreferencesDialog) -> adw::PreferencesPage {
+    let chat_session = session.clone();
+    let page = adw::PreferencesPage::builder()
+        .title(gettext("Compte"))
+        .icon_name("avatar-default-symbolic")
+        .build();
+    let identity = adw::PreferencesGroup::new();
+    identity.add(
+        &adw::ActionRow::builder()
+            .title(gettext("Identifiant"))
+            .subtitle(format!("@{}", session.account.handle))
+            .subtitle_selectable(true)
+            .use_markup(false)
+            .build(),
+    );
+    identity.add(
+        &adw::ActionRow::builder()
+            .title(gettext("Identifiant permanent (DID)"))
+            .subtitle(&session.account.did)
+            .subtitle_selectable(true)
+            .use_markup(false)
+            .build(),
+    );
+    page.add(&identity);
+
+    let manage = adw::PreferencesGroup::builder()
+        .description(gettext(
+            "L'adresse e-mail, le mot de passe et la désactivation du compte se règlent sur le site de Bluesky.",
+        ))
+        .build();
+    let site = adw::ActionRow::builder()
+        .title(gettext("Gérer le compte sur Bluesky"))
+        .activatable(true)
+        .build();
+    site.add_suffix(&crate::card::decorative_icon("adw-external-link-symbolic"));
+    {
+        let dialog = dialog.downgrade();
+        site.connect_activated(move |row| {
+            let window = row.root().and_downcast::<gtk::Window>();
+            let dialog = dialog.clone();
+            gtk::UriLauncher::new("https://bsky.app/settings/account").launch(
+                window.as_ref(),
+                gio::Cancellable::NONE,
+                move |result| {
+                    if let (Err(_), Some(dialog)) = (result, dialog.upgrade()) {
+                        dialog.add_toast(adw::Toast::new(&gettext(
+                            "Le navigateur n'a pas pu être ouvert.",
+                        )));
+                    }
+                },
+            );
+        });
+    }
+    manage.add(&site);
+    let export = adw::ActionRow::builder()
+        .title(gettext("Exporter mes données"))
+        .subtitle(gettext(
+            "Tous vos posts, j'aime, abonnements… dans un fichier CAR.",
+        ))
+        .activatable(true)
+        .build();
+    export.add_suffix(&crate::card::decorative_icon("document-save-symbolic"));
+    {
+        let (session, dialog) = (session.clone(), dialog.downgrade());
+        export.connect_activated(move |row| {
+            let Some(dialog) = dialog.upgrade() else {
+                return;
+            };
+            export_repository(row, session.clone(), dialog);
+        });
+    }
+    manage.add(&export);
+    let handle = adw::ActionRow::builder()
+        .title(gettext("Changer d'identifiant…"))
+        .activatable(true)
+        .build();
+    {
+        let (session, dialog) = (session.clone(), dialog.downgrade());
+        handle.connect_activated(move |_| {
+            if let Some(dialog) = dialog.upgrade() {
+                crate::account::change_handle_dialog(&dialog, session.clone());
+            }
+        });
+    }
+    manage.add(&handle);
+    let passwords = adw::ActionRow::builder()
+        .title(gettext("Mots de passe d'application"))
+        .activatable(true)
+        .build();
+    passwords.add_suffix(&crate::card::decorative_icon("go-next-symbolic"));
+    {
+        let (session, dialog) = (session.clone(), dialog.downgrade());
+        passwords.connect_activated(move |_| {
+            if let Some(dialog) = dialog.upgrade() {
+                let page = crate::account::app_passwords_page(session.clone(), &dialog);
+                dialog.push_subpage(&page);
+            }
+        });
+    }
+    manage.add(&passwords);
+    page.add(&manage);
+    page.add(&messages_group(chat_session, dialog));
+    page
+}
+
+/// Messagerie : qui peut m'écrire (`chat.bsky.actor.declaration`).
+fn messages_group(session: Arc<Session>, dialog: &adw::PreferencesDialog) -> adw::PreferencesGroup {
+    const CHOICES: [&str; 3] = ["all", "following", "none"];
+    let group = adw::PreferencesGroup::builder()
+        .title(gettext("Messages"))
+        .build();
+    let names = gtk::StringList::new(&[]);
+    names.append(&gettext("Tout le monde"));
+    names.append(&gettext("Comptes que vous suivez"));
+    names.append(&pgettext("personne ne peut écrire", "Personne"));
+    let row = adw::ComboRow::builder()
+        .title(gettext("Qui peut vous écrire"))
+        .model(&names)
+        .sensitive(false)
+        .build();
+    group.add(&row);
+    // Lecture du réglage, puis enregistrement à chaque choix.
+    let loading = Rc::new(std::cell::Cell::new(true));
+    {
+        let (session, loading, dialog) = (session.clone(), loading.clone(), dialog.downgrade());
+        row.connect_selected_notify(move |row| {
+            if loading.get() {
+                return;
+            }
+            let value = CHOICES
+                .get(row.selected() as usize)
+                .copied()
+                .unwrap_or("following")
+                .to_owned();
+            let task = runtime().spawn(crate::chat::set_allow_incoming(session.clone(), value));
+            let dialog = dialog.clone();
+            glib::spawn_future_local(async move {
+                if let (Ok(Err(error)), Some(dialog)) = (task.await, dialog.upgrade()) {
+                    dialog.add_toast(adw::Toast::new(&error.message));
+                }
+            });
+        });
+    }
+    let task = runtime().spawn(crate::chat::allow_incoming(session));
+    let weak = row.downgrade();
+    glib::spawn_future_local(async move {
+        let value = task.await.ok().and_then(Result::ok);
+        let Some(row) = weak.upgrade() else { return };
+        if let Some(value) = value {
+            let index = CHOICES.iter().position(|c| *c == value).unwrap_or(1);
+            row.set_selected(index as u32);
+            row.set_sensitive(true);
+        }
+        loading.set(false);
+    });
+    group
+}
+
+/// Télécharge le dépôt du compte (`getRepo`) et l'enregistre là où la
+/// personne le choisit.
+fn export_repository(row: &adw::ActionRow, session: Arc<Session>, dialog: adw::PreferencesDialog) {
+    let chooser = gtk::FileDialog::builder()
+        .title(gettext("Exporter mes données"))
+        .initial_name(format!("{}.car", session.account.handle))
+        .modal(true)
+        .build();
+    let window = row.root().and_downcast::<gtk::Window>();
+    let row = row.clone();
+    chooser.save(window.as_ref(), gio::Cancellable::NONE, move |result| {
+        let Ok(file) = result else { return };
+        row.set_sensitive(false);
+        dialog.add_toast(adw::Toast::new(&gettext("Export en cours…")));
+        let task = runtime().spawn(async move {
+            let api = session.api().await?;
+            let did = session
+                .account
+                .did
+                .parse()
+                .map_err(|_| ApiError::new(gettext("Compte invalide.")))?;
+            api.api
+                .com
+                .atproto
+                .sync
+                .get_repo(
+                    atrium_api::com::atproto::sync::get_repo::ParametersData { did, since: None }
+                        .into(),
+                )
+                .await
+                .map_err(api::request_failed)
+        });
+        glib::spawn_future_local(async move {
+            let result = task
+                .await
+                .unwrap_or_else(|_| Err(ApiError::new(gettext("Requête interrompue."))));
+            let saved = match result {
+                Ok(bytes) => file
+                    .replace_contents_future(bytes, None, false, gio::FileCreateFlags::NONE)
+                    .await
+                    .map(|_| ())
+                    .map_err(|_| gettext("Le fichier n'a pas pu être enregistré.")),
+                Err(error) => Err(error.message),
+            };
+            row.set_sensitive(true);
+            dialog.add_toast(adw::Toast::new(&match saved {
+                Ok(()) => gettext("Données exportées."),
+                Err(message) => message,
+            }));
+        });
+    });
+}
+
+/// Page « Langues » : langue proposée pour les posts, langues des posts
+/// affichés dans les fils.
+fn languages_page() -> adw::PreferencesPage {
+    use crate::compose::LANGUAGES;
+    let settings = crate::settings::settings();
+    let page = adw::PreferencesPage::builder()
+        .title(gettext("Langues"))
+        .icon_name("preferences-desktop-locale-symbolic")
+        .build();
+
+    let mine = adw::PreferencesGroup::builder()
+        .title(gettext("Vos posts"))
+        .build();
+    let names = gtk::StringList::new(&[]);
+    names.append(&gettext("Celle du système"));
+    for (_, name) in LANGUAGES {
+        names.append(name);
+    }
+    let post_language = adw::ComboRow::builder()
+        .title(gettext("Langue proposée"))
+        .subtitle(gettext("Elle se change aussi dans chaque post."))
+        .model(&names)
+        .build();
+    let current = settings.string("post-language");
+    let index = LANGUAGES
+        .iter()
+        .position(|(code, _)| *code == current.as_str())
+        .map_or(0, |i| i + 1);
+    post_language.set_selected(index as u32);
+    {
+        let settings = settings.clone();
+        post_language.connect_selected_notify(move |row| {
+            let code = match row.selected() {
+                0 => "",
+                i => LANGUAGES.get(i as usize - 1).map_or("", |(code, _)| *code),
+            };
+            let _ = settings.set_string("post-language", code);
+        });
+    }
+    mine.add(&post_language);
+    page.add(&mine);
+
+    let shown = adw::PreferencesGroup::builder()
+        .title(gettext("Posts affichés"))
+        .description(gettext(
+            "Seuls les posts dans ces langues s'affichent dans vos fils. Aucune langue cochée : toutes.",
+        ))
+        .build();
+    let wanted: Vec<String> = settings
+        .strv("content-languages")
+        .iter()
+        .map(|l| l.to_string())
+        .collect();
+    for (code, name) in LANGUAGES {
+        let row = adw::SwitchRow::builder()
+            .title(name)
+            .active(wanted.iter().any(|w| w == code))
+            .build();
+        let settings = settings.clone();
+        row.connect_active_notify(move |row| {
+            let mut wanted: Vec<String> = settings
+                .strv("content-languages")
+                .iter()
+                .map(|l| l.to_string())
+                .filter(|l| l != code)
+                .collect();
+            if row.is_active() {
+                wanted.push(code.to_owned());
+            }
+            let refs: Vec<&str> = wanted.iter().map(String::as_str).collect();
+            let _ = settings.set_strv("content-languages", refs.as_slice());
+        });
+        shown.add(&row);
+    }
+    page.add(&shown);
+    page
+}
+
+fn empty_list_row() -> adw::ActionRow {
+    adw::ActionRow::builder()
+        .title(gettext("Aucune liste"))
+        .css_classes(["dim-label"])
+        .build()
 }
 
 fn empty_row() -> adw::ActionRow {

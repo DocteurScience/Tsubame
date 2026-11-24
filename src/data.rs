@@ -36,6 +36,10 @@ pub struct Post {
     /// Date complète affichée dans le volet de discussion.
     pub date: String,
     pub text: String,
+    /// Liens, mentions et mots-dièse du texte.
+    pub facets: Vec<crate::richtext::Facet>,
+    /// Langues déclarées par l'auteur (« fr », « en-US »…).
+    pub langs: Vec<String>,
     /// Adresse de l'avatar de l'auteur (miniature).
     pub avatar: Option<String>,
     /// Image ou vidéo jointe.
@@ -96,6 +100,8 @@ impl Post {
             time: String::new(),
             date: String::new(),
             text: String::new(),
+            facets: Vec::new(),
+            langs: Vec::new(),
             avatar: None,
             media: None,
             replies: 0,
@@ -112,7 +118,7 @@ impl Post {
 }
 
 /// Liste de comptes (curation ou modération).
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct List {
     pub uri: String,
     pub name: String,
@@ -121,6 +127,12 @@ pub struct List {
     pub members: u64,
     /// Liste de modération (comptes masqués ou bloqués), sans fil de posts.
     pub moderation: bool,
+    /// DID de la personne qui l'a créée.
+    pub creator: String,
+    /// Je masque les comptes de cette liste de modération.
+    pub muted: bool,
+    /// Mon blocage par cette liste (adresse de l'enregistrement), s'il existe.
+    pub blocked: Option<String>,
 }
 
 pub fn demo_lists() -> Vec<List> {
@@ -132,6 +144,7 @@ pub fn demo_lists() -> Vec<List> {
             avatar: None,
             members: 24,
             moderation: false,
+            ..List::default()
         },
         List {
             uri: "demo:indesirables".into(),
@@ -140,6 +153,7 @@ pub fn demo_lists() -> Vec<List> {
             avatar: None,
             members: 3,
             moderation: true,
+            ..List::default()
         },
     ]
 }
@@ -231,6 +245,15 @@ pub struct Profile {
     pub muted: bool,
     /// Mon blocage de ce compte (adresse de l'enregistrement), s'il existe.
     pub blocking: Option<String>,
+    /// Comptes que je suis qui le suivent : quelques noms, et leur nombre.
+    pub known_followers: Vec<String>,
+    pub known_count: u64,
+    /// Notifications d'activité demandées : ses posts, ses réponses.
+    pub activity: (bool, bool),
+    /// Nombre de flux, de listes et de starter packs créés par le compte.
+    pub associated: (u64, u64, u64),
+    /// Le compte est un service d'étiquetage.
+    pub labeler: bool,
 }
 
 /// Référence à un post : son adresse et son contenu (CID).
@@ -253,6 +276,8 @@ pub struct Media {
     pub more: u32,
     /// Vidéo : adresse de sa liste de lecture (HLS), lue dans la carte.
     pub video: Option<String>,
+    /// Vidéo à montrer comme un GIF : en boucle, sans son ni commandes.
+    pub gif: bool,
     /// Toutes les images du post, pour la visionneuse.
     pub images: Vec<Image>,
 }
@@ -281,6 +306,7 @@ pub struct Reply {
     pub handle: String,
     pub time: String,
     pub text: String,
+    pub facets: Vec<crate::richtext::Facet>,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -307,6 +333,9 @@ fn post(
         time: time.into(),
         date: date.into(),
         text: text.into(),
+        // Les mentions de démonstration ouvrent le profil par identifiant.
+        facets: crate::richtext::detect(text),
+        langs: vec!["fr".into()],
         avatar: None,
         media: None,
         replies,
@@ -333,15 +362,17 @@ fn reply(
         handle: handle.into(),
         time: time.into(),
         text: text.into(),
+        facets: crate::richtext::detect(text),
     }
 }
 
 fn lucie_gnome_49() -> Post {
+    const TEXT: &str = "Notes de version de GNOME 49 : le nouveau sélecteur de fichiers est \
+                        enfin utilisable au clavier de bout en bout. Merci à celles et ceux \
+                        qui ont testé la bêta, dont @aya.example.social. #GNOME49";
     Post {
-        text: "Notes de version de GNOME 49 : le nouveau sélecteur de fichiers est enfin \
-               utilisable au clavier de bout en bout. Merci à celles et ceux qui ont testé \
-               la bêta."
-            .into(),
+        text: TEXT.into(),
+        facets: crate::richtext::detect(TEXT),
         thread: vec![
             reply(
                 "Aya Koné",

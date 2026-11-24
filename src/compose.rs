@@ -133,14 +133,53 @@ fn show_link(
     update();
 }
 
+/// Étiquettes qu'on peut mettre soi-même sur ses images. La première,
+/// vide, n'en met aucune.
+const SELF_LABELS: [&str; 5] = ["", "sexual", "nudity", "porn", "graphic-media"];
+
+fn self_label_title(value: &str) -> String {
+    match value {
+        "sexual" => gettext("Contenu sexuel suggestif"),
+        "nudity" => gettext("Nudité non sexuelle"),
+        "porn" => gettext("Pornographie"),
+        "graphic-media" => gettext("Violence graphique"),
+        _ => gettext("Aucune étiquette"),
+    }
+}
+
+fn set_label_button(button: &gtk::MenuButton, chosen: Option<&str>) {
+    let title = self_label_title(chosen.unwrap_or_default());
+    let name = gettext("Étiquette de contenu : {}").replace("{}", &title);
+    button.set_tooltip_text(Some(&name));
+    button.update_property(&[gtk::accessible::Property::Label(&name)]);
+    if chosen.is_some() {
+        button.add_css_class("accent");
+    } else {
+        button.remove_css_class("accent");
+    }
+}
+
+/// Retient `view` comme dernière zone de texte focalisée.
+fn track_focus(view: &gtk::TextView, last: &Rc<RefCell<glib::WeakRef<gtk::TextView>>>) {
+    let focus = gtk::EventControllerFocus::new();
+    let (last, weak) = (last.clone(), view.downgrade());
+    focus.connect_enter(move |_| {
+        last.replace(weak.clone());
+    });
+    view.add_controller(focus);
+}
+
 /// Posts ajoutés au fil, au plus, après le premier.
 const MAX_FOLLOWUPS: usize = 9;
 
-/// Post suivant du fil : sa ligne, son texte et son compteur.
+/// Post suivant du fil : sa ligne, son texte, son compteur et ses images.
 struct Followup {
     row: gtk::Box,
     view: gtk::TextView,
     counter: gtk::Label,
+    attachments: Rc<RefCell<Vec<Rc<Attachment>>>>,
+    tiles: gtk::Box,
+    add_image: gtk::Button,
 }
 
 impl Followup {
@@ -153,7 +192,7 @@ impl Followup {
 }
 
 /// Langues proposées, sous leur propre nom.
-const LANGUAGES: [(&str, &str); 6] = [
+pub const LANGUAGES: [(&str, &str); 6] = [
     ("fr", "Français"),
     ("en", "English"),
     ("es", "Español"),
@@ -163,7 +202,13 @@ const LANGUAGES: [(&str, &str); 6] = [
 ];
 
 /// Langue de l'interface si elle est proposée, sinon le français.
+/// Langue proposée : celle choisie dans les préférences, sinon celle du
+/// système, sinon le français.
 fn default_language() -> &'static str {
+    let chosen = crate::settings::settings().string("post-language");
+    if let Some((code, _)) = LANGUAGES.iter().find(|(c, _)| *c == chosen.as_str()) {
+        return code;
+    }
     glib::language_names()
         .iter()
         .filter_map(|name| name.split(['_', '.', '@']).next().map(str::to_owned))
@@ -338,6 +383,11 @@ pub fn present(
         .css_classes(["dim-label"])
         .build();
     crate::mentions::attach(&text, session.clone());
+    // Zone de texte qui a eu le focus en dernier (premier post ou post
+    // suivant du fil) : l'émoji y va.
+    let last_text: Rc<RefCell<glib::WeakRef<gtk::TextView>>> =
+        Rc::new(RefCell::new(text.downgrade()));
+    track_focus(&text, &last_text);
     let editor = gtk::Overlay::builder().child(&text).build();
     editor.add_overlay(&placeholder);
     let row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
@@ -370,7 +420,7 @@ pub fn present(
     images_area.append(
         &gtk::Label::builder()
             .label(gettext(
-                "Décrivez chaque image pour les personnes qui utilisent un lecteur d'écran.",
+                "Décrivez chaque image ou vidéo pour les personnes qui utilisent un lecteur d'écran.",
             ))
             .wrap(true)
             .xalign(0.0)
@@ -379,7 +429,8 @@ pub fn present(
     );
     content.insert_child_after(&images_area, Some(&row));
 
-    // Fil : posts suivants (texte seul), publiés en réponses successives.
+    // Fil : posts suivants (texte et images), publiés en réponses
+    // successives.
     let thread_box = gtk::Box::builder()
         .orientation(gtk::Orientation::Vertical)
         .spacing(12)
@@ -442,11 +493,11 @@ pub fn present(
         .build();
     let add_image = gtk::Button::builder()
         .icon_name("image-x-generic-symbolic")
-        .tooltip_text(gettext("Ajouter une image"))
+        .tooltip_text(gettext("Ajouter des images ou une vidéo"))
         .css_classes(["flat"])
         .build();
     add_image.update_property(&[gtk::accessible::Property::Label(&gettext(
-        "Ajouter une image",
+        "Ajouter des images ou une vidéo",
     ))]);
     // Qui peut répondre, et citations : pour un nouveau post seulement (une
     // réponse suit les réglages du début de la discussion).
@@ -482,9 +533,37 @@ pub fn present(
     gate_button.update_property(&[gtk::accessible::Property::Label(&gettext(
         "Qui peut répondre et citer",
     ))]);
+    // Émojis : le sélecteur de GTK, dans la zone de texte qui avait le focus.
+    let emoji = gtk::Button::builder()
+        .icon_name("face-smile-symbolic")
+        .tooltip_text(gettext("Insérer un émoji"))
+        .css_classes(["flat"])
+        .build();
+    emoji.update_property(&[gtk::accessible::Property::Label(&gettext(
+        "Insérer un émoji",
+    ))]);
     bottom.append(&add_image);
+    bottom.append(&emoji);
     bottom.append(&language_button);
     bottom.append(&gate_button);
+    // Étiquette de contenu des images (nudité, contenu sexuel, violence) :
+    // visible seulement avec des images.
+    let self_label: Rc<RefCell<Option<&'static str>>> = Rc::default();
+    let label_menu = gio::Menu::new();
+    for value in SELF_LABELS {
+        label_menu.append(
+            Some(&self_label_title(value)),
+            Some(&format!("compose.self-label::{value}")),
+        );
+    }
+    let label_button = gtk::MenuButton::builder()
+        .icon_name("dialog-warning-symbolic")
+        .menu_model(&label_menu)
+        .css_classes(["flat"])
+        .visible(false)
+        .build();
+    set_label_button(&label_button, None);
+    bottom.append(&label_button);
     bottom.append(&counter);
 
     let view = adw::ToolbarView::builder()
@@ -550,6 +629,28 @@ pub fn present(
         });
     }
     actions.add_action(&quotes_action);
+    let label_action = gio::SimpleAction::new_stateful(
+        "self-label",
+        Some(glib::VariantTy::STRING),
+        &"".to_variant(),
+    );
+    {
+        let (self_label, label_button) = (self_label.clone(), label_button.clone());
+        label_action.connect_change_state(move |action, value| {
+            let Some(value) = value.and_then(|v| v.str()) else {
+                return;
+            };
+            let chosen = SELF_LABELS
+                .iter()
+                .find(|v| **v == value)
+                .copied()
+                .filter(|v| !v.is_empty());
+            self_label.replace(chosen);
+            set_label_button(&label_button, chosen);
+            action.set_state(&value.to_variant());
+        });
+    }
+    actions.add_action(&label_action);
     dialog.insert_action_group("compose", Some(&actions));
 
     // Compteur et validité, à chaque frappe. Un texte en cours empêche de
@@ -587,6 +688,7 @@ pub fn present(
             add_to_thread.clone(),
             link_box.clone(),
         );
+        let label_button = label_button.clone();
         Rc::new(move || {
             let buffer = text.buffer();
             let value = buffer.text(&buffer.start_iter(), &buffer.end_iter(), false);
@@ -594,7 +696,7 @@ pub fn present(
             images_area.set_visible(images > 0);
             // Les images passent avant la carte du lien.
             link_box.set_visible(images == 0 && link_box.first_child().is_some());
-            add_image.set_sensitive(images < MAX_IMAGES && !busy.get());
+            add_image.set_sensitive(images < MAX_IMAGES && !has_video(&attachments) && !busy.get());
             // Une citation suffit, sans texte ni image.
             let result = validate(&value, images + quoting);
             let count = match result {
@@ -615,19 +717,32 @@ pub fn present(
             for followup in followups.borrow().iter() {
                 let value = followup.text();
                 let count = grapheme_count(&value);
+                let pictures = followup.attachments.borrow().len();
+                followup.tiles.set_visible(pictures > 0);
+                followup.add_image.set_sensitive(
+                    pictures < MAX_IMAGES && !has_video(&followup.attachments) && !busy.get(),
+                );
                 followup
                     .counter
                     .set_label(&format!("{count} / {MAX_GRAPHEMES}"));
-                let bad = value.trim().is_empty() || count > MAX_GRAPHEMES;
+                let bad = validate(&value, pictures).is_err();
                 if count > MAX_GRAPHEMES {
                     followup.counter.add_css_class("error");
                 } else {
                     followup.counter.remove_css_class("error");
                 }
                 thread_ok &= !bad;
-                thread_empty &= value.trim().is_empty();
+                thread_empty &= value.trim().is_empty() && pictures == 0;
             }
             add_to_thread.set_sensitive(followups.borrow().len() < MAX_FOLLOWUPS && !busy.get());
+            // L'étiquette vaut pour les images de tous les posts du fil.
+            label_button.set_visible(
+                images > 0
+                    || followups
+                        .borrow()
+                        .iter()
+                        .any(|f| !f.attachments.borrow().is_empty()),
+            );
             drafts_button
                 .set_visible(value.is_empty() && can_draft && !saved_drafts.borrow().is_empty());
             publish.set_sensitive(result.is_ok() && thread_ok && !busy.get());
@@ -649,6 +764,8 @@ pub fn present(
             author.clone(),
         );
         let session = session.clone();
+        let last_text = last_text.clone();
+        let error = error.clone();
         Rc::new(move |initial: &str| {
             if followups.borrow().len() >= MAX_FOLLOWUPS {
                 return;
@@ -663,6 +780,7 @@ pub fn present(
                 .build();
             view.buffer().set_text(initial);
             crate::mentions::attach(&view, session.clone());
+            track_focus(&view, &last_text);
             let number = followups.borrow().len() + 2;
             view.update_property(&[gtk::accessible::Property::Label(
                 &gettext("Post {} du fil").replace("{}", &number.to_string()),
@@ -680,12 +798,45 @@ pub fn present(
             remove.update_property(&[gtk::accessible::Property::Label(&gettext(
                 "Retirer ce post du fil",
             ))]);
+            // Images du post : vignettes, et un bouton pour en ajouter.
+            let attachments: Rc<RefCell<Vec<Rc<Attachment>>>> = Rc::default();
+            let tiles = gtk::Box::builder()
+                .orientation(gtk::Orientation::Horizontal)
+                .spacing(8)
+                .visible(false)
+                .build();
+            let add_image = gtk::Button::builder()
+                .icon_name("image-x-generic-symbolic")
+                .tooltip_text(gettext("Ajouter une image à ce post"))
+                .css_classes(["flat"])
+                .build();
+            add_image.update_property(&[gtk::accessible::Property::Label(&gettext(
+                "Ajouter une image à ce post",
+            ))]);
+            {
+                let (attachments, tiles, update, error) = (
+                    attachments.clone(),
+                    tiles.clone(),
+                    update.clone(),
+                    error.clone(),
+                );
+                add_image.connect_clicked(move |button| {
+                    choose_images(button, &attachments, &tiles, &update, &error);
+                });
+            }
+            paste_images(&view, &attachments, &tiles, &update);
+            let footer = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+            footer.append(&add_image);
+            counter.set_hexpand(true);
+            footer.append(&counter);
             let column = gtk::Box::builder()
                 .orientation(gtk::Orientation::Vertical)
+                .spacing(6)
                 .hexpand(true)
                 .build();
             column.append(&view);
-            column.append(&counter);
+            column.append(&tiles);
+            column.append(&footer);
             let row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
             row.append(
                 &adw::Avatar::builder()
@@ -710,6 +861,8 @@ pub fn present(
                 thread_box.reorder_child_after(&row, None::<&gtk::Widget>);
             }
             thread_box.reorder_child_after(&add_to_thread, Some(&row));
+            // Déposées sur ce post, les images lui reviennent.
+            drop_images(&row, &attachments, &tiles, &update, &error);
             {
                 let update = update.clone();
                 view.buffer().connect_changed(move |_| update());
@@ -731,6 +884,9 @@ pub fn present(
                 row,
                 view: view.clone(),
                 counter,
+                attachments,
+                tiles,
+                add_image,
             });
             update();
             if initial.is_empty() {
@@ -873,68 +1029,29 @@ pub fn present(
     update();
 
     // Ajouter des images : sélecteur de fichiers du système (portail en
-    // Flatpak).
+    // Flatpak), coller (Ctrl+V) ou déposer des fichiers sur la boîte.
     {
-        let (dialog, attachments, tiles, update, error) = (
-            dialog.clone(),
+        let (attachments, tiles, update, error) = (
             attachments.clone(),
             tiles.clone(),
             update.clone(),
             error.clone(),
         );
-        add_image.connect_clicked(move |_| {
-            let filter = gtk::FileFilter::new();
-            filter.set_name(Some(&gettext("Images")));
-            for mime in ["image/png", "image/jpeg", "image/webp"] {
-                filter.add_mime_type(mime);
+        add_image.connect_clicked(move |button| {
+            choose_images(button, &attachments, &tiles, &update, &error);
+        });
+    }
+    paste_images(&text, &attachments, &tiles, &update);
+    drop_images(&content, &attachments, &tiles, &update, &error);
+    {
+        let last_text = last_text.clone();
+        emoji.connect_clicked(move |_| {
+            // Emprunt relâché avant grab_focus, qui met à jour last_text.
+            let view = last_text.borrow().upgrade();
+            if let Some(view) = view {
+                view.grab_focus();
+                view.emit_insert_emoji();
             }
-            let filters = gio::ListStore::new::<gtk::FileFilter>();
-            filters.append(&filter);
-            let chooser = gtk::FileDialog::builder()
-                .title(gettext("Ajouter des images"))
-                .modal(true)
-                .filters(&filters)
-                .default_filter(&filter)
-                .build();
-            let window = dialog.root().and_downcast::<gtk::Window>();
-            let (attachments, tiles, update, error) = (
-                attachments.clone(),
-                tiles.clone(),
-                update.clone(),
-                error.clone(),
-            );
-            chooser.open_multiple(window.as_ref(), gio::Cancellable::NONE, move |result| {
-                let Ok(files) = result else { return };
-                let files: Vec<gio::File> =
-                    files.iter::<gio::File>().filter_map(Result::ok).collect();
-                glib::spawn_future_local(async move {
-                    for file in files {
-                        if attachments.borrow().len() >= MAX_IMAGES {
-                            break;
-                        }
-                        let loaded = file
-                            .load_bytes_future()
-                            .await
-                            .map_err(|e| e.to_string())
-                            .and_then(|(bytes, _)| {
-                                gdk::Texture::from_bytes(&bytes)
-                                    .map(|texture| (bytes, texture))
-                                    .map_err(|e| e.to_string())
-                            });
-                        match loaded {
-                            Ok((bytes, texture)) => {
-                                attach(&attachments, &tiles, &update, bytes, texture);
-                            }
-                            Err(_) => {
-                                error
-                                    .set_label(&gettext("Ce fichier n'est pas une image lisible."));
-                                error.set_visible(true);
-                            }
-                        }
-                    }
-                    update();
-                });
-            });
         });
     }
 
@@ -951,7 +1068,11 @@ pub fn present(
         );
         let followups = followups.clone();
         dialog.connect_close_attempt(move |dialog| {
-            let has_images = !attachments.borrow().is_empty();
+            let has_images = !attachments.borrow().is_empty()
+                || followups
+                    .borrow()
+                    .iter()
+                    .any(|f| !f.attachments.borrow().is_empty());
             let body = if can_draft && has_images {
                 gettext("Le brouillon garde le texte, mais pas les images.")
             } else if can_draft {
@@ -1067,15 +1188,22 @@ pub fn present(
         let followups = followups.clone();
         let link_state = link_state.clone();
         move || {
-            let more: Vec<String> = followups
+            let more: Vec<ThreadPost> = followups
                 .borrow()
                 .iter()
-                .map(|f| f.text().trim().to_owned())
+                .map(|f| ThreadPost {
+                    text: f.text().trim().to_owned(),
+                    images: images_of(&f.attachments),
+                    video: video_of(&f.attachments),
+                })
                 .collect();
-            if more
-                .iter()
-                .any(|t| t.is_empty() || grapheme_count(t) > MAX_GRAPHEMES)
-            {
+            if more.iter().any(|post| {
+                validate(
+                    &post.text,
+                    post.images.len() + usize::from(post.video.is_some()),
+                )
+                .is_err()
+            }) {
                 return;
             }
             let buffer = text.buffer();
@@ -1083,12 +1211,10 @@ pub fn present(
                 .text(&buffer.start_iter(), &buffer.end_iter(), false)
                 .trim()
                 .to_owned();
-            let images: Vec<(Vec<u8>, String)> = attachments
-                .borrow()
-                .iter()
-                .map(|a| (a.bytes.to_vec(), a.alt.borrow().trim().to_owned()))
-                .collect();
-            if validate(&value, images.len() + quoting).is_err() || busy.get() {
+            let images = images_of(&attachments);
+            let video = video_of(&attachments);
+            let media = images.len() + usize::from(video.is_some());
+            if validate(&value, media + quoting).is_err() || busy.get() {
                 return;
             }
             let Some(session) = session.clone() else {
@@ -1113,25 +1239,16 @@ pub fn present(
                 link: link_state.preview.borrow().clone(),
                 reply_rule: reply_rule.get(),
                 no_quotes: no_quotes.get(),
+                self_label: *self_label.borrow(),
+                video,
             };
             let task = runtime().spawn(async move {
                 // Images réduites et réencodées hors de la boucle GTK.
                 let mut post = post;
-                for (bytes, alt) in images {
-                    let prepared = tokio::task::spawn_blocking(move || photo::prepare(&bytes))
-                        .await
-                        .map_err(|e| e.to_string())
-                        .and_then(|r| r)
-                        .map_err(|e| {
-                            api::ApiError::new(
-                                gettext("Une image n'a pas pu être préparée : {}")
-                                    .replace("{}", &e),
-                            )
-                        })?;
-                    post.images.push(NewImage { prepared, alt });
-                }
+                post.images = prepare_images(images).await?;
                 // En boîte : le futur de publication est profond.
                 let langs = post.langs.clone();
+                let label = post.self_label;
                 let root = post.reply.as_ref().map(|(root, _)| root.clone());
                 let published = Box::pin(api::publish(session.clone(), post)).await?;
                 // Posts suivants : chacun répond au précédent. Un échec
@@ -1140,15 +1257,30 @@ pub fn present(
                 let mut parent = published.post.clone();
                 let mut failure = None;
                 let mut done = 0;
-                for text in more {
+                for ThreadPost {
+                    text,
+                    images,
+                    video,
+                } in more
+                {
+                    let images = match prepare_images(images).await {
+                        Ok(images) => images,
+                        Err(error) => {
+                            failure = Some(error);
+                            break;
+                        }
+                    };
+                    let has_images = !images.is_empty() || video.is_some();
                     let next = NewPost {
                         text,
                         langs: langs.clone(),
                         reply: Some((root.clone(), parent.clone())),
-                        images: Vec::new(),
+                        images,
                         quote: None,
                         reply_rule: api::ReplyRule::Everyone,
                         no_quotes: false,
+                        self_label: label.filter(|_| has_images),
+                        video,
                         link: None,
                     };
                     match Box::pin(api::publish(session.clone(), next)).await {
@@ -1246,12 +1378,18 @@ const THUMBNAIL: i32 = 96;
 const MAX_IMAGES: usize = 4;
 /// Longueur maximale d'un texte alternatif sur Bluesky.
 const MAX_ALT: usize = 2000;
+/// Longueur maximale du texte alternatif d'une vidéo.
+const MAX_VIDEO_ALT: usize = 1000;
+/// Taille maximale d'une vidéo, en octets.
+const MAX_VIDEO_BYTES: usize = 100 * 1024 * 1024;
 
-/// Image jointe : le fichier tel quel (préparé à la publication), son
-/// aperçu et son texte alternatif.
+/// Image ou vidéo jointe : le fichier tel quel (préparé à la publication),
+/// son aperçu et son texte alternatif.
 struct Attachment {
     bytes: glib::Bytes,
-    texture: gdk::Texture,
+    paintable: gdk::Paintable,
+    /// Pour une vidéo ou un GIF animé : son type MIME.
+    video: Option<String>,
     alt: RefCell<String>,
     tile: gtk::Overlay,
     alt_button: gtk::Button,
@@ -1275,7 +1413,13 @@ impl Attachment {
         } else {
             (
                 gettext("Ajouter un texte alternatif"),
-                gettext("Image sans texte alternatif"),
+                if self.video.as_deref() == Some("image/gif") {
+                    gettext("GIF sans texte alternatif")
+                } else if self.video.is_some() {
+                    gettext("Vidéo sans texte alternatif")
+                } else {
+                    gettext("Image sans texte alternatif")
+                },
             )
         };
         self.alt_button
@@ -1302,6 +1446,244 @@ fn thumbnail_frame(picture: &gtk::Picture) -> adw::Clamp {
         .build()
 }
 
+/// Post suivant d'un fil, prêt à partir.
+struct ThreadPost {
+    text: String,
+    images: Vec<RawImage>,
+    video: Option<api::NewVideo>,
+}
+
+/// Image jointe telle quelle, avec son texte alternatif.
+type RawImage = (Vec<u8>, String);
+
+/// Les images jointes et leur texte alternatif, pour la publication.
+fn images_of(attachments: &Rc<RefCell<Vec<Rc<Attachment>>>>) -> Vec<RawImage> {
+    attachments
+        .borrow()
+        .iter()
+        .filter(|a| a.video.is_none())
+        .map(|a| (a.bytes.to_vec(), a.alt.borrow().trim().to_owned()))
+        .collect()
+}
+
+/// La vidéo jointe, avec sa taille si le lecteur l'a lue.
+fn video_of(attachments: &Rc<RefCell<Vec<Rc<Attachment>>>>) -> Option<api::NewVideo> {
+    attachments.borrow().iter().find_map(|a| {
+        let mime = a.video.as_ref()?;
+        let (width, height) = (
+            a.paintable.intrinsic_width(),
+            a.paintable.intrinsic_height(),
+        );
+        Some(api::NewVideo {
+            bytes: a.bytes.to_vec(),
+            mime: mime.clone(),
+            alt: a.alt.borrow().trim().to_owned(),
+            size: (width > 0 && height > 0).then_some((width as u32, height as u32)),
+            // Un GIF se montre en boucle, sans commandes.
+            presentation: (mime == "image/gif").then_some("gif"),
+            blob: None,
+        })
+    })
+}
+
+fn has_video(attachments: &Rc<RefCell<Vec<Rc<Attachment>>>>) -> bool {
+    attachments.borrow().iter().any(|a| a.video.is_some())
+}
+
+/// Réduit et réencode les images hors de la boucle GTK.
+async fn prepare_images(images: Vec<RawImage>) -> Result<Vec<NewImage>, api::ApiError> {
+    let mut prepared_images = Vec::new();
+    for (bytes, alt) in images {
+        let prepared = tokio::task::spawn_blocking(move || photo::prepare(&bytes))
+            .await
+            .map_err(|e| e.to_string())
+            .and_then(|r| r)
+            .map_err(|e| {
+                api::ApiError::new(
+                    gettext("Une image n'a pas pu être préparée : {}").replace("{}", &e),
+                )
+            })?;
+        prepared_images.push(NewImage { prepared, alt });
+    }
+    Ok(prepared_images)
+}
+
+/// Joint les fichiers donnés, dans la limite de `MAX_IMAGES`.
+fn load_images(
+    files: Vec<gio::File>,
+    attachments: &Rc<RefCell<Vec<Rc<Attachment>>>>,
+    tiles: &gtk::Box,
+    update: &Rc<dyn Fn()>,
+    error: &gtk::Label,
+) {
+    let (attachments, tiles, update, error) = (
+        attachments.clone(),
+        tiles.clone(),
+        update.clone(),
+        error.clone(),
+    );
+    glib::spawn_future_local(async move {
+        for file in files {
+            if attachments.borrow().len() >= MAX_IMAGES {
+                break;
+            }
+            let Ok((bytes, _)) = file.load_bytes_future().await else {
+                error.set_label(&gettext("Ce fichier n'a pas pu être lu."));
+                error.set_visible(true);
+                continue;
+            };
+            let name = file.basename();
+            let (content_type, _) = gio::content_type_guess(name.as_deref(), &bytes[..]);
+            let mime = gio::content_type_get_mime_type(&content_type)
+                .map(|m| m.to_string())
+                .unwrap_or_default();
+            // Une vidéo (ou un GIF animé, converti en vidéo par Bluesky) se
+            // publie seule ; des images, jusqu'à quatre.
+            let as_video = mime.starts_with("video/") || mime == "image/gif";
+            let refusal = if as_video && !attachments.borrow().is_empty() {
+                Some(gettext("Une vidéo se publie seule, sans images."))
+            } else if as_video && bytes.len() > MAX_VIDEO_BYTES {
+                Some(gettext("Cette vidéo dépasse 100 Mo."))
+            } else if !as_video && has_video(&attachments) {
+                Some(gettext("Une vidéo se publie seule, sans images."))
+            } else {
+                None
+            };
+            if let Some(refusal) = refusal {
+                error.set_label(&refusal);
+                error.set_visible(true);
+                continue;
+            }
+            if mime.starts_with("video/") {
+                let paintable = gtk::MediaFile::for_file(&file).upcast();
+                attach(&attachments, &tiles, &update, bytes, paintable, Some(mime));
+                continue;
+            }
+            // Un GIF se montre par sa première image.
+            let video = as_video.then_some(mime);
+            match gdk::Texture::from_bytes(&bytes) {
+                Ok(texture) => attach(
+                    &attachments,
+                    &tiles,
+                    &update,
+                    bytes,
+                    texture.upcast(),
+                    video,
+                ),
+                Err(_) => {
+                    error.set_label(&gettext("Ce fichier n'est pas une image lisible."));
+                    error.set_visible(true);
+                }
+            }
+        }
+        update();
+    });
+}
+
+/// Ouvre le sélecteur de fichiers du système (portail en Flatpak).
+fn choose_images(
+    from: &impl IsA<gtk::Widget>,
+    attachments: &Rc<RefCell<Vec<Rc<Attachment>>>>,
+    tiles: &gtk::Box,
+    update: &Rc<dyn Fn()>,
+    error: &gtk::Label,
+) {
+    let filter = gtk::FileFilter::new();
+    filter.set_name(Some(&gettext("Images et vidéos")));
+    for mime in [
+        "image/png",
+        "image/jpeg",
+        "image/webp",
+        "image/gif",
+        "video/mp4",
+        "video/quicktime",
+        "video/webm",
+        "video/mpeg",
+    ] {
+        filter.add_mime_type(mime);
+    }
+    let filters = gio::ListStore::new::<gtk::FileFilter>();
+    filters.append(&filter);
+    let chooser = gtk::FileDialog::builder()
+        .title(gettext("Ajouter des images ou une vidéo"))
+        .modal(true)
+        .filters(&filters)
+        .default_filter(&filter)
+        .build();
+    let window = from.root().and_downcast::<gtk::Window>();
+    let (attachments, tiles, update, error) = (
+        attachments.clone(),
+        tiles.clone(),
+        update.clone(),
+        error.clone(),
+    );
+    chooser.open_multiple(window.as_ref(), gio::Cancellable::NONE, move |result| {
+        let Ok(files) = result else { return };
+        let files = files.iter::<gio::File>().filter_map(Result::ok).collect();
+        load_images(files, &attachments, &tiles, &update, &error);
+    });
+}
+
+/// Ctrl+V d'une image dans la zone de texte : elle est jointe au post.
+fn paste_images(
+    view: &gtk::TextView,
+    attachments: &Rc<RefCell<Vec<Rc<Attachment>>>>,
+    tiles: &gtk::Box,
+    update: &Rc<dyn Fn()>,
+) {
+    let (attachments, tiles, update) = (attachments.clone(), tiles.clone(), update.clone());
+    view.connect_paste_clipboard(move |view| {
+        let clipboard = view.clipboard();
+        if !clipboard
+            .formats()
+            .contains_type(gdk::Texture::static_type())
+        {
+            return; // Du texte : collage habituel.
+        }
+        view.stop_signal_emission_by_name("paste-clipboard");
+        let (attachments, tiles, update) = (attachments.clone(), tiles.clone(), update.clone());
+        glib::spawn_future_local(async move {
+            let Ok(Some(texture)) = clipboard.read_texture_future().await else {
+                return;
+            };
+            if attachments.borrow().len() >= MAX_IMAGES {
+                return;
+            }
+            if has_video(&attachments) {
+                return;
+            }
+            let bytes = texture.save_to_png_bytes();
+            attach(&attachments, &tiles, &update, bytes, texture.upcast(), None);
+            update();
+        });
+    });
+}
+
+/// Fichiers déposés sur `widget` : joints au post.
+fn drop_images(
+    widget: &impl IsA<gtk::Widget>,
+    attachments: &Rc<RefCell<Vec<Rc<Attachment>>>>,
+    tiles: &gtk::Box,
+    update: &Rc<dyn Fn()>,
+    error: &gtk::Label,
+) {
+    let drop = gtk::DropTarget::new(gdk::FileList::static_type(), gdk::DragAction::COPY);
+    let (attachments, tiles, update, error) = (
+        attachments.clone(),
+        tiles.clone(),
+        update.clone(),
+        error.clone(),
+    );
+    drop.connect_drop(move |_, value, _, _| {
+        let Ok(list) = value.get::<gdk::FileList>() else {
+            return false;
+        };
+        load_images(list.files(), &attachments, &tiles, &update, &error);
+        true
+    });
+    widget.add_controller(drop);
+}
+
 /// Ajoute une vignette : l'image, « Retirer l'image » et le bouton du
 /// texte alternatif.
 fn attach(
@@ -1309,10 +1691,11 @@ fn attach(
     tiles: &gtk::Box,
     update: &Rc<dyn Fn()>,
     bytes: glib::Bytes,
-    texture: gdk::Texture,
+    paintable: gdk::Paintable,
+    video: Option<String>,
 ) {
     let picture = gtk::Picture::builder()
-        .paintable(&texture)
+        .paintable(&paintable)
         .content_fit(gtk::ContentFit::Cover)
         .width_request(THUMBNAIL)
         .height_request(THUMBNAIL)
@@ -1339,13 +1722,53 @@ fn attach(
         .accessible_role(gtk::AccessibleRole::Group)
         .css_classes(["compose-tile"])
         .build();
+    if let Some(mime) = &video {
+        // Marque « vidéo » ou « GIF » au centre de la vignette.
+        let badge = gtk::Box::builder()
+            .halign(gtk::Align::Center)
+            .valign(gtk::Align::Center)
+            .css_classes(["osd", "compose-play"])
+            .build();
+        if mime == "image/gif" {
+            badge.append(
+                &gtk::Label::builder()
+                    .label(gettext("GIF"))
+                    .accessible_role(gtk::AccessibleRole::Presentation)
+                    .css_classes(["compose-alt"])
+                    .build(),
+            );
+        } else {
+            badge.append(&crate::card::decorative_icon(
+                "media-playback-start-symbolic",
+            ));
+        }
+        tile.add_overlay(&badge);
+    }
+    if let Some(media) = paintable.downcast_ref::<gtk::MediaFile>() {
+        // GtkMediaFile ne dessine rien avant la lecture : on lit sans son
+        // jusqu'à la première image, puis on s'arrête.
+        media.set_muted(true);
+        let handler: Rc<RefCell<Option<glib::SignalHandlerId>>> = Rc::default();
+        let id = {
+            let handler = handler.clone();
+            media.connect_invalidate_contents(move |media| {
+                media.pause();
+                if let Some(id) = handler.take() {
+                    media.disconnect(id);
+                }
+            })
+        };
+        handler.replace(Some(id));
+        media.play();
+    }
     tile.add_overlay(&remove);
     tile.add_overlay(&alt_button);
     tiles.append(&tile);
 
     let attachment = Rc::new(Attachment {
         bytes,
-        texture,
+        paintable,
+        video,
         alt: RefCell::default(),
         tile: tile.clone(),
         alt_button: alt_button.clone(),
@@ -1398,13 +1821,17 @@ fn edit_alt(parent: &gtk::Button, attachment: &Rc<Attachment>) {
     header.pack_end(&save);
 
     let preview = gtk::Picture::builder()
-        .paintable(&attachment.texture)
+        .paintable(&attachment.paintable)
         .content_fit(gtk::ContentFit::Contain)
         .height_request(200)
         .build();
-    preview.update_property(&[gtk::accessible::Property::Label(&gettext(
-        "Image à décrire",
-    ))]);
+    let is_video = attachment.video.is_some();
+    let limit = if is_video { MAX_VIDEO_ALT } else { MAX_ALT };
+    preview.update_property(&[gtk::accessible::Property::Label(&if is_video {
+        gettext("Vidéo à décrire")
+    } else {
+        gettext("Image à décrire")
+    })]);
     let text = gtk::TextView::builder()
         .wrap_mode(gtk::WrapMode::WordChar)
         .accepts_tab(false)
@@ -1420,9 +1847,11 @@ fn edit_alt(parent: &gtk::Button, attachment: &Rc<Attachment>) {
         "Texte alternatif",
     ))]);
     let help = gtk::Label::builder()
-        .label(gettext(
-            "Décrivez ce que montre l'image pour les personnes qui ne la voient pas.",
-        ))
+        .label(if is_video {
+            gettext("Décrivez ce que montre la vidéo pour les personnes qui ne la voient pas.")
+        } else {
+            gettext("Décrivez ce que montre l'image pour les personnes qui ne la voient pas.")
+        })
         .wrap(true)
         .xalign(0.0)
         .css_classes(["dim-label", "caption"])
@@ -1452,9 +1881,9 @@ fn edit_alt(parent: &gtk::Button, attachment: &Rc<Attachment>) {
         move |buffer: &gtk::TextBuffer| {
             let value = buffer.text(&buffer.start_iter(), &buffer.end_iter(), false);
             let count = grapheme_count(&value);
-            counter.set_label(&format!("{count} / {MAX_ALT}"));
-            save.set_sensitive(count <= MAX_ALT);
-            if count > MAX_ALT {
+            counter.set_label(&format!("{count} / {limit}"));
+            save.set_sensitive(count <= limit);
+            if count > limit {
                 counter.add_css_class("error");
             } else {
                 counter.remove_css_class("error");

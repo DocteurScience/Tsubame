@@ -6,10 +6,10 @@ use std::rc::Rc;
 
 use adw::prelude::*;
 use gettextrs::{gettext, ngettext};
-use gtk::glib;
+use gtk::{gio, glib};
 
 use crate::api::ApiError;
-use crate::chat::{self, Convo, Message};
+use crate::chat::{self, Convo, Message, MessagePage};
 use crate::images;
 use crate::profile::Host;
 use crate::runtime::runtime;
@@ -30,6 +30,8 @@ pub struct MessagesPage {
     /// Conversations affichées dans la liste, dans l'ordre des rangées.
     shown: RefCell<Vec<Convo>>,
     title: adw::WindowTitle,
+    /// Menu de la conversation ouverte.
+    convo_menu: gtk::MenuButton,
     convo_stack: gtk::Stack,
     bubbles: gtk::Box,
     scroll: gtk::ScrolledWindow,
@@ -37,6 +39,15 @@ pub struct MessagesPage {
     entry: gtk::Entry,
     send: gtk::Button,
     current: RefCell<Option<Convo>>,
+    /// Messages affichés, du plus ancien au plus récent.
+    messages: RefCell<Vec<Message>>,
+    /// Curseur des messages plus anciens, s'il en reste.
+    older: RefCell<Option<String>>,
+    older_button: gtk::Button,
+    /// La page elle-même, pour les rappels des bulles.
+    this: RefCell<std::rc::Weak<Self>>,
+    /// Numéro du prochain message envoyé (identifiant local).
+    sent: Cell<u64>,
     /// Numéro du dernier chargement de messages, pour ignorer les réponses
     /// d'une conversation quittée entre-temps.
     generation: Cell<u64>,
@@ -133,7 +144,79 @@ fn convo_row(convo: &Convo) -> gtk::ListBoxRow {
 }
 
 /// Bulle d'un message, à droite pour les miens, à gauche pour les autres.
-fn bubble(message: &Message) -> gtk::Box {
+/// Secondes entre deux actualisations, page Messages affichée.
+const REFRESH_SECONDS: u32 = 15;
+
+/// Réagir à un message : identifiant, émoji, ajouter (ou retirer).
+type React = Rc<dyn Fn(&str, &str, bool)>;
+
+/// Nom accessible d'une réaction : « 👍, 2 réactions, dont la vôtre ».
+fn reaction_label(reaction: &chat::Reaction) -> String {
+    let count = ngettext("{} réaction", "{} réactions", reaction.count)
+        .replace("{}", &reaction.count.to_string());
+    if reaction.mine {
+        format!("{}, {count}, {}", reaction.value, gettext("dont la vôtre"))
+    } else {
+        format!("{}, {count}", reaction.value)
+    }
+}
+
+/// Bouton « Réagir » : un menu des émojis proposés et, pour le message
+/// d'un autre, « Signaler le message… » (action `messages.report`, avec
+/// « auteur\nidentifiant »).
+fn react_button(message: &Message, react: &React) -> gtk::MenuButton {
+    let message_id = message.id.as_str();
+    let choices = gtk::Box::builder().spacing(2).build();
+    let content = gtk::Box::builder()
+        .orientation(gtk::Orientation::Vertical)
+        .spacing(6)
+        .build();
+    content.append(&choices);
+    let popover = gtk::Popover::builder().child(&content).build();
+    if !message.mine && !message.sender.is_empty() {
+        let report = gtk::Button::builder()
+            .label(gettext("Signaler le message…"))
+            .css_classes(["flat"])
+            .build();
+        let (target, popover) = (
+            format!("{}\n{}", message.sender, message.id),
+            popover.downgrade(),
+        );
+        report.connect_clicked(move |button| {
+            if let Some(popover) = popover.upgrade() {
+                popover.popdown();
+            }
+            let _ = button.activate_action("messages.report", Some(&target.to_variant()));
+        });
+        content.append(&report);
+    }
+    for value in chat::REACTIONS {
+        let choice = gtk::Button::builder()
+            .label(value)
+            .tooltip_text(value)
+            .css_classes(["flat", "reaction-choice"])
+            .build();
+        let (react, id, popover) = (react.clone(), message_id.to_owned(), popover.downgrade());
+        choice.connect_clicked(move |_| {
+            if let Some(popover) = popover.upgrade() {
+                popover.popdown();
+            }
+            react(&id, value, true);
+        });
+        choices.append(&choice);
+    }
+    let button = gtk::MenuButton::builder()
+        .icon_name("face-smile-symbolic")
+        .tooltip_text(gettext("Réagir"))
+        .valign(gtk::Align::Center)
+        .popover(&popover)
+        .css_classes(["flat", "circular", "dim-label"])
+        .build();
+    button.update_property(&[gtk::accessible::Property::Label(&gettext("Réagir"))]);
+    button
+}
+
+fn bubble(message: &Message, react: Option<&React>) -> gtk::Box {
     let label = gtk::Label::builder()
         .label(&message.text)
         .wrap(true)
@@ -144,6 +227,10 @@ fn bubble(message: &Message) -> gtk::Box {
         .tooltip_text(&message.time)
         .css_classes(["bubble", if message.mine { "mine" } else { "theirs" }])
         .build();
+    if message.failed {
+        label.add_css_class("failed");
+        label.set_tooltip_text(Some(&gettext("Message non envoyé")));
+    }
     let who = if message.mine {
         gettext("Vous, {} : ")
     } else {
@@ -154,15 +241,117 @@ fn bubble(message: &Message) -> gtk::Box {
         "{who}{}",
         message.text
     ))]);
-    let row = gtk::Box::builder()
-        .halign(if message.mine {
-            gtk::Align::End
+    if let Some((author, text, uri)) = &message.shared {
+        // Post partagé : petite carte sous le texte (ou seule).
+        let card = gtk::Box::builder()
+            .orientation(gtk::Orientation::Vertical)
+            .spacing(2)
+            .css_classes(["card", "shared-post"])
+            .build();
+        let name = gtk::Label::builder()
+            .label(author)
+            .xalign(0.0)
+            .css_classes(["heading"])
+            .build();
+        let body = gtk::Label::builder()
+            .label(text)
+            .xalign(0.0)
+            .wrap(true)
+            .lines(3)
+            .ellipsize(gtk::pango::EllipsizeMode::End)
+            .max_width_chars(44)
+            .build();
+        card.append(&name);
+        card.append(&body);
+        card.update_property(&[gtk::accessible::Property::Label(
+            &gettext("Post de {} : {}")
+                .replacen("{}", author, 1)
+                .replacen("{}", text, 1),
+        )]);
+        card.set_accessible_role(gtk::AccessibleRole::Group);
+        let holder = gtk::Box::builder()
+            .orientation(gtk::Orientation::Vertical)
+            .spacing(4)
+            .build();
+        if !message.text.is_empty() {
+            holder.append(&label);
+        }
+        if uri.is_empty() {
+            holder.append(&card);
         } else {
-            gtk::Align::Start
-        })
+            // Un clic ouvre la discussion du post.
+            let open = gtk::Button::builder()
+                .child(&card)
+                .tooltip_text(gettext("Ouvrir le post"))
+                .css_classes(["flat", "shared-post-button"])
+                .build();
+            open.update_property(&[gtk::accessible::Property::Label(
+                &gettext("Ouvrir le post de {} : {}")
+                    .replacen("{}", author, 1)
+                    .replacen("{}", text, 1),
+            )]);
+            let uri = uri.clone();
+            open.connect_clicked(move |button| {
+                let _ = button.activate_action("win.open-post-uri", Some(&uri.to_variant()));
+            });
+            holder.append(&open);
+        }
+        return bubble_line(message, holder.upcast(), react);
+    }
+    bubble_line(message, label.upcast(), react)
+}
+
+/// Bulle (ou post partagé), avec « Réagir » et les réactions dessous.
+fn bubble_line(message: &Message, content: gtk::Widget, react: Option<&React>) -> gtk::Box {
+    let align = if message.mine {
+        gtk::Align::End
+    } else {
+        gtk::Align::Start
+    };
+    let line = gtk::Box::builder().spacing(4).halign(align).build();
+    let react = react.filter(|_| !message.failed && !message.id.starts_with(chat::LOCAL_ID));
+    let button = react.map(|react| react_button(message, react));
+    if let (true, Some(button)) = (message.mine, &button) {
+        line.append(button);
+    }
+    line.append(&content);
+    if let (false, Some(button)) = (message.mine, &button) {
+        line.append(button);
+    }
+    let column = gtk::Box::builder()
+        .orientation(gtk::Orientation::Vertical)
+        .spacing(2)
+        .halign(align)
         .build();
-    row.append(&label);
-    row
+    column.append(&line);
+    if !message.reactions.is_empty() {
+        let pills = gtk::Box::builder().spacing(4).halign(align).build();
+        for reaction in &message.reactions {
+            let pill = gtk::Button::builder()
+                .label(format!("{} {}", reaction.value, reaction.count))
+                .tooltip_text(reaction_label(reaction))
+                .css_classes(["reaction"])
+                .sensitive(react.is_some())
+                .build();
+            if reaction.mine {
+                pill.add_css_class("mine");
+            }
+            pill.update_property(&[gtk::accessible::Property::Label(&reaction_label(reaction))]);
+            if let Some(react) = react {
+                // Cliquer sa réaction la retire ; celle des autres s'y ajoute.
+                let (react, id, value, mine) = (
+                    react.clone(),
+                    message.id.clone(),
+                    reaction.value.clone(),
+                    reaction.mine,
+                );
+                pill.connect_clicked(move |_| react(&id, &value, !mine));
+            }
+            pills.append(&pill);
+        }
+        column.append(&pills);
+    }
+    column
 }
 
 fn day_separator(day: &str) -> gtk::Label {
@@ -185,6 +374,14 @@ impl MessagesPage {
             .title_widget(&adw::WindowTitle::new(&gettext("Messages"), ""))
             .build();
         list_header.pack_start(&refresh);
+        let new_message = gtk::Button::builder()
+            .icon_name("document-edit-symbolic")
+            .tooltip_text(gettext("Nouveau message"))
+            .build();
+        new_message.update_property(&[gtk::accessible::Property::Label(&gettext(
+            "Nouveau message",
+        ))]);
+        list_header.pack_end(&new_message);
         let accepted_tab = gtk::ToggleButton::builder()
             .label(gettext("Conversations"))
             .active(true)
@@ -260,13 +457,26 @@ impl MessagesPage {
             .margin_end(12)
             .valign(gtk::Align::End)
             .build();
+        let older_button = gtk::Button::builder()
+            .label(gettext("Messages plus anciens"))
+            .halign(gtk::Align::Center)
+            .margin_top(12)
+            .visible(false)
+            .css_classes(["pill"])
+            .build();
+        let thread = gtk::Box::builder()
+            .orientation(gtk::Orientation::Vertical)
+            .valign(gtk::Align::End)
+            .build();
+        thread.append(&older_button);
+        thread.append(&bubbles);
         let scroll = gtk::ScrolledWindow::builder()
             .hscrollbar_policy(gtk::PolicyType::Never)
             .vexpand(true)
             .child(
                 &adw::Clamp::builder()
                     .maximum_size(720)
-                    .child(&bubbles)
+                    .child(&thread)
                     .build(),
             )
             .build();
@@ -316,7 +526,18 @@ impl MessagesPage {
         convo_stack.add_named(&spinner(), Some("loading"));
         convo_stack.add_named(&convo_box, Some("convo"));
         let convo_view = adw::ToolbarView::builder().content(&convo_stack).build();
-        convo_view.add_top_bar(&adw::HeaderBar::builder().title_widget(&title).build());
+        // Menu de la conversation ouverte : notifications, quitter.
+        let convo_menu = gtk::MenuButton::builder()
+            .icon_name("view-more-symbolic")
+            .tooltip_text(gettext("Options de la conversation"))
+            .visible(false)
+            .build();
+        convo_menu.update_property(&[gtk::accessible::Property::Label(&gettext(
+            "Options de la conversation",
+        ))]);
+        let convo_header = adw::HeaderBar::builder().title_widget(&title).build();
+        convo_header.pack_end(&convo_menu);
+        convo_view.add_top_bar(&convo_header);
         let content = adw::NavigationPage::builder()
             .title(gettext("Conversation"))
             .child(&convo_view)
@@ -342,6 +563,7 @@ impl MessagesPage {
             requests: RefCell::default(),
             shown: RefCell::default(),
             title,
+            convo_menu,
             convo_stack,
             bubbles,
             scroll,
@@ -349,7 +571,63 @@ impl MessagesPage {
             entry,
             send,
             current: RefCell::default(),
+            messages: RefCell::default(),
+            older: RefCell::default(),
+            older_button,
+            sent: Cell::new(0),
+            this: RefCell::default(),
             generation: Cell::new(0),
+        });
+        page.this.replace(Rc::downgrade(&page));
+        let actions = gio::SimpleActionGroup::new();
+        let report = gio::SimpleAction::new("report", Some(glib::VariantTy::STRING));
+        let weak = Rc::downgrade(&page);
+        report.connect_activate(move |_, param| {
+            let (Some(page), Some(target)) = (weak.upgrade(), param.and_then(|p| p.str())) else {
+                return;
+            };
+            if let Some((sender, id)) = target.split_once('\n') {
+                page.report_message(sender, id);
+            }
+        });
+        actions.add_action(&report);
+        for (name, handler) in [
+            ("mute-convo", Self::toggle_convo_mute as fn(&Rc<Self>)),
+            ("leave-convo", Self::confirm_leave),
+        ] {
+            let action = gio::SimpleAction::new(name, None);
+            let weak = Rc::downgrade(&page);
+            action.connect_activate(move |_, _| {
+                if let Some(page) = weak.upgrade() {
+                    handler(&page);
+                }
+            });
+            actions.add_action(&action);
+        }
+        page.root.insert_action_group("messages", Some(&actions));
+        let weak = Rc::downgrade(&page);
+        new_message.connect_clicked(move |button| {
+            if let Some(page) = weak.upgrade() {
+                page.new_message_dialog(button);
+            }
+        });
+        let weak = Rc::downgrade(&page);
+        page.older_button.connect_clicked(move |_| {
+            if let Some(page) = weak.upgrade() {
+                page.load_older();
+            }
+        });
+        // Actualisation régulière, seulement quand la page est affichée.
+        let weak = Rc::downgrade(&page);
+        glib::timeout_add_seconds_local(REFRESH_SECONDS, move || {
+            let Some(page) = weak.upgrade() else {
+                return glib::ControlFlow::Break;
+            };
+            if page.root.is_mapped() && page.host.session.is_some() {
+                page.load_convos();
+                page.refresh_messages();
+            }
+            glib::ControlFlow::Continue
         });
 
         for (requests, button) in [(false, accepted_tab), (true, requests_tab)] {
@@ -434,6 +712,13 @@ impl MessagesPage {
     fn show_convos(&self, result: Result<(Vec<Convo>, Vec<Convo>), ApiError>) {
         match result {
             Ok((accepted, requests)) => {
+                // Rien de neuf : la liste reste telle quelle (focus compris).
+                if *self.accepted.borrow() == accepted
+                    && *self.requests.borrow() == requests
+                    && self.list_stack.visible_child_name().as_deref() == Some("list")
+                {
+                    return;
+                }
                 self.accepted.replace(accepted);
                 self.requests.replace(requests);
                 self.fill_list();
@@ -495,6 +780,7 @@ impl MessagesPage {
                 .unwrap_or_default(),
         );
         self.banner.set_revealed(convo.request);
+        self.update_convo_menu(&convo);
         self.current.replace(Some(convo.clone()));
         self.root.set_show_content(true);
         let generation = self.generation.get() + 1;
@@ -502,11 +788,11 @@ impl MessagesPage {
         self.mark_read(&convo);
 
         let Some(session) = self.host.session.clone() else {
-            self.show_messages(Ok(chat::demo_messages(&convo.id)));
+            self.show_messages(Ok((chat::demo_messages(&convo.id), None)));
             return;
         };
         self.convo_stack.set_visible_child_name("loading");
-        let task = runtime().spawn(chat::messages(session, convo.id.clone()));
+        let task = runtime().spawn(chat::messages(session, convo.id.clone(), None));
         let weak = Rc::downgrade(self);
         glib::spawn_future_local(async move {
             let result = task
@@ -523,26 +809,316 @@ impl MessagesPage {
         });
     }
 
-    fn show_messages(&self, result: Result<Vec<Message>, ApiError>) {
-        while let Some(child) = self.bubbles.first_child() {
-            self.bubbles.remove(&child);
-        }
+    fn show_messages(&self, result: Result<MessagePage, ApiError>) {
         match result {
-            Ok(messages) => {
-                let mut day = String::new();
-                for message in &messages {
-                    if message.day != day {
-                        day = message.day.clone();
-                        self.bubbles.append(&day_separator(&day));
-                    }
-                    self.bubbles.append(&bubble(message));
-                }
+            Ok((messages, cursor)) => {
+                self.messages.replace(messages);
+                self.older.replace(cursor);
+                self.render();
             }
-            Err(error) => self.bubbles.append(&day_separator(&error.message)),
+            Err(error) => {
+                self.messages.replace(Vec::new());
+                self.older.replace(None);
+                self.render();
+                self.bubbles.append(&day_separator(&error.message));
+            }
         }
         self.convo_stack.set_visible_child_name("convo");
         self.scroll_to_end();
         self.entry.grab_focus();
+    }
+
+    /// Bulles des messages affichés, séparées par jour.
+    fn render(&self) {
+        while let Some(child) = self.bubbles.first_child() {
+            self.bubbles.remove(&child);
+        }
+        let mut day = String::new();
+        for message in self.messages.borrow().iter() {
+            if message.day != day {
+                day = message.day.clone();
+                self.bubbles.append(&day_separator(&day));
+            }
+            self.bubbles
+                .append(&bubble(message, Some(&self.react_handler())));
+        }
+        self.older_button.set_visible(self.older.borrow().is_some());
+    }
+
+    /// Menu de la conversation : « Couper les notifications » (ou les
+    /// rétablir), « Quitter la conversation… ».
+    fn update_convo_menu(&self, convo: &Convo) {
+        let menu = gio::Menu::new();
+        menu.append(
+            Some(&if convo.muted {
+                gettext("Rétablir les notifications")
+            } else {
+                gettext("Couper les notifications")
+            }),
+            Some("messages.mute-convo"),
+        );
+        menu.append(
+            Some(&gettext("Quitter la conversation…")),
+            Some("messages.leave-convo"),
+        );
+        self.convo_menu.set_menu_model(Some(&menu));
+        self.convo_menu.set_visible(true);
+    }
+
+    fn toggle_convo_mute(self: &Rc<Self>) {
+        let Some(mut convo) = self.current.borrow().clone() else {
+            return;
+        };
+        convo.muted = !convo.muted;
+        for list in [&self.accepted, &self.requests] {
+            for c in list.borrow_mut().iter_mut().filter(|c| c.id == convo.id) {
+                c.muted = convo.muted;
+            }
+        }
+        self.current.replace(Some(convo.clone()));
+        self.update_convo_menu(&convo);
+        self.host.toasts.add_toast(adw::Toast::new(&if convo.muted {
+            gettext("Notifications de la conversation coupées.")
+        } else {
+            gettext("Notifications de la conversation rétablies.")
+        }));
+        let Some(session) = self.host.session.clone() else {
+            return;
+        };
+        let task = runtime().spawn(chat::set_convo_muted(session, convo.id, convo.muted));
+        let toasts = self.host.toasts.clone();
+        glib::spawn_future_local(async move {
+            if let Ok(Err(error)) = task.await {
+                toasts.add_toast(adw::Toast::new(&error.message));
+            }
+        });
+    }
+
+    /// Quitter la conversation, après confirmation : elle disparaît de la
+    /// liste, pour soi seulement.
+    fn confirm_leave(self: &Rc<Self>) {
+        let Some(convo) = self.current.borrow().clone() else {
+            return;
+        };
+        let dialog = adw::AlertDialog::new(
+            Some(&gettext("Quitter la conversation ?")),
+            Some(&gettext(
+                "Elle disparaîtra de votre liste. Les autres membres gardent leurs messages.",
+            )),
+        );
+        dialog.add_responses(&[
+            ("cancel", &gettext("Annuler")),
+            ("leave", &gettext("Quitter")),
+        ]);
+        dialog.set_response_appearance("leave", adw::ResponseAppearance::Destructive);
+        dialog.set_default_response(Some("cancel"));
+        dialog.set_close_response("cancel");
+        let weak = Rc::downgrade(self);
+        dialog.connect_response(Some("leave"), move |_, _| {
+            let Some(page) = weak.upgrade() else { return };
+            for list in [&page.accepted, &page.requests] {
+                list.borrow_mut().retain(|c| c.id != convo.id);
+            }
+            page.current.replace(None);
+            page.convo_menu.set_visible(false);
+            page.convo_stack.set_visible_child_name("empty");
+            page.root.set_show_content(false);
+            page.fill_list();
+            page.report_unread();
+            if let Some(session) = page.host.session.clone() {
+                let task = runtime().spawn(chat::leave(session, convo.id.clone()));
+                let toasts = page.host.toasts.clone();
+                glib::spawn_future_local(async move {
+                    if let Ok(Err(error)) = task.await {
+                        toasts.add_toast(adw::Toast::new(&error.message));
+                    }
+                });
+            }
+        });
+        dialog.present(Some(&self.root));
+    }
+
+    fn report_message(&self, sender: &str, message_id: &str) {
+        let Some(convo) = self.current.borrow().clone() else {
+            return;
+        };
+        let toasts = self.host.toasts.clone();
+        crate::report::present(
+            &self.root,
+            self.host.session.clone(),
+            crate::report::Subject::Message {
+                did: sender.to_owned(),
+                convo_id: convo.id,
+                message_id: message_id.to_owned(),
+            },
+            move |result| {
+                toasts.add_toast(adw::Toast::new(&match result {
+                    Ok(()) => gettext("Signalement envoyé. Merci."),
+                    Err(error) => error.message,
+                }));
+            },
+        );
+    }
+
+    fn react_handler(&self) -> React {
+        let weak = self.this.borrow().clone();
+        Rc::new(move |id: &str, value: &str, add: bool| {
+            if let Some(page) = weak.upgrade() {
+                page.react(id, value, add);
+            }
+        })
+    }
+
+    /// Ajoute ou retire ma réaction : affichée tout de suite, puis
+    /// remplacée par l'état du service.
+    fn react(self: &Rc<Self>, id: &str, value: &str, add: bool) {
+        {
+            let mut messages = self.messages.borrow_mut();
+            let Some(message) = messages.iter_mut().find(|m| m.id == id) else {
+                return;
+            };
+            let reactions = &mut message.reactions;
+            match reactions.iter_mut().position(|r| r.value == value) {
+                Some(i) if add && !reactions[i].mine => {
+                    reactions[i].count += 1;
+                    reactions[i].mine = true;
+                }
+                Some(_) if add => return,
+                Some(i) if reactions[i].mine => {
+                    reactions[i].count -= 1;
+                    reactions[i].mine = false;
+                    if reactions[i].count == 0 {
+                        reactions.remove(i);
+                    }
+                }
+                Some(_) => return,
+                None if add => reactions.push(chat::Reaction {
+                    value: value.to_owned(),
+                    count: 1,
+                    mine: true,
+                }),
+                None => return,
+            }
+        }
+        self.render();
+        // Les bulles sont refaites : le focus revient au champ de saisie.
+        self.entry.grab_focus();
+        let (Some(session), Some(convo)) =
+            (self.host.session.clone(), self.current.borrow().clone())
+        else {
+            return;
+        };
+        let task = runtime().spawn(chat::react(
+            session,
+            convo.id,
+            id.to_owned(),
+            value.to_owned(),
+            add,
+        ));
+        let weak = Rc::downgrade(self);
+        glib::spawn_future_local(async move {
+            let result = task
+                .await
+                .unwrap_or_else(|_| Err(ApiError::new(gettext("Requête interrompue."))));
+            let Some(page) = weak.upgrade() else { return };
+            match result {
+                Ok(updated) => {
+                    if let Some(m) = page
+                        .messages
+                        .borrow_mut()
+                        .iter_mut()
+                        .find(|m| m.id == updated.id)
+                    {
+                        *m = updated;
+                    }
+                    page.render();
+                }
+                Err(error) if error.expired => (page.host.expired)(error.message),
+                Err(error) => {
+                    page.host.toasts.add_toast(adw::Toast::new(&error.message));
+                    page.refresh_messages();
+                }
+            }
+        });
+    }
+
+    /// Messages d'avant ceux affichés, sans bouger ce qu'on lit.
+    fn load_older(self: &Rc<Self>) {
+        let (Some(session), Some(convo), Some(cursor)) = (
+            self.host.session.clone(),
+            self.current.borrow().clone(),
+            self.older.borrow().clone(),
+        ) else {
+            return;
+        };
+        self.older_button.set_sensitive(false);
+        let generation = self.generation.get();
+        let task = runtime().spawn(chat::messages(session, convo.id, Some(cursor)));
+        let weak = Rc::downgrade(self);
+        glib::spawn_future_local(async move {
+            let result = task
+                .await
+                .unwrap_or_else(|_| Err(ApiError::new(gettext("Chargement interrompu."))));
+            let Some(page) = weak.upgrade() else { return };
+            page.older_button.set_sensitive(true);
+            if page.generation.get() != generation {
+                return;
+            }
+            match result {
+                Ok((older, cursor)) => {
+                    let adjustment = page.scroll.vadjustment();
+                    let from_end = adjustment.upper() - adjustment.value();
+                    {
+                        let mut messages = page.messages.borrow_mut();
+                        let shown = std::mem::take(&mut *messages);
+                        *messages = older.into_iter().chain(shown).collect();
+                    }
+                    page.older.replace(cursor);
+                    page.render();
+                    // Même distance à la fin qu'avant : le message lu reste en place.
+                    glib::idle_add_local_once(move || {
+                        adjustment.set_value(adjustment.upper() - from_end);
+                    });
+                }
+                Err(error) if error.expired => (page.host.expired)(error.message),
+                Err(error) => page.host.toasts.add_toast(adw::Toast::new(&error.message)),
+            }
+        });
+    }
+
+    /// Nouveaux messages de la conversation ouverte (actualisation).
+    fn refresh_messages(self: &Rc<Self>) {
+        let (Some(session), Some(convo)) =
+            (self.host.session.clone(), self.current.borrow().clone())
+        else {
+            return;
+        };
+        if self.convo_stack.visible_child_name().as_deref() != Some("convo") {
+            return;
+        }
+        let generation = self.generation.get();
+        let task = runtime().spawn(chat::messages(session, convo.id.clone(), None));
+        let weak = Rc::downgrade(self);
+        glib::spawn_future_local(async move {
+            let Ok(Ok((latest, _))) = task.await else {
+                return;
+            };
+            let Some(page) = weak.upgrade() else { return };
+            if page.generation.get() != generation {
+                return;
+            }
+            let merged = chat::merge(&page.messages.borrow(), latest);
+            if *page.messages.borrow() == merged {
+                return;
+            }
+            let adjustment = page.scroll.vadjustment();
+            let at_end = adjustment.value() + adjustment.page_size() >= adjustment.upper() - 24.0;
+            page.messages.replace(merged);
+            page.render();
+            if at_end {
+                page.scroll_to_end();
+            }
+        });
     }
 
     fn scroll_to_end(&self) {
@@ -586,16 +1162,21 @@ impl MessagesPage {
         self.entry.set_text("");
         // Affiché tout de suite ; marqué si l'envoi échoue.
         let now = chrono::Local::now();
+        self.sent.set(self.sent.get() + 1);
+        let local_id = format!("{}{}", chat::LOCAL_ID, self.sent.get());
         let pending = Message {
-            id: String::new(),
+            id: local_id.clone(),
             text: text.clone(),
             mine: true,
             sender: String::new(),
             time: now.format("%H:%M").to_string(),
             day: gettext("Aujourd'hui"),
+            failed: false,
+            reactions: Vec::new(),
+            shared: None,
         };
-        let row = bubble(&pending);
-        self.bubbles.append(&row);
+        self.messages.borrow_mut().push(pending.clone());
+        self.render();
         self.scroll_to_end();
         // La conversation remonte en tête, avec ce dernier message.
         {
@@ -613,28 +1194,335 @@ impl MessagesPage {
         let Some(session) = self.host.session.clone() else {
             return;
         };
-        let task = runtime().spawn(chat::send(session, convo.id, text));
+        let task = runtime().spawn(chat::send(session, convo.id, text, None));
         let weak = Rc::downgrade(self);
         glib::spawn_future_local(async move {
             let result = task
                 .await
                 .unwrap_or_else(|_| Err(ApiError::new(gettext("Envoi interrompu."))));
             let Some(page) = weak.upgrade() else { return };
-            if let Err(error) = result {
-                if error.expired {
-                    (page.host.expired)(error.message);
-                    return;
+            match result {
+                Ok(sent) => {
+                    // Le message local devient celui du service (sauf si
+                    // une actualisation l'a déjà apporté).
+                    let mut messages = page.messages.borrow_mut();
+                    let known = messages.iter().any(|m| m.id == sent.id);
+                    messages.retain(|m| m.id != local_id || !known);
+                    if let Some(m) = messages.iter_mut().find(|m| m.id == local_id) {
+                        *m = sent;
+                    }
                 }
-                if let Some(label) = row.first_child() {
-                    label.add_css_class("failed");
-                    label.set_tooltip_text(Some(&gettext("Message non envoyé")));
+                Err(error) => {
+                    if error.expired {
+                        (page.host.expired)(error.message);
+                        return;
+                    }
+                    if let Some(m) = page
+                        .messages
+                        .borrow_mut()
+                        .iter_mut()
+                        .find(|m| m.id == local_id)
+                    {
+                        m.failed = true;
+                    }
+                    page.render();
+                    glib::g_debug!("tsubame", "message : {}", error.message);
+                    page.host
+                        .toasts
+                        .add_toast(adw::Toast::new(&gettext("Message non envoyé.")));
                 }
-                glib::g_debug!("tsubame", "message : {}", error.message);
-                page.host
-                    .toasts
-                    .add_toast(adw::Toast::new(&gettext("Message non envoyé.")));
             }
         });
+    }
+
+    /// Ouvre la conversation avec un compte (DID), créée au besoin ;
+    /// `name` sert au titre en démonstration.
+    pub fn start_with(self: &Rc<Self>, did: &str, name: &str) {
+        let Some(session) = self.host.session.clone() else {
+            let convo = Convo {
+                id: format!("demo:{did}"),
+                title: name.to_owned(),
+                handle: None,
+                avatar: None,
+                last_text: String::new(),
+                last_time: String::new(),
+                unread: 0,
+                request: false,
+                muted: false,
+            };
+            self.add_and_open(convo);
+            return;
+        };
+        let task = runtime().spawn(chat::convo_for(session, did.to_owned()));
+        let weak = Rc::downgrade(self);
+        glib::spawn_future_local(async move {
+            let result = task
+                .await
+                .unwrap_or_else(|_| Err(ApiError::new(gettext("Chargement interrompu."))));
+            let Some(page) = weak.upgrade() else { return };
+            match result {
+                Ok(convo) => page.add_and_open(convo),
+                Err(error) if error.expired => (page.host.expired)(error.message),
+                Err(error) => page.host.toasts.add_toast(adw::Toast::new(&error.message)),
+            }
+        });
+    }
+
+    fn add_and_open(self: &Rc<Self>, convo: Convo) {
+        let known = self
+            .accepted
+            .borrow()
+            .iter()
+            .chain(self.requests.borrow().iter())
+            .any(|c| c.id == convo.id);
+        if !known {
+            self.accepted.borrow_mut().insert(0, convo.clone());
+        }
+        if convo.request {
+            self.requests_tab.set_active(true);
+        }
+        self.open(convo);
+        // Après `open` : la rangée de la conversation ouverte est choisie.
+        self.fill_list();
+    }
+
+    /// Boîte « Nouveau message » : chercher un compte, puis ouvrir la
+    /// conversation avec lui.
+    fn new_message_dialog(self: &Rc<Self>, parent: &gtk::Button) {
+        let dialog = adw::Dialog::builder()
+            .title(gettext("Nouveau message"))
+            .content_width(420)
+            .content_height(480)
+            .build();
+        let entry = gtk::SearchEntry::builder()
+            .placeholder_text(gettext("Rechercher un compte"))
+            .search_delay(300)
+            .hexpand(true)
+            .build();
+        entry.update_property(&[gtk::accessible::Property::Label(&gettext(
+            "Rechercher un compte",
+        ))]);
+        let results = gtk::ListBox::builder()
+            .selection_mode(gtk::SelectionMode::None)
+            .valign(gtk::Align::Start)
+            .css_classes(["boxed-list"])
+            .visible(false)
+            .build();
+        results.update_property(&[gtk::accessible::Property::Label(&gettext("Comptes"))]);
+        let content = gtk::Box::builder()
+            .orientation(gtk::Orientation::Vertical)
+            .spacing(12)
+            .margin_top(12)
+            .margin_bottom(12)
+            .margin_start(12)
+            .margin_end(12)
+            .build();
+        content.append(&entry);
+        content.append(&results);
+        let view = adw::ToolbarView::builder()
+            .content(
+                &gtk::ScrolledWindow::builder()
+                    .hscrollbar_policy(gtk::PolicyType::Never)
+                    .child(&content)
+                    .build(),
+            )
+            .build();
+        view.add_top_bar(&adw::HeaderBar::new());
+        dialog.set_child(Some(&view));
+
+        let found: Rc<RefCell<Vec<crate::data::Actor>>> = Rc::default();
+        let show = {
+            let (results, found) = (results.clone(), found.clone());
+            move |actors: Vec<crate::data::Actor>| {
+                results.remove_all();
+                for actor in &actors {
+                    let row = adw::ActionRow::builder()
+                        .title(&actor.name)
+                        .subtitle(format!("@{}", actor.handle))
+                        .use_markup(false)
+                        .activatable(true)
+                        .build();
+                    let avatar = adw::Avatar::builder()
+                        .size(32)
+                        .text(&actor.name)
+                        .show_initials(true)
+                        .accessible_role(gtk::AccessibleRole::Presentation)
+                        .build();
+                    if let Some(url) = &actor.avatar {
+                        let weak = avatar.downgrade();
+                        images::load(url, move |texture| {
+                            if let Some(avatar) = weak.upgrade() {
+                                avatar.set_custom_image(Some(texture));
+                            }
+                        });
+                    }
+                    row.add_prefix(&avatar);
+                    results.append(&row);
+                }
+                results.set_visible(!actors.is_empty());
+                found.replace(actors);
+            }
+        };
+        let show = Rc::new(show);
+        let session = self.host.session.clone();
+        entry.connect_search_changed(move |entry| {
+            let query = entry.text().trim().to_owned();
+            if query.is_empty() {
+                show(Vec::new());
+                return;
+            }
+            let Some(session) = session.clone() else {
+                let lower = query.to_lowercase();
+                show(
+                    crate::data::demo_actors()
+                        .into_iter()
+                        .filter(|a| {
+                            a.name.to_lowercase().contains(&lower) || a.handle.contains(&lower)
+                        })
+                        .collect(),
+                );
+                return;
+            };
+            let task = runtime().spawn(crate::api::typeahead(session, query.clone()));
+            let (show, entry) = (show.clone(), entry.downgrade());
+            glib::spawn_future_local(async move {
+                let Ok(Ok(actors)) = task.await else { return };
+                // Une frappe plus récente l'emporte.
+                if entry.upgrade().map(|e| e.text().trim() == query) == Some(true) {
+                    show(actors);
+                }
+            });
+        });
+        let weak = Rc::downgrade(self);
+        let closing = dialog.downgrade();
+        results.connect_row_activated(move |_, row| {
+            let actor = found.borrow().get(row.index() as usize).cloned();
+            let (Some(page), Some(actor)) = (weak.upgrade(), actor) else {
+                return;
+            };
+            if let Some(dialog) = closing.upgrade() {
+                dialog.close();
+            }
+            page.start_with(&actor.did, &actor.name);
+        });
+        dialog.present(Some(parent));
+        entry.grab_focus();
+    }
+
+    /// Boîte « Envoyer en message » : choisir une conversation, avec un
+    /// mot facultatif, pour y partager le post `uri` (de contenu `cid`).
+    pub fn share_post(self: &Rc<Self>, parent: &impl IsA<gtk::Widget>, uri: &str, cid: &str) {
+        let dialog = adw::Dialog::builder()
+            .title(gettext("Envoyer en message"))
+            .content_width(420)
+            .content_height(520)
+            .build();
+        let note = gtk::Entry::builder()
+            .placeholder_text(gettext("Ajouter un message (facultatif)"))
+            .build();
+        note.update_property(&[gtk::accessible::Property::Label(&gettext(
+            "Message accompagnant le post",
+        ))]);
+        let rows = gtk::ListBox::builder()
+            .selection_mode(gtk::SelectionMode::None)
+            .valign(gtk::Align::Start)
+            .css_classes(["boxed-list"])
+            .build();
+        rows.update_property(&[gtk::accessible::Property::Label(&gettext("Conversations"))]);
+        let convos = self.accepted.borrow().clone();
+        for convo in &convos {
+            let row = adw::ActionRow::builder()
+                .title(&convo.title)
+                .use_markup(false)
+                .activatable(true)
+                .build();
+            if let Some(handle) = &convo.handle {
+                row.set_subtitle(&format!("@{handle}"));
+            }
+            row.add_prefix(
+                &adw::Avatar::builder()
+                    .size(32)
+                    .text(&convo.title)
+                    .show_initials(true)
+                    .accessible_role(gtk::AccessibleRole::Presentation)
+                    .build(),
+            );
+            row.add_suffix(&crate::card::decorative_icon("mail-send-symbolic"));
+            rows.append(&row);
+        }
+        let content = gtk::Box::builder()
+            .orientation(gtk::Orientation::Vertical)
+            .spacing(12)
+            .margin_top(12)
+            .margin_bottom(12)
+            .margin_start(12)
+            .margin_end(12)
+            .build();
+        content.append(&note);
+        if convos.is_empty() {
+            content.append(
+                &adw::StatusPage::builder()
+                    .title(gettext("Aucune conversation"))
+                    .description(gettext(
+                        "Commencez une conversation depuis la page Messages.",
+                    ))
+                    .css_classes(["compact"])
+                    .build(),
+            );
+        } else {
+            content.append(&rows);
+        }
+        let view = adw::ToolbarView::builder()
+            .content(
+                &gtk::ScrolledWindow::builder()
+                    .hscrollbar_policy(gtk::PolicyType::Never)
+                    .child(&content)
+                    .build(),
+            )
+            .build();
+        view.add_top_bar(&adw::HeaderBar::new());
+        dialog.set_child(Some(&view));
+
+        let (host, uri, cid, closing) = (
+            self.host.clone(),
+            uri.to_owned(),
+            cid.to_owned(),
+            dialog.downgrade(),
+        );
+        rows.connect_row_activated(move |_, row| {
+            let Some(convo) = convos.get(row.index() as usize).cloned() else {
+                return;
+            };
+            if let Some(dialog) = closing.upgrade() {
+                dialog.close();
+            }
+            let Some(session) = host.session.clone() else {
+                host.toasts.add_toast(adw::Toast::new(&gettext(
+                    "Mode démonstration : rien n'est publié.",
+                )));
+                return;
+            };
+            let task = runtime().spawn(chat::send(
+                session,
+                convo.id.clone(),
+                note.text().trim().to_owned(),
+                Some((uri.clone(), cid.clone())),
+            ));
+            let host = host.clone();
+            glib::spawn_future_local(async move {
+                match task
+                    .await
+                    .unwrap_or_else(|_| Err(ApiError::new(gettext("Envoi interrompu."))))
+                {
+                    Ok(_) => host.toasts.add_toast(adw::Toast::new(
+                        &gettext("Post envoyé à {}.").replace("{}", &convo.title),
+                    )),
+                    Err(error) if error.expired => (host.expired)(error.message),
+                    Err(error) => host.toasts.add_toast(adw::Toast::new(&error.message)),
+                }
+            });
+        });
+        dialog.present(Some(parent));
     }
 
     /// Accepter une demande : elle rejoint les conversations.

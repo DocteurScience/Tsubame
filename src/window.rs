@@ -71,6 +71,12 @@ fn other_pages() -> Vec<OtherPage> {
             None,
         ),
         page(
+            "feeds",
+            "application-rss+xml-symbolic",
+            gettext("Flux"),
+            None,
+        ),
+        page(
             "bookmarks",
             "user-bookmarks-symbolic",
             gettext("Signets"),
@@ -214,6 +220,7 @@ struct State {
     messages_bin: adw::Bin,
     bookmarks_bin: adw::Bin,
     lists_bin: adw::Bin,
+    feeds_bin: adw::Bin,
     /// Signets et Listes, gardés en vie avec leur page.
     other_pages: RefCell<Vec<Rc<dyn std::any::Any>>>,
     messages: RefCell<Option<Rc<MessagesPage>>>,
@@ -236,6 +243,9 @@ struct State {
     /// trop tard.
     shown_uri: RefCell<Option<String>>,
     logout_action: gio::SimpleAction,
+    /// Section « comptes » du menu principal, et les comptes qu'elle liste.
+    accounts_menu: gio::Menu,
+    known_accounts: RefCell<Vec<auth::Account>>,
 }
 
 impl State {
@@ -504,6 +514,11 @@ impl State {
                 .unwrap_or_default(),
         );
         self.logout_action.set_enabled(session.is_some());
+        if let Some(session) = &session {
+            let _ = self
+                .settings
+                .set_string("current-account", &session.account.did);
+        }
         interactions::set_me(session.as_ref().map(|s| s.account.did.clone()));
         self.session.replace(session);
         self.clear_thread();
@@ -520,6 +535,66 @@ impl State {
         if let Some(column) = self.columns.borrow().get(self.current.get()) {
             column.focus();
         }
+        self.refresh_accounts();
+    }
+
+    /// Section « comptes » du menu principal : passer à un autre compte
+    /// gardé dans le trousseau, en ajouter un.
+    fn refresh_accounts(self: &Rc<Self>) {
+        let task = runtime().spawn(auth::stored_accounts());
+        let weak = Rc::downgrade(self);
+        glib::spawn_future_local(async move {
+            let accounts = task.await.ok().and_then(Result::ok).unwrap_or_default();
+            let Some(state) = weak.upgrade() else { return };
+            let current = state
+                .session
+                .borrow()
+                .as_ref()
+                .map(|s| s.account.did.clone());
+            state.accounts_menu.remove_all();
+            for account in accounts.iter().filter(|a| Some(&a.did) != current.as_ref()) {
+                let item = gio::MenuItem::new(
+                    Some(&gettext("Passer à @{}").replace("{}", &account.handle)),
+                    None,
+                );
+                item.set_action_and_target_value(
+                    Some("win.switch-account"),
+                    Some(&account.did.to_variant()),
+                );
+                state.accounts_menu.append_item(&item);
+            }
+            state.accounts_menu.append(
+                Some(&gettext("Ajouter un compte…")),
+                Some("win.add-account"),
+            );
+            state.known_accounts.replace(accounts);
+        });
+    }
+
+    /// Passe au compte `did`, gardé dans le trousseau.
+    fn switch_account(self: &Rc<Self>, did: &str) {
+        let account = self
+            .known_accounts
+            .borrow()
+            .iter()
+            .find(|a| a.did == did)
+            .cloned();
+        if let Some(account) = account {
+            self.stop_polling();
+            self.enter(Some(auth::session_for(account)));
+        }
+    }
+
+    /// Écran de connexion pour un compte de plus ; « Retour » revient à
+    /// l'application telle qu'elle était.
+    fn add_account(self: &Rc<Self>) {
+        let weak = Rc::downgrade(self);
+        self.login.show_add_account(move || {
+            if let Some(state) = weak.upgrade() {
+                state.root_stack.set_visible_child_name("main");
+            }
+        });
+        self.root_stack.set_visible_child_name("login");
     }
 
     /// Revient à l'écran de connexion.
@@ -572,6 +647,7 @@ impl State {
         dialog.connect_response(Some("logout"), move |_, _| {
             let Some(state) = weak.upgrade() else { return };
             let account = account.clone();
+            let leaving = account.did.clone();
             let task = runtime().spawn(async move { auth::logout(&account).await });
             let weak = Rc::downgrade(&state);
             glib::spawn_future_local(async move {
@@ -582,7 +658,20 @@ impl State {
                     Ok(Err(error)) => Some(error.message()),
                     Err(_) => Some(gettext("La déconnexion a échoué.")),
                 };
-                state.leave(message.as_deref());
+                // Un autre compte reste connecté : on passe à lui.
+                let others = runtime().spawn(auth::stored_accounts());
+                let next = others
+                    .await
+                    .ok()
+                    .and_then(Result::ok)
+                    .and_then(|accounts| accounts.into_iter().find(|a| a.did != leaving));
+                match (message, next) {
+                    (None, Some(next)) => {
+                        state.stop_polling();
+                        state.enter(Some(auth::session_for(next)));
+                    }
+                    (message, _) => state.leave(message.as_deref()),
+                }
             });
         });
         dialog.present(Some(window));
@@ -593,7 +682,8 @@ impl State {
     fn restore_session(self: &Rc<Self>) {
         self.login.show_checking();
         self.root_stack.set_visible_child_name("login");
-        let task = runtime().spawn(auth::stored_session());
+        let preferred = self.settings.string("current-account").to_string();
+        let task = runtime().spawn(auth::stored_session(preferred));
         let weak = Rc::downgrade(self);
         glib::spawn_future_local(async move {
             let result = task.await;
@@ -970,6 +1060,19 @@ impl State {
     }
 
     /// Empile le profil de `actor` (DID ou identifiant).
+    /// Posts d'un mot-dièse (recherche « #mot »), en page empilée.
+    fn open_tag(self: &Rc<Self>, tag: &str) {
+        let title = format!("#{tag}");
+        let page = crate::feed_page::FeedPage::new(
+            &title,
+            api::Source::Search(title.clone()),
+            crate::explore::demo_search_posts(&title),
+            self.profile_host(),
+        );
+        let page = page.navigation_page(&title);
+        (self.profile_host().push)(page);
+    }
+
     fn open_profile(self: &Rc<Self>, actor: &str) {
         let page = ProfilePage::new(actor, self.profile_host());
         self.nav.push(&page.navigation_page());
@@ -977,6 +1080,24 @@ impl State {
 
     /// Empile la discussion d'un post (ouvert depuis un profil) et charge
     /// ses réponses.
+    fn open_post_uri(self: &Rc<Self>, uri: &str) {
+        let Some(session) = self.session.borrow().clone() else {
+            return;
+        };
+        let task = runtime().spawn(api::post(session, uri.to_owned()));
+        let weak = Rc::downgrade(self);
+        glib::spawn_future_local(async move {
+            let result = task
+                .await
+                .unwrap_or_else(|_| Err(api::ApiError::new(gettext("Chargement interrompu."))));
+            let Some(state) = weak.upgrade() else { return };
+            match result {
+                Ok(post) => state.open_post_page(post),
+                Err(error) => state.toasts.add_toast(adw::Toast::new(&error.message)),
+            }
+        });
+    }
+
     fn open_post_page(self: &Rc<Self>, post: Post) {
         let view = Rc::new(ThreadView::new());
         view.set_selector_visible(false);
@@ -1040,6 +1161,27 @@ impl State {
             if let Ok(Ok(preferences)) = task.await
                 && let Some(state) = weak.upgrade()
             {
+                // Étiquettes des services choisis, avant de recharger.
+                let session = state.session.borrow().clone();
+                if let Some(session) = session {
+                    let labelers = moderation::labelers(&preferences);
+                    let lang = moderation::interface_language();
+                    let task = runtime().spawn(async move {
+                        moderation::configure_labelers(session.clone(), labelers.clone()).await;
+                        moderation::labeler_details(session, labelers, lang).await
+                    });
+                    if let Ok(Ok(details)) = task.await {
+                        moderation::set_labeler_names(
+                            details
+                                .iter()
+                                .map(|(did, name, _)| (did.clone(), name.clone()))
+                                .collect(),
+                        );
+                        moderation::set_definitions(
+                            details.into_iter().flat_map(|(_, _, defs)| defs).collect(),
+                        );
+                    }
+                }
                 moderation::set_preferences(preferences);
                 state.load_all();
             }
@@ -1172,6 +1314,41 @@ impl State {
     }
 
     /// Épingler un de mes posts en haut de mon profil, ou l'en retirer.
+    /// Ouvre la traduction du texte du post dans le navigateur, vers la
+    /// langue de l'interface.
+    fn translate(self: &Rc<Self>, key: &str) {
+        let Some(post) = interactions::find(key).map(|entry| entry.post()) else {
+            return;
+        };
+        let uri = translation_uri(&post.text, &moderation::interface_language());
+        let window = self.toasts.root().and_downcast::<gtk::Window>();
+        let toasts = self.toasts.clone();
+        gtk::UriLauncher::new(&uri).launch(
+            window.as_ref(),
+            gio::Cancellable::NONE,
+            move |result| {
+                if result.is_err() {
+                    toasts.add_toast(adw::Toast::new(&gettext(
+                        "Le navigateur n'a pas pu être ouvert.",
+                    )));
+                }
+            },
+        );
+    }
+
+    /// Partager un post dans une conversation.
+    fn send_post(self: &Rc<Self>, key: &str) {
+        let Some(post) = interactions::find(key).map(|entry| entry.post()) else {
+            return;
+        };
+        let (Some(uri), Some(cid)) = (post.uri.clone(), post.cid.clone()) else {
+            return;
+        };
+        if let Some(page) = self.messages.borrow().as_ref() {
+            page.share_post(&self.toasts, &uri, &cid);
+        }
+    }
+
     fn toggle_pin(self: &Rc<Self>, key: &str) {
         let Some(post) = interactions::find(key).map(|entry| entry.post()) else {
             return;
@@ -1330,8 +1507,16 @@ impl State {
         self.bookmarks_bin.set_child(Some(&bookmarks.root));
         let lists = ListsPage::new(self.profile_host());
         self.lists_bin.set_child(Some(&lists.root));
+        // Flux : un changement des flux épinglés change les colonnes possibles.
+        let weak = Rc::downgrade(self);
+        let feeds = crate::feeds::FeedsPage::new(self.profile_host(), move || {
+            if let Some(state) = weak.upgrade() {
+                state.load_pinned_feeds();
+            }
+        });
+        self.feeds_bin.set_child(Some(&feeds.root));
         self.other_pages
-            .replace(vec![bookmarks as Rc<dyn std::any::Any>, lists]);
+            .replace(vec![bookmarks as Rc<dyn std::any::Any>, lists, feeds]);
     }
 
     /// Page Messages, pour le compte connecté ou la démonstration.
@@ -1361,6 +1546,14 @@ impl State {
         let page = ExplorePage::new(self.profile_host());
         self.explore_bin.set_child(Some(&page.root));
         self.explore.replace(Some(page));
+    }
+
+    /// Ouvre la page Messages sur la conversation avec ce compte.
+    fn message(&self, did: &str) {
+        self.stack.set_visible_child_name("messages");
+        if let Some(page) = self.messages.borrow().as_ref() {
+            page.start_with(did, did);
+        }
     }
 
     /// Rechercher (Ctrl+K) : ouvre Explorer, le champ de recherche prêt.
@@ -1787,6 +1980,38 @@ fn install_actions(window: &adw::ApplicationWindow, state: &Rc<State>) {
         }
     });
     window.add_action(&open_profile);
+    let open_tag = gio::SimpleAction::new("open-tag", Some(glib::VariantTy::STRING));
+    let weak = Rc::downgrade(state);
+    open_tag.connect_activate(move |_, param| {
+        if let (Some(state), Some(tag)) = (weak.upgrade(), param.and_then(|p| p.str())) {
+            state.open_tag(tag);
+        }
+    });
+    window.add_action(&open_tag);
+    let switch = gio::SimpleAction::new("switch-account", Some(glib::VariantTy::STRING));
+    let weak = Rc::downgrade(state);
+    switch.connect_activate(move |_, param| {
+        if let (Some(state), Some(did)) = (weak.upgrade(), param.and_then(|p| p.str())) {
+            state.switch_account(did);
+        }
+    });
+    window.add_action(&switch);
+    let add_account = gio::SimpleAction::new("add-account", None);
+    let weak = Rc::downgrade(state);
+    add_account.connect_activate(move |_, _| {
+        if let Some(state) = weak.upgrade() {
+            state.add_account();
+        }
+    });
+    window.add_action(&add_account);
+    let message = gio::SimpleAction::new("message", Some(glib::VariantTy::STRING));
+    let weak = Rc::downgrade(state);
+    message.connect_activate(move |_, param| {
+        if let (Some(state), Some(did)) = (weak.upgrade(), param.and_then(|p| p.str())) {
+            state.message(did);
+        }
+    });
+    window.add_action(&message);
 
     let preferences = gio::SimpleAction::new("preferences", None);
     let weak = Rc::downgrade(state);
@@ -1798,6 +2023,8 @@ fn install_actions(window: &adw::ApplicationWindow, state: &Rc<State>) {
     window.add_action(&preferences);
     for (name, handler) in [
         ("copy-link", State::copy_link as fn(&Rc<State>, &str)),
+        ("send-post", State::send_post),
+        ("translate", State::translate),
         ("mute-author", State::mute_author),
         ("block-author", State::confirm_block),
         ("report-post", State::report_post),
@@ -1860,6 +2087,23 @@ fn install_actions(window: &adw::ApplicationWindow, state: &Rc<State>) {
         }
     });
     window.add_action(&open_post);
+    // Post connu par sa seule adresse (post partagé dans un message).
+    let open_post_uri = gio::SimpleAction::new("open-post-uri", Some(glib::VariantTy::STRING));
+    let weak = Rc::downgrade(state);
+    open_post_uri.connect_activate(move |_, param| {
+        if let (Some(state), Some(uri)) = (weak.upgrade(), param.and_then(|p| p.str())) {
+            state.open_post_uri(uri);
+        }
+    });
+    window.add_action(&open_post_uri);
+    let reload_pinned = gio::SimpleAction::new("reload-pinned", None);
+    let weak = Rc::downgrade(state);
+    reload_pinned.connect_activate(move |_, _| {
+        if let Some(state) = weak.upgrade() {
+            state.load_pinned_feeds();
+        }
+    });
+    window.add_action(&reload_pinned);
 
     for (name, which) in [
         ("toggle-like", Interaction::Like),
@@ -1993,6 +2237,7 @@ pub fn build(app: &adw::Application) -> adw::ApplicationWindow {
     let messages_bin = adw::Bin::new();
     let bookmarks_bin = adw::Bin::new();
     let lists_bin = adw::Bin::new();
+    let feeds_bin = adw::Bin::new();
     let mut messages_stack_page = None;
     for page in &pages[1..] {
         let child: gtk::Widget = match page.name {
@@ -2000,6 +2245,7 @@ pub fn build(app: &adw::Application) -> adw::ApplicationWindow {
             "messages" => messages_bin.clone().upcast(),
             "bookmarks" => bookmarks_bin.clone().upcast(),
             "lists" => lists_bin.clone().upcast(),
+            "feeds" => feeds_bin.clone().upcast(),
             _ => placeholder_page(page.icon, &page.title).upcast(),
         };
         let stack_page =
@@ -2047,6 +2293,8 @@ pub fn build(app: &adw::Application) -> adw::ApplicationWindow {
         .build();
     sidebar_list.update_property(&[gtk::accessible::Property::Label(&gettext("Navigation"))]);
     let menu = gio::Menu::new();
+    let accounts_menu = gio::Menu::new();
+    menu.append_section(None, &accounts_menu);
     let account_section = gio::Menu::new();
     account_section.append(Some(&gettext("Préférences")), Some("win.preferences"));
     account_section.append(Some(&gettext("Se déconnecter…")), Some("win.logout"));
@@ -2148,6 +2396,7 @@ pub fn build(app: &adw::Application) -> adw::ApplicationWindow {
         messages_bin,
         bookmarks_bin,
         lists_bin,
+        feeds_bin,
         other_pages: RefCell::default(),
         messages: RefCell::default(),
         messages_page: messages_stack_page.expect("page Messages"),
@@ -2162,6 +2411,8 @@ pub fn build(app: &adw::Application) -> adw::ApplicationWindow {
         unread: Cell::new(0),
         notifications_page: notifications.clone(),
         logout_action: gio::SimpleAction::new("logout", None),
+        accounts_menu,
+        known_accounts: RefCell::default(),
         poll: RefCell::default(),
     });
     state.connect_column(&state.compact_notifications, Target::CompactNotifications);
@@ -2176,6 +2427,26 @@ pub fn build(app: &adw::Application) -> adw::ApplicationWindow {
         .connect_changed(Some("pane-position"), move |_, _| {
             if let Some(state) = weak.upgrade() {
                 state.update_layout();
+            }
+        });
+    // Langues des posts affichés : filtre des fils, rechargés au changement.
+    moderation::set_content_languages(
+        state
+            .settings
+            .strv("content-languages")
+            .iter()
+            .map(|l| l.to_string())
+            .collect(),
+    );
+    let weak = Rc::downgrade(&state);
+    state
+        .settings
+        .connect_changed(Some("content-languages"), move |settings, key| {
+            moderation::set_content_languages(
+                settings.strv(key).iter().map(|l| l.to_string()).collect(),
+            );
+            if let Some(state) = weak.upgrade() {
+                state.load_all();
             }
         });
     let weak = Rc::downgrade(&state);
@@ -2330,5 +2601,26 @@ mod tests {
         assert_eq!(drop_index(1, 1, true), None);
         assert_eq!(drop_index(1, 0, true), None); // après la précédente
         assert_eq!(drop_index(1, 2, false), None); // avant la suivante
+    }
+}
+
+/// Adresse de Google Traduction pour `text`, vers `target` (« fr »…), la
+/// langue d'origine étant détectée.
+pub fn translation_uri(text: &str, target: &str) -> String {
+    format!(
+        "https://translate.google.com/?sl=auto&tl={}&text={}&op=translate",
+        glib::Uri::escape_string(target, None, false),
+        glib::Uri::escape_string(text, None, false),
+    )
+}
+
+#[cfg(test)]
+mod translation_tests {
+    #[test]
+    fn translation_links_escape_the_text() {
+        assert_eq!(
+            super::translation_uri("Bonjour & à demain #GNOME", "en"),
+            "https://translate.google.com/?sl=auto&tl=en&text=Bonjour%20%26%20%C3%A0%20demain%20%23GNOME&op=translate"
+        );
     }
 }

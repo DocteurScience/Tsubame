@@ -24,8 +24,23 @@ enum Tab {
     Posts,
     Replies,
     Media,
+    Videos,
     Likes,
+    Feeds,
+    Lists,
+    Packs,
 }
+
+const TABS: [Tab; 8] = [
+    Tab::Posts,
+    Tab::Replies,
+    Tab::Media,
+    Tab::Videos,
+    Tab::Likes,
+    Tab::Feeds,
+    Tab::Lists,
+    Tab::Packs,
+];
 
 impl Tab {
     fn title(self) -> String {
@@ -33,8 +48,18 @@ impl Tab {
             Tab::Posts => gettext("Posts"),
             Tab::Replies => gettext("Réponses"),
             Tab::Media => gettext("Médias"),
+            Tab::Videos => gettext("Vidéos"),
             Tab::Likes => pgettext("onglet du profil", "J'aime"),
+            Tab::Feeds => gettext("Flux"),
+            Tab::Lists => gettext("Listes"),
+            Tab::Packs => gettext("Starter packs"),
         }
+    }
+
+    /// Onglet de posts (les autres listent des flux, listes ou starter
+    /// packs).
+    fn is_posts(self) -> bool {
+        !matches!(self, Tab::Feeds | Tab::Lists | Tab::Packs)
     }
 
     fn source(self, actor: &str) -> Source {
@@ -46,7 +71,10 @@ impl Tab {
             Tab::Posts => author(AuthorFilter::Posts),
             Tab::Replies => author(AuthorFilter::Replies),
             Tab::Media => author(AuthorFilter::Media),
+            Tab::Videos => author(AuthorFilter::Videos),
             Tab::Likes => Source::Likes(actor.to_owned()),
+            // Pas de posts : `is_posts` les écarte avant.
+            Tab::Feeds | Tab::Lists | Tab::Packs => author(AuthorFilter::Posts),
         }
     }
 }
@@ -101,15 +129,38 @@ pub struct ProfilePage {
     follows: gtk::Button,
     post_count: gtk::Label,
     follow: gtk::Button,
+    /// « Envoyer un message ».
+    message: gtk::Button,
+    /// Notifications d'activité : bouton et ses deux cases.
+    bell: gtk::MenuButton,
+    bell_posts: gtk::CheckButton,
+    bell_replies: gtk::CheckButton,
+    /// Mise à jour des cases en cours : ne pas renvoyer la demande.
+    bell_updating: std::cell::Cell<bool>,
+    /// « Suivi par … », qui ouvre la liste de ces comptes.
+    known: gtk::Button,
     /// « Modifier le profil », sur son propre profil.
     edit: gtk::Button,
     /// Menu ⋮ : lien, masquer, bloquer, signaler.
     more: gtk::MenuButton,
-    likes_tab: gtk::ToggleButton,
+    /// Boutons des onglets, pour montrer ceux qui ont un contenu.
+    tab_buttons: Vec<(Tab, gtk::ToggleButton)>,
     scroll: gtk::ScrolledWindow,
     posts: PostList,
+    /// Flux, listes ou starter packs du compte (onglets sans posts).
+    others: gtk::ListBox,
+    others_status: gtk::Label,
+    /// Ce qu'ouvre chaque rangée de `others`.
+    other_items: RefCell<Vec<Other>>,
     tab: Cell<Tab>,
     profile: RefCell<Option<Profile>>,
+}
+
+/// Élément d'un onglet sans posts.
+enum Other {
+    Feed(crate::feeds::FeedInfo),
+    List(crate::data::List),
+    Pack(crate::starter_packs::StarterPack),
 }
 
 /// Texte de l'en-tête. Non sélectionnable : une étiquette sélectionnable
@@ -153,6 +204,9 @@ impl ProfilePage {
             .valign(gtk::Align::End)
             .build();
         let follow = gtk::Button::builder()
+            // Raccourci au besoin : avec la cloche et « Message », la
+            // rangée doit tenir en palier mobile.
+            .can_shrink(true)
             .valign(gtk::Align::Center)
             .halign(gtk::Align::End)
             .hexpand(true)
@@ -169,7 +223,45 @@ impl ProfilePage {
             .visible(false)
             .css_classes(["pill"])
             .build();
+        let message = gtk::Button::builder()
+            .icon_name("mail-unread-symbolic")
+            .tooltip_text(gettext("Envoyer un message"))
+            .valign(gtk::Align::Center)
+            .visible(false)
+            .css_classes(["circular", "avatar-button"])
+            .build();
+        message.update_property(&[gtk::accessible::Property::Label(&gettext(
+            "Envoyer un message",
+        ))]);
+        let bell_posts = gtk::CheckButton::with_label(&gettext("Ses posts"));
+        let bell_replies = gtk::CheckButton::with_label(&gettext("Ses réponses"));
+        let bell_box = gtk::Box::builder()
+            .orientation(gtk::Orientation::Vertical)
+            .spacing(6)
+            .build();
+        bell_box.append(
+            &gtk::Label::builder()
+                .label(gettext("Me notifier de :"))
+                .xalign(0.0)
+                .css_classes(["heading"])
+                .build(),
+        );
+        bell_box.append(&bell_posts);
+        bell_box.append(&bell_replies);
+        let bell = gtk::MenuButton::builder()
+            .icon_name("preferences-system-notifications-symbolic")
+            .tooltip_text(gettext("Notifications d'activité"))
+            .valign(gtk::Align::Center)
+            .visible(false)
+            .popover(&gtk::Popover::builder().child(&bell_box).build())
+            .css_classes(["circular", "avatar-button"])
+            .build();
+        bell.update_property(&[gtk::accessible::Property::Label(&gettext(
+            "Notifications d'activité",
+        ))]);
         top.append(&follow);
+        top.append(&bell);
+        top.append(&message);
         top.append(&edit);
         let name = label(&["title-1"]);
         let handle = label(&["dim-label"]);
@@ -204,15 +296,21 @@ impl ProfilePage {
             .halign(gtk::Align::Start)
             .accessible_role(gtk::AccessibleRole::Group)
             .margin_top(6)
+            // Place pour la barre de défilement, sous les onglets.
+            .margin_bottom(8)
             .build();
         tabs.update_property(&[gtk::accessible::Property::Label(&gettext(
             "Contenu du profil",
         ))]);
         let mut buttons = Vec::new();
-        for tab in [Tab::Posts, Tab::Replies, Tab::Media, Tab::Likes] {
+        for tab in TABS {
             let button = gtk::ToggleButton::builder()
                 .label(tab.title())
                 .active(tab == Tab::Posts)
+                .visible(matches!(
+                    tab,
+                    Tab::Posts | Tab::Replies | Tab::Media | Tab::Videos
+                ))
                 .build();
             if let Some((_, first)) = buttons.first() {
                 button.set_group(Some(first));
@@ -220,8 +318,31 @@ impl ProfilePage {
             tabs.append(&button);
             buttons.push((tab, button));
         }
-        let likes_tab = buttons[3].1.clone();
-        likes_tab.set_visible(false);
+        let tab_buttons = buttons.clone();
+        // Défilement horizontal si les onglets ne tiennent pas (mobile).
+        let tabs_scroll = gtk::ScrolledWindow::builder()
+            .vscrollbar_policy(gtk::PolicyType::Never)
+            .hscrollbar_policy(gtk::PolicyType::Automatic)
+            .propagate_natural_height(true)
+            .child(&tabs)
+            .build();
+        let others = gtk::ListBox::builder()
+            .selection_mode(gtk::SelectionMode::None)
+            .valign(gtk::Align::Start)
+            .margin_start(12)
+            .margin_end(12)
+            .visible(false)
+            .css_classes(["boxed-list"])
+            .build();
+        others.update_property(&[gtk::accessible::Property::Label(&gettext(
+            "Contenu du profil",
+        ))]);
+        let others_status = gtk::Label::builder()
+            .wrap(true)
+            .margin_top(24)
+            .visible(false)
+            .css_classes(["dim-label"])
+            .build();
 
         let posts = PostList::new(
             &gettext("Posts du profil"),
@@ -240,7 +361,20 @@ impl ProfilePage {
         details.append(&handle);
         details.append(&bio);
         details.append(&stats);
-        details.append(&tabs);
+        let known = gtk::Button::builder()
+            .halign(gtk::Align::Start)
+            .visible(false)
+            .css_classes(["flat", "known-followers"])
+            .child(
+                &gtk::Label::builder()
+                    .wrap(true)
+                    .xalign(0.0)
+                    .css_classes(["dim-label", "caption"])
+                    .build(),
+            )
+            .build();
+        details.append(&known);
+        details.append(&tabs_scroll);
         let column = gtk::Box::builder()
             .orientation(gtk::Orientation::Vertical)
             .spacing(12)
@@ -257,6 +391,8 @@ impl ProfilePage {
         column.append(&banner_frame);
         column.append(&details);
         column.append(&posts.root);
+        column.append(&others);
+        column.append(&others_status);
         let scroll = gtk::ScrolledWindow::builder()
             .hscrollbar_policy(gtk::PolicyType::Never)
             // Même largeur que les cartes (et leurs marges), pour aligner
@@ -312,9 +448,18 @@ impl ProfilePage {
             follows,
             post_count,
             follow,
+            message,
+            bell,
+            bell_posts,
+            bell_replies,
+            bell_updating: std::cell::Cell::new(false),
+            known,
             edit,
             more,
-            likes_tab,
+            tab_buttons,
+            others,
+            others_status,
+            other_items: RefCell::default(),
             scroll,
             posts,
             tab: Cell::new(Tab::Posts),
@@ -332,6 +477,12 @@ impl ProfilePage {
                 }
             });
         }
+        let weak = Rc::downgrade(&page);
+        page.others.connect_row_activated(move |_, row| {
+            if let Some(page) = weak.upgrade() {
+                page.open_other(row.index() as usize);
+            }
+        });
         let weak = Rc::downgrade(&page);
         retry.connect_clicked(move |_| {
             if let Some(page) = weak.upgrade() {
@@ -384,6 +535,16 @@ impl ProfilePage {
             );
         });
         let weak = Rc::downgrade(&page);
+        {
+            let weak = Rc::downgrade(&page);
+            page.message.connect_clicked(move |button| {
+                let Some(page) = weak.upgrade() else { return };
+                let did = page.profile.borrow().as_ref().map(|p| p.did.clone());
+                if let Some(did) = did {
+                    let _ = button.activate_action("win.message", Some(&did.to_variant()));
+                }
+            });
+        }
         page.follow.connect_clicked(move |_| {
             if let Some(page) = weak.upgrade() {
                 page.toggle_follow();
@@ -415,12 +576,37 @@ impl ProfilePage {
             });
         }
 
+        {
+            let weak = Rc::downgrade(&page);
+            page.known.connect_clicked(move |_| {
+                let Some(page) = weak.upgrade() else { return };
+                let Some(profile) = page.profile.borrow().clone() else {
+                    return;
+                };
+                (page.host.push)(crate::feed_page::people_page(
+                    api::People::Known(profile.did.clone()),
+                    &profile.name,
+                    &page.host,
+                ));
+            });
+        }
+        for check in [&page.bell_posts, &page.bell_replies] {
+            let weak = Rc::downgrade(&page);
+            check.connect_toggled(move |_| {
+                if let Some(page) = weak.upgrade() {
+                    page.update_activity();
+                }
+            });
+        }
+
         let actions = gio::SimpleActionGroup::new();
         for (name, handler) in [
             ("copy-link", Self::copy_link as fn(&Rc<Self>)),
             ("mute", Self::toggle_mute),
             ("block", Self::toggle_block),
             ("report", Self::report),
+            ("add-to-list", Self::add_to_list),
+            ("labeler", Self::toggle_labeler),
         ] {
             let action = gio::SimpleAction::new(name, None);
             let weak = Rc::downgrade(&page);
@@ -494,11 +680,34 @@ impl ProfilePage {
         });
         self.bio.set_label(&profile.bio);
         self.bio.set_visible(!profile.bio.trim().is_empty());
-        self.likes_tab.set_visible(is_me);
+        let (feeds, lists, packs) = profile.associated;
+        for (tab, button) in &self.tab_buttons {
+            match tab {
+                Tab::Likes => button.set_visible(is_me),
+                Tab::Feeds => button.set_visible(feeds > 0),
+                Tab::Lists => button.set_visible(lists > 0),
+                Tab::Packs => button.set_visible(packs > 0),
+                _ => {}
+            }
+        }
         self.edit.set_visible(is_me);
         self.follow
             .set_visible(!is_me && self.host.session.is_some() && !profile.did.is_empty());
         self.more.set_visible(!is_me && !profile.handle.is_empty());
+        let known = known_followers_text(&profile.known_followers, profile.known_count);
+        self.known.set_visible(known.is_some() && !is_me);
+        if let Some(label) = self.known.child().and_downcast::<gtk::Label>() {
+            label.set_label(&known.unwrap_or_default());
+        }
+        self.bell
+            .set_visible(!is_me && !profile.did.is_empty() && profile.blocking.is_none());
+        self.show_activity(profile.activity);
+        self.message.set_visible(
+            !is_me
+                && !profile.did.is_empty()
+                && profile.blocking.is_none()
+                && self.host.session.is_some(),
+        );
         if let Some(url) = &profile.avatar {
             let weak = self.avatar.downgrade();
             images::load(url, move |texture| {
@@ -572,8 +781,140 @@ impl ProfilePage {
         }
     }
 
+    /// Flux, listes ou starter packs du compte.
+    fn load_others(self: &Rc<Self>, tab: Tab) {
+        use crate::{feeds, starter_packs};
+        let actor = self
+            .profile
+            .borrow()
+            .as_ref()
+            .map(|p| p.did.clone())
+            .filter(|did| !did.is_empty())
+            .unwrap_or_else(|| self.actor.clone());
+        let Some(session) = self.host.session.clone() else {
+            let items = match tab {
+                Tab::Feeds => feeds::demo_feeds()
+                    .into_iter()
+                    .take(1)
+                    .map(Other::Feed)
+                    .collect(),
+                Tab::Lists => data::demo_lists().into_iter().map(Other::List).collect(),
+                _ => starter_packs::demo_packs()
+                    .into_iter()
+                    .take(1)
+                    .map(Other::Pack)
+                    .collect(),
+            };
+            self.show_others(tab, Ok(items));
+            return;
+        };
+        self.others_status.set_label(&gettext("Chargement…"));
+        self.others_status.set_visible(true);
+        let task = runtime().spawn(async move {
+            match tab {
+                Tab::Feeds => Box::pin(feeds::by_actor(session, actor))
+                    .await
+                    .map(|v| v.into_iter().map(Other::Feed).collect()),
+                Tab::Lists => Box::pin(api::lists(session, actor))
+                    .await
+                    .map(|v| v.into_iter().map(Other::List).collect()),
+                _ => Box::pin(starter_packs::by_actor(session, actor))
+                    .await
+                    .map(|v| v.into_iter().map(Other::Pack).collect()),
+            }
+        });
+        let weak = Rc::downgrade(self);
+        glib::spawn_future_local(async move {
+            let result: Result<Vec<Other>, ApiError> = task
+                .await
+                .unwrap_or_else(|_| Err(ApiError::new(gettext("Chargement interrompu."))));
+            let Some(page) = weak.upgrade() else { return };
+            // Un autre onglet a été choisi entre-temps.
+            if page.tab.get() != tab {
+                return;
+            }
+            match result {
+                Err(error) if error.expired => (page.host.expired)(error.message),
+                result => page.show_others(tab, result),
+            }
+        });
+    }
+
+    fn show_others(&self, tab: Tab, result: Result<Vec<Other>, ApiError>) {
+        self.others.remove_all();
+        match result {
+            Ok(items) if !items.is_empty() => {
+                for item in &items {
+                    let row = match item {
+                        Other::Feed(info) => crate::feeds::feed_row(info),
+                        Other::List(list) => crate::feed_page::list_row(list),
+                        Other::Pack(pack) => crate::starter_packs::pack_row(pack),
+                    };
+                    self.others.append(&row);
+                }
+                self.other_items.replace(items);
+                self.others.set_visible(true);
+                self.others_status.set_visible(false);
+            }
+            Ok(_) => {
+                self.others_status.set_label(&match tab {
+                    Tab::Feeds => gettext("Aucun flux."),
+                    Tab::Lists => gettext("Aucune liste."),
+                    _ => gettext("Aucun starter pack."),
+                });
+                self.others_status.set_visible(true);
+            }
+            Err(error) => {
+                self.others_status.set_label(&error.message);
+                self.others_status.set_visible(true);
+            }
+        }
+    }
+
+    fn open_other(self: &Rc<Self>, index: usize) {
+        let items = self.other_items.borrow();
+        let Some(item) = items.get(index) else { return };
+        let page = match item {
+            Other::Feed(info) => crate::feed_page::FeedPage::new(
+                &info.name,
+                Source::Feed(info.uri.clone()),
+                data::posts(data::Feed::Discover),
+                self.host.clone(),
+            )
+            .navigation_page(&info.name),
+            Other::List(list) if list.moderation => {
+                crate::lists::members_page(list, &self.host, Rc::new(|| {}))
+            }
+            Other::List(list) => {
+                let feed = crate::feed_page::FeedPage::new(
+                    &list.name,
+                    Source::List(list.uri.clone()),
+                    data::posts(data::Feed::LinuxEtLibre),
+                    self.host.clone(),
+                );
+                feed.header
+                    .pack_end(&crate::lists::menu_button(list, &self.host, Rc::new(|| {})));
+                feed.navigation_page(&list.name)
+            }
+            Other::Pack(pack) => {
+                crate::starter_packs::StarterPackPage::new(pack, self.host.clone())
+                    .navigation_page()
+            }
+        };
+        (self.host.push)(page);
+    }
+
     fn load_posts(self: &Rc<Self>, more: bool) {
         let tab = self.tab.get();
+        self.posts.root.set_visible(tab.is_posts());
+        self.others.set_visible(false);
+        self.others_status.set_visible(false);
+        if !tab.is_posts() {
+            if !more {
+                self.load_others(tab);
+            }
+            return;
+        }
         if self
             .profile
             .borrow()
@@ -674,7 +1015,24 @@ fn profile_menu(profile: &Profile) -> gio::Menu {
     let menu = gio::Menu::new();
     let sharing = gio::Menu::new();
     sharing.append(Some(&gettext("Copier le lien")), Some("profile.copy-link"));
+    sharing.append(
+        Some(&gettext("Ajouter à une liste…")),
+        Some("profile.add-to-list"),
+    );
     menu.append_section(None, &sharing);
+    if profile.labeler && profile.did != crate::moderation::BLUESKY_LABELER {
+        let labeling = gio::Menu::new();
+        let subscribed = crate::moderation::subscribed_labelers().contains(&profile.did);
+        labeling.append(
+            Some(&if subscribed {
+                gettext("Se désabonner du service d'étiquetage")
+            } else {
+                gettext("S'abonner au service d'étiquetage")
+            }),
+            Some("profile.labeler"),
+        );
+        menu.append_section(None, &labeling);
+    }
     let moderation = gio::Menu::new();
     let mute = if profile.muted {
         gettext("Ne plus masquer")
@@ -704,6 +1062,127 @@ impl ProfilePage {
         self.host
             .toasts
             .add_toast(adw::Toast::new(&gettext("Lien copié.")));
+    }
+
+    /// Cases et icône des notifications d'activité.
+    fn show_activity(&self, (posts, replies): (bool, bool)) {
+        self.bell_updating.set(true);
+        self.bell_posts.set_active(posts);
+        self.bell_replies.set_active(replies);
+        self.bell_updating.set(false);
+        self.bell.set_icon_name(if posts || replies {
+            "preferences-system-notifications-symbolic"
+        } else {
+            "notifications-disabled-symbolic"
+        });
+    }
+
+    /// Envoie le choix des cases ; revient en arrière si la demande échoue.
+    fn update_activity(self: &Rc<Self>) {
+        if self.bell_updating.get() {
+            return;
+        }
+        let Some(profile) = self.profile.borrow().clone() else {
+            return;
+        };
+        let wanted = (self.bell_posts.is_active(), self.bell_replies.is_active());
+        self.show_activity(wanted);
+        let Some(session) = self.host.session.clone() else {
+            if let Some(p) = self.profile.borrow_mut().as_mut() {
+                p.activity = wanted;
+            }
+            return;
+        };
+        let task = runtime().spawn(api::set_activity(
+            session,
+            profile.did.clone(),
+            wanted.0,
+            wanted.1,
+        ));
+        let weak = Rc::downgrade(self);
+        glib::spawn_future_local(async move {
+            let result = task
+                .await
+                .unwrap_or_else(|_| Err(ApiError::new(gettext("Requête interrompue."))));
+            let Some(page) = weak.upgrade() else { return };
+            match result {
+                Ok(()) => {
+                    if let Some(p) = page.profile.borrow_mut().as_mut() {
+                        p.activity = wanted;
+                    }
+                }
+                Err(error) if error.expired => (page.host.expired)(error.message),
+                Err(error) => {
+                    page.show_activity(profile.activity);
+                    page.host.toasts.add_toast(adw::Toast::new(&error.message));
+                }
+            }
+        });
+    }
+
+    /// S'abonne au service d'étiquetage (ou s'en désabonne) : préférences
+    /// du compte, puis en-tête des requêtes pour recevoir ses étiquettes.
+    fn toggle_labeler(self: &Rc<Self>) {
+        use crate::moderation;
+        let Some(profile) = self.profile.borrow().clone() else {
+            return;
+        };
+        let Some(session) = self.host.session.clone() else {
+            return;
+        };
+        let subscribed = moderation::subscribed_labelers().contains(&profile.did);
+        if !subscribed && moderation::subscribed_labelers().len() >= moderation::MAX_LABELERS {
+            self.host.toasts.add_toast(adw::Toast::new(&gettext(
+                "Le nombre maximal de services d'étiquetage est atteint.",
+            )));
+            return;
+        }
+        let did = profile.did.clone();
+        let task = runtime().spawn(async move {
+            let preferences = moderation::update_preferences(session.clone(), {
+                let did = did.clone();
+                move |p| moderation::set_labeler(p, &did, !subscribed)
+            })
+            .await?;
+            moderation::configure_labelers(session, moderation::labelers(&preferences)).await;
+            Ok::<_, ApiError>(preferences)
+        });
+        let weak = Rc::downgrade(self);
+        glib::spawn_future_local(async move {
+            let result = task
+                .await
+                .unwrap_or_else(|_| Err(ApiError::new(gettext("Requête interrompue."))));
+            let Some(page) = weak.upgrade() else { return };
+            match result {
+                Ok(preferences) => {
+                    moderation::set_preferences(preferences);
+                    page.host.toasts.add_toast(adw::Toast::new(&if subscribed {
+                        gettext("Désabonné du service d'étiquetage.")
+                    } else {
+                        gettext(
+                            "Abonné : ses étiquettes s'afficheront à la prochaine actualisation.",
+                        )
+                    }));
+                    if let Some(profile) = page.profile.borrow().as_ref() {
+                        page.more.set_menu_model(Some(&profile_menu(profile)));
+                    }
+                }
+                Err(error) if error.expired => (page.host.expired)(error.message),
+                Err(error) => page.host.toasts.add_toast(adw::Toast::new(&error.message)),
+            }
+        });
+    }
+
+    fn add_to_list(self: &Rc<Self>) {
+        let Some((did, handle)) = self
+            .profile
+            .borrow()
+            .as_ref()
+            .map(|p| (p.did.clone(), p.handle.clone()))
+        else {
+            return;
+        };
+        crate::lists::memberships_dialog(&self.root, &did, &handle, &self.host);
     }
 
     fn report(self: &Rc<Self>) {
@@ -836,7 +1315,8 @@ fn demo_posts(handle: &str, tab: Tab) -> Vec<Post> {
     posts.retain(|post| seen.insert(post.date.clone()));
     match tab {
         Tab::Media => posts.retain(|post| post.media.is_some()),
-        Tab::Likes => posts.clear(),
+        Tab::Videos => posts.retain(|post| post.media.as_ref().is_some_and(|m| m.video.is_some())),
+        Tab::Likes | Tab::Feeds | Tab::Lists | Tab::Packs => posts.clear(),
         Tab::Posts | Tab::Replies => {}
     }
     posts
@@ -863,7 +1343,41 @@ fn demo_profile(handle: &str) -> Profile {
         follows_me: false,
         muted: false,
         blocking: None,
+        known_followers: vec!["Nadia Safi".into(), "Romain Bailly".into()],
+        known_count: 5,
+        activity: (false, false),
+        associated: (1, 2, 1),
+        labeler: false,
     }
+}
+
+/// « Suivi par Nadia Safi, Romain Bailly et 3 autres » : les comptes que je
+/// suis qui suivent ce compte. `None` s'il n'y en a pas.
+pub fn known_followers_text(names: &[String], count: u64) -> Option<String> {
+    let shown = names.len().min(2);
+    let others = count.saturating_sub(shown as u64);
+    let n = others.min(u32::MAX as u64) as u32;
+    let text = match (names, others) {
+        ([], _) => return None,
+        ([a], 0) => gettext("Suivi par {a}").replace("{a}", a),
+        ([a], _) => ngettext(
+            "Suivi par {a} et {n} autre",
+            "Suivi par {a} et {n} autres",
+            n,
+        )
+        .replace("{a}", a),
+        ([a, b, ..], 0) => gettext("Suivi par {a} et {b}")
+            .replace("{a}", a)
+            .replace("{b}", b),
+        ([a, b, ..], _) => ngettext(
+            "Suivi par {a}, {b} et {n} autre",
+            "Suivi par {a}, {b} et {n} autres",
+            n,
+        )
+        .replace("{a}", a)
+        .replace("{b}", b),
+    };
+    Some(text.replace("{n}", &format_count(others)))
 }
 
 #[cfg(test)]
@@ -876,6 +1390,24 @@ mod tests {
         assert_eq!(format_count(999), "999");
         assert_eq!(format_count(1284), "1\u{202f}284");
         assert_eq!(format_count(1_234_567), "1\u{202f}234\u{202f}567");
+    }
+
+    #[test]
+    fn known_followers_are_summed_up() {
+        let names = |n: &[&str]| n.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        assert_eq!(known_followers_text(&[], 0), None);
+        assert_eq!(
+            known_followers_text(&names(&["Aya"]), 1).as_deref(),
+            Some("Suivi par Aya")
+        );
+        assert_eq!(
+            known_followers_text(&names(&["Aya", "Lucie"]), 2).as_deref(),
+            Some("Suivi par Aya et Lucie")
+        );
+        assert_eq!(
+            known_followers_text(&names(&["Aya", "Lucie", "Nadia"]), 4).as_deref(),
+            Some("Suivi par Aya, Lucie et 2 autres")
+        );
     }
 
     #[test]

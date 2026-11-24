@@ -17,12 +17,15 @@ use crate::images;
 use crate::post_list::PostList;
 use crate::profile::Host;
 use crate::runtime::runtime;
+use crate::starter_packs::{self, StarterPack, StarterPackPage, pack_row};
 
 /// Onglets des résultats.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Results {
     Posts,
     People,
+    Feeds,
+    Packs,
 }
 
 pub struct ExplorePage {
@@ -36,10 +39,24 @@ pub struct ExplorePage {
     posts: PostList,
     people: gtk::ListBox,
     people_status: adw::StatusPage,
+    /// Starter packs suggérés (sans recherche) et trouvés.
+    packs: gtk::ListBox,
+    pack_results: gtk::ListBox,
+    /// Flux trouvés (adresse et nom par rangée).
+    feed_results: gtk::ListBox,
+    known_packs: RefCell<Vec<StarterPack>>,
     query: RefCell<String>,
     /// Numéro de la dernière recherche de personnes : les réponses à une
     /// recherche dépassée sont ignorées.
     people_generation: Cell<u64>,
+}
+
+/// Étiquette d'onglet, raccourcie si la place manque (palier mobile).
+fn tab_label(text: &str) -> gtk::Label {
+    gtk::Label::builder()
+        .label(text)
+        .ellipsize(gtk::pango::EllipsizeMode::End)
+        .build()
 }
 
 fn heading(text: &str) -> gtk::Label {
@@ -200,7 +217,7 @@ fn topic_row(rank: usize, topic: &Topic) -> adw::ActionRow {
 impl ExplorePage {
     pub fn new(host: Host) -> Rc<Self> {
         let entry = gtk::SearchEntry::builder()
-            .placeholder_text(gettext("Rechercher des posts, des personnes…"))
+            .placeholder_text(gettext("Rechercher des posts, des personnes, des flux…"))
             .search_delay(500)
             .hexpand(true)
             .build();
@@ -217,6 +234,7 @@ impl ExplorePage {
         // Sans recherche : sujets du moment, personnes à suivre.
         let topics = boxed_list(&gettext("Sujets du moment"));
         let suggested = boxed_list(&gettext("Personnes à suivre"));
+        let packs = boxed_list(&gettext("Starter packs"));
         let discover = gtk::Box::builder()
             .orientation(gtk::Orientation::Vertical)
             .spacing(12)
@@ -229,6 +247,15 @@ impl ExplorePage {
         discover.append(&topics);
         discover.append(&heading(&gettext("Personnes à suivre")));
         discover.append(&suggested);
+        discover.append(&heading(&gettext("Starter packs")));
+        discover.append(&packs);
+        let create_pack = gtk::Button::builder()
+            .label(gettext("Créer un starter pack…"))
+            .halign(gtk::Align::Start)
+            .visible(host.session.is_some())
+            .css_classes(["pill"])
+            .build();
+        discover.append(&create_pack);
         let discover_scroll = gtk::ScrolledWindow::builder()
             .hscrollbar_policy(gtk::PolicyType::Never)
             .child(
@@ -244,19 +271,61 @@ impl ExplorePage {
             .css_classes(["linked"])
             .halign(gtk::Align::Center)
             .margin_top(12)
+            .margin_start(12)
+            .margin_end(12)
             .accessible_role(gtk::AccessibleRole::Group)
             .build();
         tabs.update_property(&[gtk::accessible::Property::Label(&gettext("Résultats"))]);
         let posts_tab = gtk::ToggleButton::builder()
-            .label(gettext("Posts"))
+            .child(&tab_label(&gettext("Posts")))
             .active(true)
             .build();
         let people_tab = gtk::ToggleButton::builder()
-            .label(gettext("Personnes"))
+            .child(&tab_label(&gettext("Personnes")))
+            .group(&posts_tab)
+            .build();
+        let feeds_tab = gtk::ToggleButton::builder()
+            .child(&tab_label(&gettext("Flux")))
+            .group(&posts_tab)
+            .build();
+        let packs_tab = gtk::ToggleButton::builder()
+            .child(&tab_label(&gettext("Starter packs")))
             .group(&posts_tab)
             .build();
         tabs.append(&posts_tab);
         tabs.append(&people_tab);
+        tabs.append(&feeds_tab);
+        tabs.append(&packs_tab);
+        let feed_results = boxed_list(&gettext("Flux trouvés"));
+        let feeds_scroll = gtk::ScrolledWindow::builder()
+            .hscrollbar_policy(gtk::PolicyType::Never)
+            .vexpand(true)
+            .child(
+                &adw::Clamp::builder()
+                    .maximum_size(crate::columns::COLUMN_MAX_WIDTH + 24)
+                    .margin_top(12)
+                    .margin_bottom(24)
+                    .margin_start(12)
+                    .margin_end(12)
+                    .child(&feed_results)
+                    .build(),
+            )
+            .build();
+        let pack_results = boxed_list(&gettext("Starter packs trouvés"));
+        let packs_scroll = gtk::ScrolledWindow::builder()
+            .hscrollbar_policy(gtk::PolicyType::Never)
+            .vexpand(true)
+            .child(
+                &adw::Clamp::builder()
+                    .maximum_size(crate::columns::COLUMN_MAX_WIDTH + 24)
+                    .margin_top(12)
+                    .margin_bottom(24)
+                    .margin_start(12)
+                    .margin_end(12)
+                    .child(&pack_results)
+                    .build(),
+            )
+            .build();
         let posts = PostList::new(&gettext("Posts trouvés"), "");
         let people = boxed_list(&gettext("Personnes trouvées"));
         let people_status = adw::StatusPage::builder()
@@ -286,6 +355,8 @@ impl ExplorePage {
         let results = gtk::Stack::new();
         results.add_named(&posts.root, Some("posts"));
         results.add_named(&people_scroll, Some("people"));
+        results.add_named(&feeds_scroll, Some("feeds"));
+        results.add_named(&packs_scroll, Some("packs"));
         let results_box = gtk::Box::new(gtk::Orientation::Vertical, 0);
         results_box.append(&tabs);
         results_box.append(&results);
@@ -310,6 +381,10 @@ impl ExplorePage {
             posts,
             people,
             people_status,
+            packs,
+            pack_results,
+            feed_results,
+            known_packs: RefCell::default(),
             query: RefCell::default(),
             people_generation: Cell::new(0),
         });
@@ -326,7 +401,12 @@ impl ExplorePage {
                 page.search(entry.text().trim());
             }
         });
-        for (tab, button) in [(Results::Posts, posts_tab), (Results::People, people_tab)] {
+        for (tab, button) in [
+            (Results::Posts, posts_tab),
+            (Results::People, people_tab),
+            (Results::Feeds, feeds_tab),
+            (Results::Packs, packs_tab),
+        ] {
             let weak = Rc::downgrade(&page);
             button.connect_toggled(move |button| {
                 if button.is_active()
@@ -335,6 +415,8 @@ impl ExplorePage {
                     page.results.set_visible_child_name(match tab {
                         Results::Posts => "posts",
                         Results::People => "people",
+                        Results::Feeds => "feeds",
+                        Results::Packs => "packs",
                     });
                 }
             });
@@ -368,9 +450,170 @@ impl ExplorePage {
                 page.search(&query);
             }
         });
+        let weak = Rc::downgrade(&page);
+        create_pack.connect_clicked(move |button| {
+            if let Some(page) = weak.upgrade() {
+                page.create_pack(button);
+            }
+        });
+        for list in [&page.packs, &page.pack_results] {
+            let weak = Rc::downgrade(&page);
+            list.connect_row_activated(move |_, row| {
+                if let Some(page) = weak.upgrade() {
+                    page.open_pack(&row.widget_name());
+                }
+            });
+        }
+        let weak = Rc::downgrade(&page);
+        page.feed_results.connect_row_activated(move |_, row| {
+            let Some(page) = weak.upgrade() else { return };
+            let Some(row) = row.downcast_ref::<adw::ActionRow>() else {
+                return;
+            };
+            let name = row.title().to_string();
+            let feed = crate::feed_page::FeedPage::new(
+                &name,
+                Source::Feed(row.widget_name().to_string()),
+                data::posts(data::Feed::Discover),
+                page.host.clone(),
+            );
+            (page.host.push)(feed.navigation_page(&name));
+        });
 
         page.load_discover();
         page
+    }
+
+    fn show_feeds(&self, feeds: Result<Vec<crate::feeds::FeedInfo>, ApiError>) {
+        clear(&self.feed_results);
+        match feeds {
+            Ok(feeds) if !feeds.is_empty() => {
+                for info in &feeds {
+                    let row = crate::feeds::feed_row(info);
+                    row.set_widget_name(&info.uri);
+                    self.feed_results.append(&row);
+                }
+            }
+            Ok(_) => self.feed_results.append(&message_row(&gettext(
+                "Aucun flux ne correspond à cette recherche.",
+            ))),
+            Err(error) => self.feed_results.append(&message_row(&error.message)),
+        }
+    }
+
+    fn load_feeds(self: &Rc<Self>) {
+        let query = self.query.borrow().clone();
+        let Some(session) = self.host.session.clone() else {
+            let found = crate::feeds::demo_feeds()
+                .into_iter()
+                .filter(|f| matches(&f.name, &query) || matches(&f.description, &query))
+                .collect();
+            self.show_feeds(Ok(found));
+            return;
+        };
+        let task = runtime().spawn(crate::feeds::discover(session, Some(query.clone())));
+        let weak = Rc::downgrade(self);
+        glib::spawn_future_local(async move {
+            let result = task
+                .await
+                .unwrap_or_else(|_| Err(ApiError::new(gettext("Chargement interrompu."))));
+            let Some(page) = weak.upgrade() else { return };
+            if *page.query.borrow() != query {
+                return;
+            }
+            page.show_feeds(result);
+        });
+    }
+
+    /// Nouveau starter pack : nom et description, puis sa page, pour y
+    /// ajouter des comptes.
+    fn create_pack(self: &Rc<Self>, button: &gtk::Button) {
+        let weak = Rc::downgrade(self);
+        crate::lists::starter_pack_dialog(button, None, move |name, description| {
+            let Some(page) = weak.upgrade() else { return };
+            let Some(session) = page.host.session.clone() else {
+                return;
+            };
+            let task = runtime().spawn(Box::pin(crate::lists::create_starter_pack(
+                session,
+                name.clone(),
+                description.clone(),
+            )));
+            let weak = Rc::downgrade(&page);
+            glib::spawn_future_local(async move {
+                let result = task
+                    .await
+                    .unwrap_or_else(|_| Err(ApiError::new(gettext("Requête interrompue."))));
+                let Some(page) = weak.upgrade() else { return };
+                match result {
+                    Ok(uri) => {
+                        let pack = StarterPack {
+                            uri,
+                            name,
+                            description,
+                            ..StarterPack::default()
+                        };
+                        let pack_page = StarterPackPage::new(&pack, page.host.clone());
+                        (page.host.push)(pack_page.navigation_page());
+                    }
+                    Err(error) => page.host.toasts.add_toast(adw::Toast::new(&error.message)),
+                }
+            });
+        });
+    }
+
+    fn open_pack(&self, uri: &str) {
+        let pack = self
+            .known_packs
+            .borrow()
+            .iter()
+            .find(|p| p.uri == uri)
+            .cloned();
+        if let Some(pack) = pack {
+            let page = StarterPackPage::new(&pack, self.host.clone());
+            (self.host.push)(page.navigation_page());
+        }
+    }
+
+    /// Remplit `list` de starter packs, ou d'un message.
+    fn show_packs(&self, list: &gtk::ListBox, packs: Result<Vec<StarterPack>, ApiError>) {
+        clear(list);
+        match packs {
+            Ok(packs) if !packs.is_empty() => {
+                for pack in &packs {
+                    let row = pack_row(pack);
+                    row.set_widget_name(&pack.uri);
+                    list.append(&row);
+                }
+                self.known_packs.borrow_mut().extend(packs);
+            }
+            Ok(_) => list.append(&message_row(&gettext("Aucun starter pack."))),
+            Err(error) => list.append(&message_row(&error.message)),
+        }
+    }
+
+    fn load_packs(self: &Rc<Self>) {
+        let query = self.query.borrow().clone();
+        let Some(session) = self.host.session.clone() else {
+            let found = starter_packs::demo_packs()
+                .into_iter()
+                .filter(|p| matches(&p.name, &query) || matches(&p.creator, &query))
+                .collect();
+            self.show_packs(&self.pack_results, Ok(found));
+            return;
+        };
+        let task = runtime().spawn(starter_packs::search(session, query.clone()));
+        let weak = Rc::downgrade(self);
+        glib::spawn_future_local(async move {
+            let result = task
+                .await
+                .unwrap_or_else(|_| Err(ApiError::new(gettext("Chargement interrompu."))));
+            let Some(page) = weak.upgrade() else { return };
+            if *page.query.borrow() != query {
+                return;
+            }
+            page.show_packs(&page.pack_results, result);
+        });
     }
 
     /// Sujets du moment et personnes à suivre.
@@ -378,8 +621,20 @@ impl ExplorePage {
         let Some(session) = self.host.session.clone() else {
             self.show_topics(Ok(data::demo_topics()));
             self.show_suggested(Ok(data::demo_actors()));
+            self.show_packs(&self.packs, Ok(starter_packs::demo_packs()));
             return;
         };
+        // Starter packs à part : leur échec n'empêche pas le reste.
+        let packs = runtime().spawn(starter_packs::suggested(session.clone()));
+        let weak = Rc::downgrade(self);
+        glib::spawn_future_local(async move {
+            let result = packs
+                .await
+                .unwrap_or_else(|_| Err(ApiError::new(gettext("Chargement interrompu."))));
+            if let Some(page) = weak.upgrade() {
+                page.show_packs(&page.packs, result);
+            }
+        });
         let topics = runtime().spawn(api::trending(session.clone()));
         let people = runtime().spawn(api::suggestions(session));
         let weak = Rc::downgrade(self);
@@ -455,6 +710,8 @@ impl ExplorePage {
         self.stack.set_visible_child_name("results");
         self.load_posts(false);
         self.load_people();
+        self.load_feeds();
+        self.load_packs();
     }
 
     fn load_posts(self: &Rc<Self>, more: bool) {
@@ -552,7 +809,7 @@ fn matches(text: &str, query: &str) -> bool {
 }
 
 /// Recherche dans les faux posts : texte ou auteur.
-fn demo_search_posts(query: &str) -> Vec<Post> {
+pub fn demo_search_posts(query: &str) -> Vec<Post> {
     let mut seen = std::collections::HashSet::new();
     [
         data::Feed::Following,

@@ -152,6 +152,25 @@ def check_names(screen):
     report(screen, problems)
 
 
+def in_horizontal_scroller(o):
+    """Vrai si un ancêtre défile horizontalement (barre horizontale visible) :
+    ce qui dépasse y est caché et s'atteint en faisant défiler."""
+    parent = o.parent
+    while parent is not None:
+        if parent.getRole() == pyatspi.ROLE_SCROLL_PANE:
+            for i in range(parent.childCount):
+                bar = parent.getChildAtIndex(i)
+                if (
+                    bar is not None
+                    and bar.getRole() == pyatspi.ROLE_SCROLL_BAR
+                    and bar.getState().contains(pyatspi.STATE_HORIZONTAL)
+                    and bar.getState().contains(pyatspi.STATE_SHOWING)
+                ):
+                    return True
+        parent = parent.parent
+    return False
+
+
 def check_sizes(screen, width=360):
     problems = []
 
@@ -162,7 +181,7 @@ def check_sizes(screen, width=360):
         if e.width <= 0 or e.height <= 0:
             return
         name = o.name or ""
-        if e.x + e.width > width + 2:
+        if e.x + e.width > width + 2 and not in_horizontal_scroller(o):
             problems.append(f"« {name[:40]} » dépasse à droite (x={e.x}, largeur {e.width})")
         if (e.width < MIN_TARGET or e.height < MIN_TARGET) and not name.startswith(ALLOWED_SMALL):
             problems.append(f"« {name[:40]} » {e.width}×{e.height} px")
@@ -183,7 +202,7 @@ def widest(width, limit=6):
             e = o.queryComponent().getExtents(pyatspi.WINDOW_COORDS)
         except NotImplementedError:
             return
-        if e.x + e.width > width + 2:
+        if e.x + e.width > width + 2 and not in_horizontal_scroller(o):
             found.append((depth, f"{o.getRoleName()}«{(o.name or '')[:20]}» {e.width}px"))
 
     walk(app(), f)
@@ -211,7 +230,7 @@ def main():
     key("ctrl+comma")
     check_names("préférences")
     key("Escape")
-    for page in ("Explorer", "Messages", "Signets", "Listes"):
+    for page in ("Explorer", "Messages", "Flux", "Signets", "Listes"):
         activate(page)
         check_names(page.lower())
     activate("Following")

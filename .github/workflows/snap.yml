@@ -12,6 +12,8 @@ jobs:
   snap:
     name: Paquet Snap
     runs-on: ubuntu-24.04
+    # Un blocage (miroir apt, LXD) échoue au lieu de tourner six heures.
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
       - uses: snapcore/action-build@v1

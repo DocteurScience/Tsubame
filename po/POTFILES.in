@@ -1,5 +1,6 @@
 data/io.github.DocteurScience.Tsubame.desktop.in
 data/io.github.DocteurScience.Tsubame.metainfo.xml.in
+src/account.rs
 src/api.rs
 src/auth/keyring.rs
 src/auth/loopback.rs
@@ -14,7 +15,9 @@ src/drafts.rs
 src/edit_profile.rs
 src/explore.rs
 src/feed_page.rs
+src/feeds.rs
 src/link_preview.rs
+src/lists.rs
 src/login.rs
 src/main.rs
 src/mentions.rs
@@ -24,6 +27,7 @@ src/post_list.rs
 src/preferences.rs
 src/profile.rs
 src/report.rs
+src/starter_packs.rs
 src/thread.rs
 src/viewer.rs
 src/window.rs

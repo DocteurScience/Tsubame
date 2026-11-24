@@ -16,6 +16,21 @@
       <summary>Position du volet de lecture</summary>
       <description>Où s’affiche la discussion sur grand écran : à droite des colonnes, en dessous, ou nulle part (elle s’ouvre alors en page).</description>
     </key>
+    <key name="current-account" type="s">
+      <default>''</default>
+      <summary>Compte utilisé</summary>
+      <description>DID du dernier compte utilisé, ouvert au lancement quand plusieurs comptes sont connectés.</description>
+    </key>
+    <key name="post-language" type="s">
+      <default>''</default>
+      <summary>Langue des posts</summary>
+      <description>Code de la langue proposée pour un nouveau post (fr, en…). Vide : celle du système.</description>
+    </key>
+    <key name="content-languages" type="as">
+      <default>[]</default>
+      <summary>Langues des posts affichés</summary>
+      <description>Codes des langues des posts à afficher dans les fils. Vide : toutes les langues.</description>
+    </key>
     <key name="desktop-notifications" type="b">
       <default>true</default>
       <summary>Notifications du bureau</summary>

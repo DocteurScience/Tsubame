@@ -127,13 +127,162 @@ pub fn set_label_visibility(preferences: &mut Vec<Value>, label: &str, visibilit
     preferences.push(json!({"$type": LABEL, "label": label, "visibility": visibility.api_name()}));
 }
 
-pub fn muted_words(preferences: &[Value]) -> Vec<String> {
+/// Étiquette définie par un service tiers (`labelValueDefinitions`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LabelDefinition {
+    pub labeler: String,
+    pub value: String,
+    /// Nom dans la langue de l'interface (ou le premier donné).
+    pub name: String,
+    /// Réglage par défaut du service.
+    pub default: Visibility,
+    pub adult_only: bool,
+    /// Étiquette purement informative (rien à flouter ni masquer).
+    pub inform_only: bool,
+}
+
+/// Séparateur entre le service et la valeur d'une étiquette tierce
+/// (« did:plc:…#valeur »).
+pub const LABELER_SEPARATOR: char = '#';
+
+/// Définitions d'étiquettes d'un service, d'après sa vue détaillée
+/// (`getServices`).
+pub fn definitions_from_view(view: &Value, lang: &str) -> Vec<LabelDefinition> {
+    let Some(labeler) = view
+        .get("creator")
+        .and_then(|c| c.get("did"))
+        .and_then(Value::as_str)
+    else {
+        return Vec::new();
+    };
+    view.get("policies")
+        .and_then(|p| p.get("labelValueDefinitions"))
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|def| {
+            let value = def.get("identifier")?.as_str()?.to_owned();
+            let locales: Vec<&Value> = def
+                .get("locales")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+                .collect();
+            let locale = locales
+                .iter()
+                .find(|l| {
+                    l.get("lang")
+                        .and_then(Value::as_str)
+                        .is_some_and(|code| code.split('-').next() == Some(lang))
+                })
+                .or(locales.first());
+            let name = locale
+                .and_then(|l| l.get("name")?.as_str())
+                .unwrap_or(&value)
+                .to_owned();
+            let severity = def
+                .get("severity")
+                .and_then(Value::as_str)
+                .unwrap_or("none");
+            let blurs = def.get("blurs").and_then(Value::as_str).unwrap_or("none");
+            Some(LabelDefinition {
+                labeler: labeler.to_owned(),
+                default: def
+                    .get("defaultSetting")
+                    .and_then(Value::as_str)
+                    .and_then(Visibility::from_api)
+                    .unwrap_or(Visibility::Warn),
+                adult_only: def
+                    .get("adultOnly")
+                    .and_then(Value::as_bool)
+                    .unwrap_or(false),
+                inform_only: severity == "inform" || (severity == "none" && blurs == "none"),
+                value,
+                name,
+            })
+        })
+        .collect()
+}
+
+/// Réglage d'une étiquette d'un service tiers, ou son défaut.
+pub fn labeler_label_visibility(preferences: &[Value], definition: &LabelDefinition) -> Visibility {
+    of_type(preferences, LABEL)
+        .find(|item| {
+            item.get("label").and_then(Value::as_str) == Some(definition.value.as_str())
+                && item.get("labelerDid").and_then(Value::as_str)
+                    == Some(definition.labeler.as_str())
+        })
+        .and_then(|item| Visibility::from_api(item.get("visibility")?.as_str()?))
+        .unwrap_or(definition.default)
+}
+
+pub fn set_labeler_label_visibility(
+    preferences: &mut Vec<Value>,
+    labeler: &str,
+    label: &str,
+    visibility: Visibility,
+) {
+    preferences.retain(|item| {
+        !(item.get("$type").and_then(Value::as_str) == Some(LABEL)
+            && item.get("label").and_then(Value::as_str) == Some(label)
+            && item.get("labelerDid").and_then(Value::as_str) == Some(labeler))
+    });
+    preferences.push(json!({
+        "$type": LABEL,
+        "labelerDid": labeler,
+        "label": label,
+        "visibility": visibility.api_name(),
+    }));
+}
+
+/// Mot masqué, avec ses réglages.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MutedWord {
+    pub value: String,
+    /// Seulement dans les mots-clics (pas dans le texte).
+    pub tags_only: bool,
+    /// Fin du masquage, s'il est temporaire.
+    pub expires: Option<chrono::DateTime<chrono::Utc>>,
+}
+
+impl MutedWord {
+    pub fn active(&self, now: chrono::DateTime<chrono::Utc>) -> bool {
+        self.expires.is_none_or(|end| end > now)
+    }
+}
+
+/// Mots masqués, tels qu'enregistrés (y compris ceux qui ont expiré).
+pub fn muted_word_items(preferences: &[Value]) -> Vec<MutedWord> {
     of_type(preferences, MUTED_WORDS)
         .next()
         .and_then(|item| item.get("items")?.as_array().cloned())
         .into_iter()
         .flatten()
-        .filter_map(|word| word.get("value")?.as_str().map(str::to_owned))
+        .filter_map(|word| {
+            let targets: Vec<&str> = word
+                .get("targets")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+                .filter_map(Value::as_str)
+                .collect();
+            Some(MutedWord {
+                value: word.get("value")?.as_str()?.to_owned(),
+                tags_only: !targets.is_empty() && !targets.contains(&"content"),
+                expires: word
+                    .get("expiresAt")
+                    .and_then(Value::as_str)
+                    .and_then(crate::api::parse_datetime)
+                    .map(|t| t.with_timezone(&chrono::Utc)),
+            })
+        })
+        .collect()
+}
+
+pub fn muted_words(preferences: &[Value]) -> Vec<String> {
+    muted_word_items(preferences)
+        .into_iter()
+        .map(|w| w.value)
         .collect()
 }
 
@@ -153,7 +302,19 @@ fn muted_words_item(preferences: &mut Vec<Value>) -> &mut Value {
 
 /// Ajoute un mot (ou un mot-clic « #… ») masqué partout : textes et
 /// mots-clics, de tous les comptes. Sans effet s'il l'est déjà.
+#[cfg(test)]
 pub fn add_muted_word(preferences: &mut Vec<Value>, word: &str) {
+    add_muted_word_with(preferences, word, false, None);
+}
+
+/// Ajoute un mot masqué : dans les mots-clics seulement (`tags_only`), et
+/// jusqu'à `expires` s'il est temporaire.
+pub fn add_muted_word_with(
+    preferences: &mut Vec<Value>,
+    word: &str,
+    tags_only: bool,
+    expires: Option<chrono::DateTime<chrono::Utc>>,
+) {
     let word = word.trim().trim_start_matches(['#', '＃']).trim();
     if word.is_empty()
         || muted_words(preferences)
@@ -164,7 +325,16 @@ pub fn add_muted_word(preferences: &mut Vec<Value>, word: &str) {
     }
     let item = muted_words_item(preferences);
     if let Some(items) = item.get_mut("items").and_then(Value::as_array_mut) {
-        items.push(json!({"value": word, "targets": ["content", "tag"], "actorTarget": "all"}));
+        let targets = if tags_only {
+            json!(["tag"])
+        } else {
+            json!(["content", "tag"])
+        };
+        let mut entry = json!({"value": word, "targets": targets, "actorTarget": "all"});
+        if let Some(end) = expires {
+            entry["expiresAt"] = json!(end.to_rfc3339_opts(chrono::SecondsFormat::Millis, true));
+        }
+        items.push(entry);
     }
 }
 
@@ -173,6 +343,151 @@ pub fn remove_muted_word(preferences: &mut Vec<Value>, word: &str) {
     if let Some(items) = item.get_mut("items").and_then(Value::as_array_mut) {
         items.retain(|w| w.get("value").and_then(Value::as_str) != Some(word));
     }
+}
+
+/// Service de modération de Bluesky, toujours actif.
+pub const BLUESKY_LABELER: &str = "did:plc:ar7c4by46qjdydhdevvrndac";
+/// Abonnements à des services d'étiquetage acceptés par Bluesky, au plus.
+pub const MAX_LABELERS: usize = 20;
+
+/// Abonne (ou désabonne) le compte au service d'étiquetage `did`.
+pub fn set_labeler(preferences: &mut Vec<Value>, did: &str, subscribed: bool) {
+    let index = match preferences
+        .iter()
+        .position(|item| item.get("$type").and_then(Value::as_str) == Some(LABELERS))
+    {
+        Some(index) => index,
+        None => {
+            preferences.push(json!({"$type": LABELERS, "labelers": []}));
+            preferences.len() - 1
+        }
+    };
+    let item = &mut preferences[index];
+    if !item.get("labelers").is_some_and(Value::is_array) {
+        item["labelers"] = json!([]);
+    }
+    let list = item["labelers"].as_array_mut().expect("tableau");
+    list.retain(|l| l.get("did").and_then(Value::as_str) != Some(did));
+    if subscribed {
+        list.push(json!({"did": did}));
+    }
+}
+
+/// Langues des posts à afficher dans les fils (vide : toutes).
+pub fn set_content_languages(languages: Vec<String>) {
+    CONTENT_LANGUAGES.with_borrow_mut(|current| *current = languages);
+}
+
+/// Le post est-il dans une langue écartée ? Un post sans langue déclarée,
+/// ou un choix vide, ne l'est jamais. Seule la langue principale compte
+/// (« en-US » vaut « en »).
+pub fn outside_languages(post_langs: &[String], wanted: &[String]) -> bool {
+    let primary = |code: &str| code.split('-').next().unwrap_or(code).to_lowercase();
+    !wanted.is_empty()
+        && !post_langs.is_empty()
+        && !post_langs
+            .iter()
+            .any(|l| wanted.iter().any(|w| primary(w) == primary(l)))
+}
+
+/// Définitions des étiquettes des services suivis, pour les fils.
+pub fn set_definitions(definitions: Vec<LabelDefinition>) {
+    DEFINITIONS.with_borrow_mut(|current| *current = definitions);
+}
+
+/// Noms des services tiers suivis, pour les choisir (signalement).
+pub fn set_labeler_names(names: Vec<(String, String)>) {
+    LABELER_NAMES.with_borrow_mut(|current| *current = names);
+}
+
+pub fn labeler_names() -> Vec<(String, String)> {
+    LABELER_NAMES.with_borrow(Clone::clone)
+}
+
+/// Langue de l'interface (« fr », « en »…), pour les noms d'étiquettes.
+pub fn interface_language() -> String {
+    gtk::glib::language_names()
+        .first()
+        .and_then(|l| l.split(['_', '.', '@']).next())
+        .filter(|l| *l != "C")
+        .unwrap_or("en")
+        .to_owned()
+}
+
+/// Services d'étiquetage, avec leur nom et leurs étiquettes
+/// (`getServices` détaillé).
+pub async fn labeler_details(
+    session: Arc<Session>,
+    dids: Vec<String>,
+    lang: String,
+) -> Result<Vec<(String, String, Vec<LabelDefinition>)>, ApiError> {
+    use atrium_api::types::string::Did;
+    if dids.is_empty() {
+        return Ok(Vec::new());
+    }
+    let api = session.api().await?;
+    let output = api
+        .api
+        .app
+        .bsky
+        .labeler
+        .get_services(
+            atrium_api::app::bsky::labeler::get_services::ParametersData {
+                detailed: Some(true),
+                dids: dids
+                    .iter()
+                    .filter_map(|d| Did::new(d.clone()).ok())
+                    .collect(),
+            }
+            .into(),
+        )
+        .await
+        .map_err(request_failed)?;
+    let views = serde_json::to_value(&output.data.views).unwrap_or_default();
+    Ok(views
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|view| {
+            let creator = view.get("creator")?;
+            let did = creator.get("did")?.as_str()?.to_owned();
+            let name = api::name_or_handle(
+                creator.get("displayName").and_then(Value::as_str),
+                creator
+                    .get("handle")
+                    .and_then(Value::as_str)
+                    .unwrap_or(&did),
+            );
+            Some((did, name, definitions_from_view(view, &lang)))
+        })
+        .collect())
+}
+
+/// Préférences du compte connecté, telles que chargées.
+pub fn current_preferences() -> Vec<Value> {
+    PREFERENCES.with_borrow(Clone::clone)
+}
+
+/// Services d'étiquetage du compte connecté (préférences chargées).
+pub fn subscribed_labelers() -> Vec<String> {
+    PREFERENCES.with_borrow(|p| labelers(p))
+}
+
+/// Demande à Bluesky les étiquettes de ces services en plus des siennes
+/// (en-tête `atproto-accept-labelers`) pour les requêtes de cette session.
+pub async fn configure_labelers(session: Arc<Session>, labelers: Vec<String>) {
+    use atrium_api::agent::Configure;
+    use atrium_api::types::string::Did;
+    let Ok(api) = session.api().await else { return };
+    let mut dids = vec![(Did::new(BLUESKY_LABELER.to_owned()).expect("DID"), true)];
+    dids.extend(
+        labelers
+            .into_iter()
+            .filter(|d| d != BLUESKY_LABELER)
+            .filter_map(|d| Did::new(d).ok())
+            .map(|d| (d, false)),
+    );
+    api.configure_labelers_header(Some(dids));
 }
 
 /// Services d'étiquetage auxquels le compte est abonné (DID).
@@ -205,15 +520,62 @@ pub fn contains_muted_word(text: &str, muted: &[String]) -> bool {
     })
 }
 
+/// Le post contient-il un mot masqué encore actif ? Un mot « mots-clics
+/// seulement » ne se compare qu'aux mots-clics du post.
+pub fn post_is_muted(post: &Post, muted: &[MutedWord], now: chrono::DateTime<chrono::Utc>) -> bool {
+    let active = muted.iter().filter(|w| w.active(now));
+    let (tags_only, anywhere): (Vec<&MutedWord>, Vec<&MutedWord>) =
+        active.partition(|w| w.tags_only);
+    let anywhere: Vec<String> = anywhere.iter().map(|w| w.value.clone()).collect();
+    if !anywhere.is_empty() && contains_muted_word(&post.text, &anywhere) {
+        return true;
+    }
+    let tags: Vec<String> = post
+        .facets
+        .iter()
+        .filter_map(|f| match &f.feature {
+            crate::richtext::Feature::Tag(tag) => Some(tag.to_lowercase()),
+            _ => None,
+        })
+        .collect();
+    tags_only
+        .iter()
+        .any(|w| tags.contains(&w.value.to_lowercase()))
+}
+
 /// Ce que demandent les étiquettes d'un contenu, avec l'étiquette qui
 /// décide. « !hide » et « !warn » viennent de la modération de Bluesky et
 /// ne se règlent pas ; le contenu pour adultes désactivé masque ses
 /// étiquettes. Les étiquettes inconnues sont ignorées.
 pub fn decide(preferences: &[Value], labels: &[String]) -> Option<(Visibility, String)> {
+    DEFINITIONS.with_borrow(|definitions| decide_with(preferences, definitions, labels))
+}
+
+/// `decide`, avec les définitions des services tiers : une étiquette
+/// « service#valeur » suit son réglage ; sans définition connue, ignorée.
+pub fn decide_with(
+    preferences: &[Value],
+    definitions: &[LabelDefinition],
+    labels: &[String],
+) -> Option<(Visibility, String)> {
     let adult = adult_content(preferences);
     labels
         .iter()
         .filter_map(|label| {
+            if let Some((labeler, value)) = label.split_once(LABELER_SEPARATOR) {
+                let definition = definitions
+                    .iter()
+                    .find(|d| d.labeler == labeler && d.value == value)?;
+                if definition.inform_only {
+                    return None;
+                }
+                let visibility = if definition.adult_only && !adult {
+                    Visibility::Hide
+                } else {
+                    labeler_label_visibility(preferences, definition)
+                };
+                return Some((visibility, label.clone()));
+            }
             let visibility = match label.as_str() {
                 "!hide" => Visibility::Hide,
                 "!warn" => Visibility::Warn,
@@ -231,6 +593,15 @@ pub fn decide(preferences: &[Value], labels: &[String]) -> Option<(Visibility, S
 
 /// Titre de l'avertissement affiché sur un contenu étiqueté.
 pub fn warning_title(label: &str) -> String {
+    if let Some((labeler, value)) = label.split_once(LABELER_SEPARATOR) {
+        return DEFINITIONS.with_borrow(|definitions| {
+            definitions
+                .iter()
+                .find(|d| d.labeler == labeler && d.value == value)
+                .map(|d| d.name.clone())
+                .unwrap_or_else(|| value.to_owned())
+        });
+    }
     match label {
         "!warn" | "!hide" => gettext("Contenu signalé par la modération"),
         other => label_title(other),
@@ -242,18 +613,25 @@ thread_local! {
     /// l'affichage des posts.
     static PREFERENCES: RefCell<Vec<Value>> = RefCell::default();
     /// Mots masqués tirés de ces préférences.
-    static MUTED: RefCell<Vec<String>> = RefCell::default();
+    static MUTED: RefCell<Vec<MutedWord>> = RefCell::default();
+    /// Étiquettes des services tiers suivis.
+    static DEFINITIONS: RefCell<Vec<LabelDefinition>> = RefCell::default();
+    /// Services tiers suivis : DID et nom.
+    static LABELER_NAMES: RefCell<Vec<(String, String)>> = RefCell::default();
+    /// Langues des posts à afficher (vide : toutes).
+    static CONTENT_LANGUAGES: RefCell<Vec<String>> = RefCell::default();
 }
 
 /// Préférences à appliquer aux fils ; vide au départ et sans compte.
 pub fn set_preferences(preferences: Vec<Value>) {
-    MUTED.with_borrow_mut(|muted| *muted = muted_words(&preferences));
+    MUTED.with_borrow_mut(|muted| *muted = muted_word_items(&preferences));
     PREFERENCES.with_borrow_mut(|current| *current = preferences);
 }
 
 /// Post à cacher : il contient un mot masqué, ou une étiquette le masque.
 pub fn is_hidden(post: &Post) -> bool {
-    MUTED.with_borrow(|muted| !muted.is_empty() && contains_muted_word(&post.text, muted))
+    MUTED.with_borrow(|muted| post_is_muted(post, muted, chrono::Utc::now()))
+        || CONTENT_LANGUAGES.with_borrow(|wanted| outside_languages(&post.langs, wanted))
         || matches!(media_warning_visibility(post), Some((Visibility::Hide, _)))
 }
 
@@ -429,53 +807,6 @@ pub async fn block(session: Arc<Session>, actor: String) -> Result<String, ApiEr
     Ok(output.data.uri)
 }
 
-/// Noms des services d'étiquetage.
-pub async fn labeler_names(
-    session: Arc<Session>,
-    dids: Vec<String>,
-) -> Result<Vec<(String, String)>, ApiError> {
-    use atrium_api::types::string::Did;
-    if dids.is_empty() {
-        return Ok(Vec::new());
-    }
-    let api = session.api().await?;
-    let output = api
-        .api
-        .app
-        .bsky
-        .labeler
-        .get_services(
-            atrium_api::app::bsky::labeler::get_services::ParametersData {
-                detailed: Some(false),
-                dids: dids
-                    .iter()
-                    .filter_map(|d| Did::new(d.clone()).ok())
-                    .collect(),
-            }
-            .into(),
-        )
-        .await
-        .map_err(request_failed)?;
-    let views = serde_json::to_value(&output.data.views).unwrap_or_default();
-    Ok(views
-        .as_array()
-        .into_iter()
-        .flatten()
-        .filter_map(|view| {
-            let did = view.get("creator")?.get("did")?.as_str()?.to_owned();
-            let creator = view.get("creator")?;
-            let name = api::name_or_handle(
-                creator.get("displayName").and_then(Value::as_str),
-                creator
-                    .get("handle")
-                    .and_then(Value::as_str)
-                    .unwrap_or(&did),
-            );
-            Some((did, name))
-        })
-        .collect())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -538,6 +869,98 @@ mod tests {
         assert_eq!(muted_words(&p), vec!["spoiler"]);
         assert_eq!(labelers(&p), vec!["did:plc:veille"]);
         assert!(!adult_content(&[]));
+    }
+
+    #[test]
+    fn temporary_and_tag_words() {
+        let mut p = Vec::new();
+        let now = chrono::Utc::now();
+        add_muted_word_with(
+            &mut p,
+            "#finale",
+            true,
+            Some(now + chrono::Duration::hours(24)),
+        );
+        add_muted_word_with(
+            &mut p,
+            "ancien",
+            false,
+            Some(now - chrono::Duration::hours(1)),
+        );
+        let words = muted_word_items(&p);
+        assert!(words[0].tags_only && words[0].active(now));
+        assert!(!words[1].active(now));
+        let post = |text: &str| crate::data::Post {
+            facets: crate::richtext::detect(text),
+            ..crate::data::posts(crate::data::Feed::Following)[0].clone()
+        };
+        let with_text = |text: &str| crate::data::Post {
+            text: text.into(),
+            ..post(text)
+        };
+        // « finale » dans le texte : pas un mot-clic, pas masqué.
+        assert!(!post_is_muted(&with_text("La finale ce soir"), &words, now));
+        assert!(post_is_muted(&with_text("Ce soir #Finale"), &words, now));
+        // Mot expiré : plus masqué.
+        assert!(!post_is_muted(&with_text("Un ancien post"), &words, now));
+    }
+
+    #[test]
+    fn third_party_labels_follow_their_settings() {
+        let view = json!({
+            "creator": {"did": "did:plc:veille", "handle": "veille.example"},
+            "policies": {"labelValues": ["spoiler", "info"], "labelValueDefinitions": [
+                {"identifier": "spoiler", "severity": "alert", "blurs": "content",
+                 "defaultSetting": "warn", "adultOnly": false,
+                 "locales": [{"lang": "en", "name": "Spoiler"}, {"lang": "fr", "name": "Divulgâcheur"}]},
+                {"identifier": "info", "severity": "inform", "blurs": "none",
+                 "defaultSetting": "warn", "locales": []},
+            ]}
+        });
+        let definitions = definitions_from_view(&view, "fr");
+        assert_eq!(definitions[0].name, "Divulgâcheur");
+        assert!(definitions[1].inform_only);
+        let mut p = Vec::new();
+        let labels = vec![
+            "did:plc:veille#spoiler".to_owned(),
+            "did:plc:veille#info".to_owned(),
+        ];
+        assert_eq!(
+            decide_with(&p, &definitions, &labels),
+            Some((Visibility::Warn, "did:plc:veille#spoiler".to_owned()))
+        );
+        set_labeler_label_visibility(&mut p, "did:plc:veille", "spoiler", Visibility::Hide);
+        assert_eq!(
+            decide_with(&p, &definitions, &labels).map(|(v, _)| v),
+            Some(Visibility::Hide)
+        );
+        // Service inconnu : ignoré.
+        assert_eq!(decide_with(&p, &[], &labels), None);
+    }
+
+    #[test]
+    fn posts_are_filtered_by_language() {
+        let langs = |l: &[&str]| l.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        assert!(!outside_languages(&langs(&["en"]), &[]));
+        assert!(!outside_languages(&[], &langs(&["fr"])));
+        assert!(!outside_languages(
+            &langs(&["en-US"]),
+            &langs(&["fr", "en"])
+        ));
+        assert!(outside_languages(&langs(&["ja"]), &langs(&["fr", "en"])));
+    }
+
+    #[test]
+    fn labelers_are_subscribed_once() {
+        let mut p = prefs();
+        set_labeler(&mut p, "did:plc:autre", true);
+        set_labeler(&mut p, "did:plc:autre", true);
+        assert_eq!(labelers(&p), ["did:plc:veille", "did:plc:autre"]);
+        set_labeler(&mut p, "did:plc:veille", false);
+        assert_eq!(labelers(&p), ["did:plc:autre"]);
+        let mut empty = Vec::new();
+        set_labeler(&mut empty, "did:plc:x", true);
+        assert_eq!(labelers(&empty), ["did:plc:x"]);
     }
 
     #[test]

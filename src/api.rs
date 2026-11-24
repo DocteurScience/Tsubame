@@ -58,6 +58,8 @@ pub enum AuthorFilter {
     Replies,
     /// Posts avec image ou vidéo.
     Media,
+    /// Posts avec vidéo.
+    Videos,
 }
 
 impl AuthorFilter {
@@ -66,6 +68,7 @@ impl AuthorFilter {
             AuthorFilter::Posts => "posts_no_replies",
             AuthorFilter::Replies => "posts_with_replies",
             AuthorFilter::Media => "posts_with_media",
+            AuthorFilter::Videos => "posts_with_video",
         }
     }
 }
@@ -383,6 +386,7 @@ fn media(post: &PostView) -> Option<Media> {
             aspect_ratio: ratio(&first.aspect_ratio),
             more: view.images.len().saturating_sub(1) as u32,
             video: None,
+            gif: false,
             images: view
                 .images
                 .iter()
@@ -401,6 +405,7 @@ fn media(post: &PostView) -> Option<Media> {
             aspect_ratio: ratio(&view.aspect_ratio),
             more: 0,
             video: Some(view.playlist.clone()),
+            gif: view.presentation.as_deref() == Some("gif"),
             images: Vec::new(),
         })
     };
@@ -444,6 +449,16 @@ pub fn post_from_view(post: &PostView, now: DateTime<Utc>) -> Post {
         time: indexed.map(|t| relative_time(t, now)).unwrap_or_default(),
         date: indexed.map(full_date).unwrap_or_default(),
         text: record_text(post),
+        facets: serde_json::to_value(&post.record)
+            .map(|record| crate::richtext::from_record(&record))
+            .unwrap_or_default(),
+        langs: serde_json::to_value(&post.record)
+            .ok()
+            .and_then(|record| record.get("langs")?.as_array().cloned())
+            .into_iter()
+            .flatten()
+            .filter_map(|l| l.as_str().map(str::to_owned))
+            .collect(),
         avatar: post.author.avatar.clone(),
         media: media(post),
         replies: count(post.reply_count),
@@ -548,10 +563,19 @@ fn labels(post: &PostView) -> Vec<String> {
         .flatten()
         .chain(post.author.labels.iter().flatten())
     {
+        // Étiquettes de Bluesky et de l'auteur lui-même : la valeur seule ;
+        // celles d'un service tiers : « service#valeur ».
+        let src = label.src.as_str();
+        let value = if src == crate::moderation::BLUESKY_LABELER || src == post.author.did.as_str()
+        {
+            label.val.clone()
+        } else {
+            format!("{src}{}{}", crate::moderation::LABELER_SEPARATOR, label.val)
+        };
         if label.neg == Some(true) {
-            labels.retain(|value| *value != label.val);
-        } else if !labels.contains(&label.val) {
-            labels.push(label.val.clone());
+            labels.retain(|v| *v != value);
+        } else if !labels.contains(&value) {
+            labels.push(value);
         }
     }
     labels
@@ -590,6 +614,9 @@ fn reply_from_view(post: &PostView, now: DateTime<Utc>) -> Reply {
         handle: post.author.handle.as_str().to_owned(),
         time: indexed.map(|t| relative_time(t, now)).unwrap_or_default(),
         text: record_text(post),
+        facets: serde_json::to_value(&post.record)
+            .map(|record| crate::richtext::from_record(&record))
+            .unwrap_or_default(),
     }
 }
 
@@ -618,6 +645,16 @@ async fn posts_by_uri(
         }
     }
     Ok(posts)
+}
+
+/// Un post, par son adresse (`getPosts`).
+pub async fn post(session: Arc<Session>, uri: String) -> Result<Post, ApiError> {
+    let api = session.api().await?;
+    let mut posts = posts_by_uri(&api, vec![uri.clone()]).await?;
+    let view = posts
+        .remove(&uri)
+        .ok_or_else(|| ApiError::new(gettext("Ce post n'est plus disponible.")))?;
+    Ok(post_from_view(&view, Utc::now()))
 }
 
 /// Raisons de notification gardées par le filtre « Mentions ».
@@ -829,6 +866,10 @@ pub fn post_from_notification(
                 .ok()
                 .and_then(|record| record.get("text")?.as_str().map(str::to_owned))
                 .unwrap_or_default(),
+            facets: serde_json::to_value(&notification.record)
+                .map(|record| crate::richtext::from_record(&record))
+                .unwrap_or_default(),
+            langs: Vec::new(),
             avatar: None,
             media: None,
             replies: 0,
@@ -980,9 +1021,9 @@ pub struct PinnedFeed {
 }
 
 /// Adresses des fils épinglés, dans l'ordre, d'après les préférences
-/// (format `savedFeedsPrefV2`, ou l'ancien `savedFeedsPref`). Les listes et
-/// le fil Following, qui ne sont pas des générateurs de fil, sont laissés
-/// de côté.
+/// (format `savedFeedsPrefV2`, ou l'ancien `savedFeedsPref`) : fils et
+/// listes (format récent seulement). Le fil Following, qui a déjà sa
+/// colonne, est laissé de côté.
 pub fn pinned_feed_uris(preferences: &serde_json::Value) -> Vec<String> {
     let items = preferences.as_array().cloned().unwrap_or_default();
     let of_type = |name: &str| {
@@ -998,7 +1039,10 @@ pub fn pinned_feed_uris(preferences: &serde_json::Value) -> Vec<String> {
             .flatten()
             .filter(|item| {
                 item.get("pinned").and_then(|p| p.as_bool()) == Some(true)
-                    && item.get("type").and_then(|t| t.as_str()) == Some("feed")
+                    && matches!(
+                        item.get("type").and_then(|t| t.as_str()),
+                        Some("feed" | "list")
+                    )
             })
             .filter_map(|item| item.get("value")?.as_str().map(str::to_owned))
             .collect();
@@ -1010,6 +1054,11 @@ pub fn pinned_feed_uris(preferences: &serde_json::Value) -> Vec<String> {
         .filter_map(|uri| uri.as_str().map(str::to_owned))
         .filter(|uri| uri.contains("/app.bsky.feed.generator/"))
         .collect()
+}
+
+/// Adresse d'une liste (et non d'un générateur de fil) ?
+pub fn is_list_uri(uri: &str) -> bool {
+    uri.contains("/app.bsky.graph.list/")
 }
 
 /// Fils épinglés du compte, avec leurs noms.
@@ -1028,38 +1077,59 @@ pub async fn pinned_feeds(session: Arc<Session>) -> Result<Vec<PinnedFeed>, ApiE
     if uris.is_empty() {
         return Ok(Vec::new());
     }
-    let output = api
-        .api
-        .app
-        .bsky
-        .feed
-        .get_feed_generators(
-            atrium_api::app::bsky::feed::get_feed_generators::ParametersData {
-                feeds: uris.clone(),
-            }
-            .into(),
-        )
-        .await
-        .map_err(request_failed)?;
-    let names: HashMap<&str, &str> = output
-        .data
-        .feeds
-        .iter()
-        .map(|feed| (feed.uri.as_str(), feed.display_name.as_str()))
-        .collect();
+    let generators: Vec<String> = uris.iter().filter(|u| !is_list_uri(u)).cloned().collect();
+    let mut names: HashMap<String, String> = HashMap::new();
+    if !generators.is_empty() {
+        let output = api
+            .api
+            .app
+            .bsky
+            .feed
+            .get_feed_generators(
+                atrium_api::app::bsky::feed::get_feed_generators::ParametersData {
+                    feeds: generators,
+                }
+                .into(),
+            )
+            .await
+            .map_err(request_failed)?;
+        for feed in &output.data.feeds {
+            names.insert(feed.uri.clone(), feed.display_name.clone());
+        }
+    }
+    // Listes épinglées : leur nom (`getList`, sans les membres).
+    for uri in uris.iter().filter(|u| is_list_uri(u)) {
+        if let Ok(output) = api
+            .api
+            .app
+            .bsky
+            .graph
+            .get_list(
+                atrium_api::app::bsky::graph::get_list::ParametersData {
+                    cursor: None,
+                    limit: 1.try_into().ok(),
+                    list: uri.clone(),
+                }
+                .into(),
+            )
+            .await
+        {
+            names.insert(uri.clone(), output.data.list.name.clone());
+        }
+    }
     // Dans l'ordre des préférences ; un fil disparu depuis est ignoré.
     Ok(uris
         .iter()
         .filter_map(|uri| {
             names.get(uri.as_str()).map(|name| PinnedFeed {
                 uri: uri.clone(),
-                name: (*name).to_owned(),
+                name: name.clone(),
             })
         })
         .collect())
 }
 
-fn invalid_actor() -> ApiError {
+pub(crate) fn invalid_actor() -> ApiError {
     ApiError::new(gettext("Ce compte n'existe pas."))
 }
 
@@ -1082,7 +1152,61 @@ pub fn profile_from_view(
         follows_me: viewer.is_some_and(|v| v.followed_by.is_some()),
         muted: viewer.and_then(|v| v.muted).unwrap_or(false),
         blocking: viewer.and_then(|v| v.blocking.clone()),
+        known_followers: viewer
+            .and_then(|v| v.known_followers.as_ref())
+            .map(|known| {
+                known
+                    .followers
+                    .iter()
+                    .map(|f| name_or_handle(f.display_name.as_deref(), f.handle.as_str()))
+                    .collect()
+            })
+            .unwrap_or_default(),
+        known_count: viewer
+            .and_then(|v| v.known_followers.as_ref())
+            .map(|known| known.count.max(0) as u64)
+            .unwrap_or(0),
+        activity: viewer
+            .and_then(|v| v.activity_subscription.as_ref())
+            .map(|a| (a.post, a.reply))
+            .unwrap_or((false, false)),
+        associated: profile
+            .associated
+            .as_ref()
+            .map(|a| (count(a.feedgens), count(a.lists), count(a.starter_packs)))
+            .unwrap_or_default(),
+        labeler: profile
+            .associated
+            .as_ref()
+            .and_then(|a| a.labeler)
+            .unwrap_or(false),
     }
+}
+
+/// Demande (ou arrête) les notifications des posts et des réponses d'un
+/// compte (`putActivitySubscription`).
+pub async fn set_activity(
+    session: Arc<Session>,
+    did: String,
+    post: bool,
+    reply: bool,
+) -> Result<(), ApiError> {
+    use atrium_api::app::bsky::notification::{defs, put_activity_subscription};
+    let api = session.api().await?;
+    api.api
+        .app
+        .bsky
+        .notification
+        .put_activity_subscription(
+            put_activity_subscription::InputData {
+                activity_subscription: defs::ActivitySubscriptionData { post, reply }.into(),
+                subject: did.parse().map_err(|_| invalid_actor())?,
+            }
+            .into(),
+        )
+        .await
+        .map_err(request_failed)?;
+    Ok(())
 }
 
 /// Profil d'un compte, par son DID ou identifiant.
@@ -1189,7 +1313,7 @@ pub async fn unbookmark(session: Arc<Session>, uri: String) -> Result<(), ApiErr
         .map_err(request_failed)
 }
 
-fn list_from_view(list: &atrium_api::app::bsky::graph::defs::ListView) -> List {
+pub(crate) fn list_from_view(list: &atrium_api::app::bsky::graph::defs::ListView) -> List {
     let purpose = serde_json::to_value(&list.purpose).unwrap_or_default();
     List {
         uri: list.uri.clone(),
@@ -1198,6 +1322,9 @@ fn list_from_view(list: &atrium_api::app::bsky::graph::defs::ListView) -> List {
         avatar: list.avatar.clone(),
         members: list.list_item_count.unwrap_or(0) as u64,
         moderation: purpose.as_str() == Some("app.bsky.graph.defs#modlist"),
+        creator: list.creator.did.as_str().to_owned(),
+        muted: list.viewer.as_ref().and_then(|v| v.muted).unwrap_or(false),
+        blocked: list.viewer.as_ref().and_then(|v| v.blocked.clone()),
     }
 }
 
@@ -1223,32 +1350,6 @@ pub async fn lists(session: Arc<Session>, actor: String) -> Result<Vec<List>, Ap
     Ok(output.data.lists.iter().map(list_from_view).collect())
 }
 
-/// Membres d'une liste.
-pub async fn list_members(session: Arc<Session>, uri: String) -> Result<Vec<Actor>, ApiError> {
-    let api = session.api().await?;
-    let output = api
-        .api
-        .app
-        .bsky
-        .graph
-        .get_list(
-            atrium_api::app::bsky::graph::get_list::ParametersData {
-                cursor: None,
-                limit: 100.try_into().ok(),
-                list: uri,
-            }
-            .into(),
-        )
-        .await
-        .map_err(request_failed)?;
-    Ok(output
-        .data
-        .items
-        .iter()
-        .map(|item| actor_from_view(&item.subject))
-        .collect())
-}
-
 /// Liste de comptes : abonnés ou abonnements d'un compte (DID ou
 /// identifiant), comptes qui ont aimé ou reposté un post (adresse).
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1257,6 +1358,8 @@ pub enum People {
     Follows(String),
     Likers(String),
     Reposters(String),
+    /// Comptes que je suis qui suivent ce compte.
+    Known(String),
 }
 
 impl People {
@@ -1266,6 +1369,7 @@ impl People {
             People::Follows(_) => gettext("Abonnements"),
             People::Likers(_) => pgettext("comptes qui ont aimé un post", "J'aime"),
             People::Reposters(_) => gettext("Reposts"),
+            People::Known(_) => gettext("Abonnés que vous connaissez"),
         }
     }
 
@@ -1275,6 +1379,7 @@ impl People {
             People::Follows(_) => gettext("Aucun abonnement pour l'instant."),
             People::Likers(_) => gettext("Personne n'a encore aimé ce post."),
             People::Reposters(_) => gettext("Personne n'a encore reposté ce post."),
+            People::Known(_) => gettext("Aucun compte que vous suivez ne suit ce compte."),
         }
     }
 }
@@ -1287,6 +1392,26 @@ pub async fn people(
 ) -> Result<(Vec<Actor>, Option<String>), ApiError> {
     use atrium_api::app::bsky::feed::{get_likes, get_reposted_by};
     match people {
+        People::Known(actor) => {
+            use atrium_api::app::bsky::graph::get_known_followers;
+            let api = session.api().await?;
+            let output = Box::pin(
+                api.api.app.bsky.graph.get_known_followers(
+                    get_known_followers::ParametersData {
+                        actor: actor.parse().map_err(|_| invalid_actor())?,
+                        cursor,
+                        limit: 50.try_into().ok(),
+                    }
+                    .into(),
+                ),
+            )
+            .await
+            .map_err(request_failed)?;
+            Ok((
+                output.data.followers.iter().map(actor_from_view).collect(),
+                output.data.cursor,
+            ))
+        }
         People::Followers(actor) => Box::pin(connections(session, actor, true, cursor)).await,
         People::Follows(actor) => Box::pin(connections(session, actor, false, cursor)).await,
         People::Likers(uri) => {
@@ -1609,9 +1734,33 @@ pub struct NewPost {
     pub reply_rule: ReplyRule,
     /// Interdire de citer ce post.
     pub no_quotes: bool,
+    /// Étiquette de contenu posée par l'auteur sur ses images (« nudity »,
+    /// « sexual », « porn », « graphic-media »).
+    pub self_label: Option<&'static str>,
     /// Lien joint, avec son aperçu (sans effet avec des images).
     pub link: Option<NewLink>,
+    /// Vidéo jointe (seule, sans images).
+    pub video: Option<NewVideo>,
 }
+
+/// Vidéo jointe à un nouveau post.
+#[derive(Debug, Clone, Default)]
+pub struct NewVideo {
+    pub bytes: Vec<u8>,
+    /// Type MIME du fichier (« video/mp4 »…).
+    pub mime: String,
+    pub alt: String,
+    /// Largeur et hauteur, si le lecteur a pu les lire.
+    pub size: Option<(u32, u32)>,
+    /// Présentation suggérée : « gif » pour un GIF animé (en boucle, sans
+    /// commandes).
+    pub presentation: Option<&'static str>,
+    /// Blob de la vidéo, une fois traitée par le service vidéo.
+    pub blob: Option<serde_json::Value>,
+}
+
+/// Service qui reçoit et convertit les vidéos de Bluesky.
+const VIDEO_SERVICE: &str = "https://video.bsky.app";
 
 /// Lien joint à un nouveau post.
 #[derive(Debug, Clone, Default)]
@@ -1664,13 +1813,33 @@ pub fn post_record(
         "text": post.text,
         "createdAt": created_at,
     });
+    if let Some(value) = post.self_label {
+        record["labels"] = json!({
+            "$type": "com.atproto.label.defs#selfLabels",
+            "values": [{"val": value}],
+        });
+    }
     if !post.langs.is_empty() {
         record["langs"] = json!(post.langs);
     }
     if !facets.is_empty() {
         record["facets"] = json!(facets);
     }
-    if !blobs.is_empty() {
+    if let Some(video) = &post.video
+        && let Some(blob) = &video.blob
+    {
+        let mut embed = json!({"$type": "app.bsky.embed.video", "video": blob});
+        if !video.alt.is_empty() {
+            embed["alt"] = json!(video.alt);
+        }
+        if let Some((width, height)) = video.size {
+            embed["aspectRatio"] = json!({"width": width, "height": height});
+        }
+        if let Some(presentation) = video.presentation {
+            embed["presentation"] = json!(presentation);
+        }
+        record["embed"] = embed;
+    } else if !blobs.is_empty() {
         let images: Vec<_> = post
             .images
             .iter()
@@ -1766,8 +1935,15 @@ pub async fn publish(session: Arc<Session>, mut post: NewPost) -> Result<Publish
             })?;
         blobs.push(serde_json::to_value(&output.data.blob).map_err(|_| invalid_post())?);
     }
+    // Vidéo : envoyée au service vidéo, qui la convertit et rend son blob.
+    if let Some(video) = post.video.as_mut()
+        && video.blob.is_none()
+    {
+        video.blob = Some(upload_video(&api, &session.account.did, video).await?);
+    }
     // Image de l'aperçu du lien : sans elle, la carte reste valable.
     if post.images.is_empty()
+        && post.video.is_none()
         && let Some(link) = post.link.as_mut()
         && let Some(thumb) = &link.thumb
     {
@@ -1854,6 +2030,105 @@ pub async fn publish(session: Arc<Session>, mut post: NewPost) -> Result<Publish
         post: published,
         gates_failed,
     })
+}
+
+/// Envoie une vidéo au service vidéo avec un jeton de service du PDS, puis
+/// attend la fin de sa conversion. Rend le blob à citer dans le post.
+async fn upload_video(
+    api: &crate::auth::Api,
+    did: &str,
+    video: &NewVideo,
+) -> Result<serde_json::Value, ApiError> {
+    use atrium_api::com::atproto::server::get_service_auth;
+    use atrium_api::types::string::Nsid;
+
+    let failed = |detail: String| {
+        glib_debug(&format!("vidéo : {detail}"));
+        ApiError::new(gettext("La vidéo n'a pas pu être envoyée."))
+    };
+    // Le jeton est destiné au PDS du compte : le service vidéo y dépose
+    // le blob en son nom.
+    let server = api
+        .api
+        .com
+        .atproto
+        .server
+        .describe_server()
+        .await
+        .map_err(|e| failed(e.to_string()))?;
+    let token = api
+        .api
+        .com
+        .atproto
+        .server
+        .get_service_auth(
+            get_service_auth::ParametersData {
+                aud: server.data.did.as_str().to_owned(),
+                exp: Some(chrono::Utc::now().timestamp() + 30 * 60),
+                lxm: Nsid::new("com.atproto.repo.uploadBlob".to_owned()).ok(),
+            }
+            .into(),
+        )
+        .await
+        .map_err(|e| failed(e.to_string()))?
+        .data
+        .token;
+    let client = reqwest::Client::new();
+    let name = format!("{}.mp4", chrono::Utc::now().timestamp_millis());
+    let response = client
+        .post(format!(
+            "{VIDEO_SERVICE}/xrpc/app.bsky.video.uploadVideo?did={did}&name={name}"
+        ))
+        .bearer_auth(token)
+        .header("Content-Type", &video.mime)
+        .body(video.bytes.clone())
+        .send()
+        .await
+        .map_err(|e| failed(e.to_string()))?;
+    let status = response.status();
+    let body = response.bytes().await.map_err(|e| failed(e.to_string()))?;
+    let body: serde_json::Value = serde_json::from_slice(&body).unwrap_or_default();
+    // Une vidéo déjà envoyée renvoie une erreur avec la tâche existante.
+    let mut job = job_status(&body);
+    let Some(job_id) = job["jobId"].as_str().map(str::to_owned) else {
+        return Err(failed(format!("{status} {body}")));
+    };
+    for _ in 0..300 {
+        if let Some(blob) = job.get("blob") {
+            return Ok(blob.clone());
+        }
+        match job["state"].as_str() {
+            Some("JOB_STATE_FAILED") => {
+                let detail = job["error"].as_str().or(job["message"].as_str());
+                glib_debug(&format!("vidéo : {job}"));
+                return Err(ApiError::new(match detail {
+                    Some(detail) => gettext("La vidéo a été refusée : {}").replace("{}", detail),
+                    None => gettext("La vidéo n'a pas pu être convertie."),
+                }));
+            }
+            _ => tokio::time::sleep(std::time::Duration::from_secs(2)).await,
+        }
+        let body = client
+            .get(format!(
+                "{VIDEO_SERVICE}/xrpc/app.bsky.video.getJobStatus?jobId={job_id}"
+            ))
+            .send()
+            .await
+            .map_err(|e| failed(e.to_string()))?
+            .bytes()
+            .await
+            .map_err(|e| failed(e.to_string()))?;
+        let body: serde_json::Value = serde_json::from_slice(&body).unwrap_or_default();
+        job = job_status(&body);
+    }
+    Err(ApiError::new(gettext(
+        "La conversion de la vidéo prend trop de temps.",
+    )))
+}
+
+/// L'état d'une tâche du service vidéo, sous `jobStatus` ou à la racine.
+fn job_status(body: &serde_json::Value) -> serde_json::Value {
+    body.get("jobStatus").unwrap_or(body).clone()
 }
 
 fn glib_debug(message: &str) {
@@ -2020,6 +2295,7 @@ mod tests {
                 aspect_ratio: Some((1600, 900)),
                 more: 1,
                 video: None,
+                gif: false,
                 images: vec![
                     crate::data::Image {
                         thumb: "https://cdn.example/thumb.jpg".into(),
@@ -2058,12 +2334,13 @@ mod tests {
                 "uri": "at://did:plc:r/app.bsky.feed.post/1",
                 "cid": "bafyreie5737gdxlw5i64vzichcalba3z2v5n6icifvx5xytvske7mr3hpm",
                 "author": {"did": "did:plc:r", "handle": "romain.example.social",
-                    "labels": [{"src": "did:plc:m", "uri": "did:plc:r", "val": "nudity", "cts": "2026-11-20T14:56:00.000Z"}]},
+                    "labels": [{"src": "did:plc:ar7c4by46qjdydhdevvrndac", "uri": "did:plc:r", "val": "nudity", "cts": "2026-11-20T14:56:00.000Z"}]},
                 "record": {"$type": "app.bsky.feed.post", "text": "Bonjour", "createdAt": "2026-11-20T14:56:00.000Z"},
                 "labels": [
-                    {"src": "did:plc:m", "uri": "at://did:plc:r/app.bsky.feed.post/1", "val": "graphic-media", "cts": "2026-11-20T14:56:00.000Z"},
-                    {"src": "did:plc:m", "uri": "at://did:plc:r/app.bsky.feed.post/1", "val": "porn", "cts": "2026-11-20T14:56:00.000Z"},
-                    {"src": "did:plc:m", "uri": "at://did:plc:r/app.bsky.feed.post/1", "val": "porn", "neg": true, "cts": "2026-11-20T14:57:00.000Z"}
+                    {"src": "did:plc:ar7c4by46qjdydhdevvrndac", "uri": "at://did:plc:r/app.bsky.feed.post/1", "val": "graphic-media", "cts": "2026-11-20T14:56:00.000Z"},
+                    {"src": "did:plc:ar7c4by46qjdydhdevvrndac", "uri": "at://did:plc:r/app.bsky.feed.post/1", "val": "porn", "cts": "2026-11-20T14:56:00.000Z"},
+                    {"src": "did:plc:ar7c4by46qjdydhdevvrndac", "uri": "at://did:plc:r/app.bsky.feed.post/1", "val": "porn", "neg": true, "cts": "2026-11-20T14:57:00.000Z"},
+                    {"src": "did:plc:veille", "uri": "at://did:plc:r/app.bsky.feed.post/1", "val": "spoiler", "cts": "2026-11-20T14:57:00.000Z"}
                 ],
                 "indexedAt": "2026-11-20T14:56:00.000Z"
             }"#,
@@ -2071,7 +2348,11 @@ mod tests {
         .unwrap();
         assert_eq!(
             post_from_view(&post, now()).labels,
-            vec!["graphic-media".to_owned(), "nudity".to_owned()]
+            vec![
+                "graphic-media".to_owned(),
+                "did:plc:veille#spoiler".to_owned(),
+                "nudity".to_owned()
+            ]
         );
     }
 
@@ -2357,6 +2638,63 @@ mod tests {
     const CID: &str = "bafyreie5737gdxlw5i64vzichcalba3z2v5n6icifvx5xytvske7mr3hpm";
 
     #[test]
+    fn self_labels_go_in_the_record() {
+        let post = NewPost {
+            text: "Photo".into(),
+            langs: Vec::new(),
+            reply: None,
+            quote: None,
+            reply_rule: ReplyRule::Everyone,
+            no_quotes: false,
+            self_label: Some("graphic-media"),
+            video: None,
+            link: None,
+            images: Vec::new(),
+        };
+        let record = post_record(&post, &HashMap::new(), "2026-11-20T15:00:00.000Z", &[]);
+        assert_eq!(record["labels"]["values"][0]["val"], "graphic-media");
+        let _: atrium_api::app::bsky::feed::post::Record = serde_json::from_value(record).unwrap();
+    }
+
+    #[test]
+    fn videos_become_video_embeds() {
+        let post = NewPost {
+            text: String::new(),
+            langs: Vec::new(),
+            reply: None,
+            quote: None,
+            reply_rule: ReplyRule::Everyone,
+            no_quotes: false,
+            self_label: None,
+            video: Some(NewVideo {
+                alt: "Un train".into(),
+                size: Some((1920, 1080)),
+                presentation: Some("gif"),
+                blob: Some(serde_json::json!({
+                    "$type": "blob", "ref": {"$link": CID}, "mimeType": "video/mp4", "size": 1
+                })),
+                ..NewVideo::default()
+            }),
+            link: None,
+            images: Vec::new(),
+        };
+        let record = post_record(&post, &HashMap::new(), "2026-11-20T15:00:00.000Z", &[]);
+        assert_eq!(record["embed"]["$type"], "app.bsky.embed.video");
+        assert_eq!(record["embed"]["alt"], "Un train");
+        assert_eq!(record["embed"]["aspectRatio"]["width"], 1920);
+        assert_eq!(record["embed"]["presentation"], "gif");
+        let _: atrium_api::app::bsky::feed::post::Record = serde_json::from_value(record).unwrap();
+    }
+
+    #[test]
+    fn video_jobs_are_read_at_both_levels() {
+        let nested = serde_json::json!({"jobStatus": {"jobId": "a", "state": "JOB_STATE_CREATED"}});
+        assert_eq!(job_status(&nested)["jobId"], "a");
+        let flat = serde_json::json!({"jobId": "b", "error": "already_exists"});
+        assert_eq!(job_status(&flat)["jobId"], "b");
+    }
+
+    #[test]
     fn new_posts_become_records() {
         let root = StrongRef {
             uri: "at://did:plc:lucie/app.bsky.feed.post/1".into(),
@@ -2374,6 +2712,8 @@ mod tests {
             quote: None,
             reply_rule: ReplyRule::Everyone,
             no_quotes: false,
+            self_label: None,
+            video: None,
             link: None,
             images: Vec::new(),
         };
@@ -2418,6 +2758,8 @@ mod tests {
             quote: None,
             reply_rule: ReplyRule::Everyone,
             no_quotes: false,
+            self_label: None,
+            video: None,
             link: None,
             images: vec![image("Lever de soleil sur le Vercors"), image("")],
         };
@@ -2489,6 +2831,8 @@ mod tests {
             quote: None,
             reply_rule: ReplyRule::Everyone,
             no_quotes: false,
+            self_label: None,
+            video: None,
             images: Vec::new(),
             link: Some(NewLink {
                 uri: "https://example.org/billet".into(),
@@ -2529,6 +2873,8 @@ mod tests {
             quote: Some(quoted),
             reply_rule: ReplyRule::Everyone,
             no_quotes: false,
+            self_label: None,
+            video: None,
             link: None,
             images: Vec::new(),
         };
@@ -2648,6 +2994,8 @@ mod tests {
             quote: None,
             reply_rule: ReplyRule::Everyone,
             no_quotes: false,
+            self_label: None,
+            video: None,
             link: None,
             images: Vec::new(),
         };
@@ -2752,6 +3100,8 @@ mod tests {
             pinned_feed_uris(&preferences),
             vec![
                 "at://did:plc:a/app.bsky.feed.generator/linux",
+                // Les listes épinglées deviennent aussi des colonnes.
+                "at://did:plc:a/app.bsky.graph.list/l",
                 "at://did:plc:b/app.bsky.feed.generator/photo",
             ]
         );

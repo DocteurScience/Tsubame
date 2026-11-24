@@ -335,15 +335,38 @@ fn parse_callback(query: &str) -> Result<CallbackParams, LoginError> {
     serde_html_form::from_str(query).map_err(|e| LoginError::Failed(e.to_string()))
 }
 
-/// Compte dont la session est dans le trousseau, s'il y en a un.
-pub async fn stored_session() -> Result<Option<Arc<Session>>, LoginError> {
+/// Compte dont la session est dans le trousseau, s'il y en a un : celui
+/// de DID `preferred` s'il y est (dernier compte utilisé), sinon le premier.
+pub async fn stored_session(preferred: String) -> Result<Option<Arc<Session>>, LoginError> {
     let accounts = keyring::stored_accounts().await?;
-    Ok(accounts.into_iter().next().map(|account| {
+    let index = accounts
+        .iter()
+        .position(|a| a.did == preferred)
+        .unwrap_or(0);
+    Ok(accounts.into_iter().nth(index).map(|account| {
         Session::new(Account {
             did: account.did,
             handle: account.handle,
         })
     }))
+}
+
+/// Comptes dont la session est dans le trousseau.
+pub async fn stored_accounts() -> Result<Vec<Account>, LoginError> {
+    Ok(keyring::stored_accounts()
+        .await?
+        .into_iter()
+        .map(|a| Account {
+            did: a.did,
+            handle: a.handle,
+        })
+        .collect())
+}
+
+/// Session d'un compte gardé dans le trousseau (restaurée à la première
+/// requête).
+pub fn session_for(account: Account) -> Arc<Session> {
+    Session::new(account)
 }
 
 /// Accès à l'API de Bluesky avec la session OAuth d'un compte.
