@@ -34,6 +34,7 @@ Logiciels et Flathub).
 
 ### Lire
 
+- Visionneuse : zoom (boutons, +, -, 0) et enregistrement de l'image.
 - Notifications regroupées : avatars et liste des personnes, groupes poursuivis d'une page à l'autre.
 - GIF reçus lus en boucle, sans son, d'un clic.
 - Langue proposée pour les posts, filtre des posts par langue, « Traduire » dans le menu d'un post.

@@ -2528,7 +2528,10 @@ mod tests {
         merge_group(&mut card, more);
         assert_eq!(card.group.len(), 4);
         assert!(card.unread);
-        assert_eq!(card.context.as_deref(), Some("Aya et 3 autres ont aimé votre post"));
+        assert_eq!(
+            card.context.as_deref(),
+            Some("Aya et 3 autres ont aimé votre post")
+        );
     }
 
     #[test]

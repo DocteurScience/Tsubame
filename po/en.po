@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: tsubame\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-24 11:07+0000\n"
+"POT-Creation-Date: 2026-11-24 11:09+0000\n"
 "PO-Revision-Date: 2026-11-22\n"
 "Last-Translator: \n"
 "Language-Team: English\n"
@@ -2493,25 +2493,45 @@ msgid_plural "{} réponses"
 msgstr[0] "{} reply"
 msgstr[1] "{} replies"
 
-#: src/viewer.rs:19
+#: src/viewer.rs:20
 msgid "{} / {}"
 msgstr "{} / {}"
 
-#: src/viewer.rs:65
+#: src/viewer.rs:87
 msgid "Image précédente"
 msgstr "Previous image"
 
-#: src/viewer.rs:70
+#: src/viewer.rs:92
 msgid "Image suivante"
 msgstr "Next image"
 
-#: src/viewer.rs:77 src/viewer.rs:87
+#: src/viewer.rs:105 src/viewer.rs:133
 msgid "Image"
 msgstr "Image"
 
-#: src/viewer.rs:107
+#: src/viewer.rs:115 src/viewer.rs:309
+msgid "Enregistrer l'image"
+msgstr "Save image"
+
+#: src/viewer.rs:116
+msgid "Zoom arrière"
+msgstr "Zoom out"
+
+#: src/viewer.rs:117
+msgid "Ajuster à la fenêtre"
+msgstr "Fit to window"
+
+#: src/viewer.rs:118
+msgid "Zoom avant"
+msgstr "Zoom in"
+
+#: src/viewer.rs:226
 msgid "Pas de texte alternatif."
 msgstr "No alternative text."
+
+#: src/viewer.rs:310
+msgid "image"
+msgstr "image"
 
 #: src/window.rs:64
 msgid "Explorer"
