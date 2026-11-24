@@ -8,7 +8,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 use adw::prelude::*;
-use gettextrs::gettext;
+use gettextrs::{gettext, pgettext};
 use gtk::{gio, glib};
 use serde_json::Value;
 
@@ -781,6 +781,7 @@ impl Dialog {
 /// Page « Compte » : identité, gestion sur le site de Bluesky (adresse
 /// e-mail, mot de passe, désactivation), export des données.
 fn account_page(session: Arc<Session>, dialog: &adw::PreferencesDialog) -> adw::PreferencesPage {
+    let chat_session = session.clone();
     let page = adw::PreferencesPage::builder()
         .title(gettext("Compte"))
         .icon_name("avatar-default-symbolic")
@@ -852,7 +853,61 @@ fn account_page(session: Arc<Session>, dialog: &adw::PreferencesDialog) -> adw::
     }
     manage.add(&export);
     page.add(&manage);
+    page.add(&messages_group(chat_session, dialog));
     page
+}
+
+/// Messagerie : qui peut m'écrire (`chat.bsky.actor.declaration`).
+fn messages_group(session: Arc<Session>, dialog: &adw::PreferencesDialog) -> adw::PreferencesGroup {
+    const CHOICES: [&str; 3] = ["all", "following", "none"];
+    let group = adw::PreferencesGroup::builder()
+        .title(gettext("Messages"))
+        .build();
+    let names = gtk::StringList::new(&[]);
+    names.append(&gettext("Tout le monde"));
+    names.append(&gettext("Comptes que vous suivez"));
+    names.append(&pgettext("personne ne peut écrire", "Personne"));
+    let row = adw::ComboRow::builder()
+        .title(gettext("Qui peut vous écrire"))
+        .model(&names)
+        .sensitive(false)
+        .build();
+    group.add(&row);
+    // Lecture du réglage, puis enregistrement à chaque choix.
+    let loading = Rc::new(std::cell::Cell::new(true));
+    {
+        let (session, loading, dialog) = (session.clone(), loading.clone(), dialog.downgrade());
+        row.connect_selected_notify(move |row| {
+            if loading.get() {
+                return;
+            }
+            let value = CHOICES
+                .get(row.selected() as usize)
+                .copied()
+                .unwrap_or("following")
+                .to_owned();
+            let task = runtime().spawn(crate::chat::set_allow_incoming(session.clone(), value));
+            let dialog = dialog.clone();
+            glib::spawn_future_local(async move {
+                if let (Ok(Err(error)), Some(dialog)) = (task.await, dialog.upgrade()) {
+                    dialog.add_toast(adw::Toast::new(&error.message));
+                }
+            });
+        });
+    }
+    let task = runtime().spawn(crate::chat::allow_incoming(session));
+    let weak = row.downgrade();
+    glib::spawn_future_local(async move {
+        let value = task.await.ok().and_then(Result::ok);
+        let Some(row) = weak.upgrade() else { return };
+        if let Some(value) = value {
+            let index = CHOICES.iter().position(|c| *c == value).unwrap_or(1);
+            row.set_selected(index as u32);
+            row.set_sensitive(true);
+        }
+        loading.set(false);
+    });
+    group
 }
 
 /// Télécharge le dépôt du compte (`getRepo`) et l'enregistre là où la

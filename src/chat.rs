@@ -16,6 +16,8 @@ use crate::auth::Session;
 
 const CHAT_SERVICE: &str = "did:web:api.bsky.chat";
 const CHAT_SERVICE_TYPE: &str = "bsky_chat";
+/// Déclaration de messagerie du compte (qui peut écrire).
+const DECLARATION: &str = "chat.bsky.actor.declaration";
 
 /// Conversation dans la liste.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -31,6 +33,8 @@ pub struct Convo {
     pub unread: u32,
     /// Demande de message pas encore acceptée.
     pub request: bool,
+    /// Notifications de la conversation coupées.
+    pub muted: bool,
 }
 
 /// Message d'une conversation.
@@ -47,13 +51,17 @@ pub struct Message {
     pub failed: bool,
     /// Réactions, regroupées par émoji, dans l'ordre d'arrivée.
     pub reactions: Vec<Reaction>,
-    /// Post partagé : son auteur et son texte.
-    pub shared: Option<(String, String)>,
+    /// Post partagé : son auteur, son texte et son adresse.
+    pub shared: Option<(String, String, String)>,
 }
 
 /// Post partagé dans un message (embed `app.bsky.embed.record#view`).
-fn shared_from_json(message: &Value) -> Option<(String, String)> {
+fn shared_from_json(message: &Value) -> Option<(String, String, String)> {
     let record = message.get("embed")?.get("record")?;
+    let uri = record
+        .get("uri")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
     let author = record.get("author")?;
     let name = name_or_handle(
         author.get("displayName").and_then(Value::as_str),
@@ -63,7 +71,7 @@ fn shared_from_json(message: &Value) -> Option<(String, String)> {
             .unwrap_or_default(),
     );
     let text = str_at(record, &["value", "text"]).unwrap_or_default();
-    Some((name, text.to_owned()))
+    Some((name, text.to_owned(), uri.to_owned()))
 }
 
 /// Réaction à un message : un émoji, combien l'ont mis, et si j'en suis.
@@ -216,6 +224,7 @@ pub fn convo_from_json(convo: &Value, me: &str, now: DateTime<Utc>) -> Option<Co
             .and_then(Value::as_u64)
             .unwrap_or(0) as u32,
         request: convo.get("status").and_then(Value::as_str) == Some("request"),
+        muted: convo.get("muted").and_then(Value::as_bool).unwrap_or(false),
     })
 }
 
@@ -474,6 +483,115 @@ pub async fn react(
         .ok_or_else(|| ApiError::new(gettext("Réponse illisible du service de messages.")))
 }
 
+/// Coupe (ou rétablit) les notifications d'une conversation.
+pub async fn set_convo_muted(
+    session: Arc<Session>,
+    convo_id: String,
+    muted: bool,
+) -> Result<(), ApiError> {
+    use atrium_api::chat::bsky::convo::{mute_convo, unmute_convo};
+    let api = session.api().await?;
+    let chat = api.api_with_proxy(chat_did(), CHAT_SERVICE_TYPE);
+    if muted {
+        chat.chat
+            .bsky
+            .convo
+            .mute_convo(mute_convo::InputData { convo_id }.into())
+            .await
+            .map(|_| ())
+            .map_err(chat_failed)
+    } else {
+        chat.chat
+            .bsky
+            .convo
+            .unmute_convo(unmute_convo::InputData { convo_id }.into())
+            .await
+            .map(|_| ())
+            .map_err(chat_failed)
+    }
+}
+
+/// Quitte une conversation : elle disparaît de la liste.
+pub async fn leave(session: Arc<Session>, convo_id: String) -> Result<(), ApiError> {
+    use atrium_api::chat::bsky::convo::leave_convo;
+    let api = session.api().await?;
+    let chat = api.api_with_proxy(chat_did(), CHAT_SERVICE_TYPE);
+    chat.chat
+        .bsky
+        .convo
+        .leave_convo(leave_convo::InputData { convo_id }.into())
+        .await
+        .map(|_| ())
+        .map_err(chat_failed)
+}
+
+/// Qui peut m'écrire : « all », « following » ou « none »
+/// (`chat.bsky.actor.declaration` ; « following » sans déclaration).
+pub async fn allow_incoming(session: Arc<Session>) -> Result<String, ApiError> {
+    use atrium_api::com::atproto::repo::get_record;
+    use atrium_api::types::string::{Nsid, RecordKey};
+    let api = session.api().await?;
+    let result = api
+        .api
+        .com
+        .atproto
+        .repo
+        .get_record(
+            get_record::ParametersData {
+                cid: None,
+                collection: Nsid::new(DECLARATION.to_owned()).expect("NSID"),
+                repo: session
+                    .account
+                    .did
+                    .parse()
+                    .map_err(|_| api::invalid_actor())?,
+                rkey: RecordKey::new("self".to_owned()).expect("clé"),
+            }
+            .into(),
+        )
+        .await;
+    match result {
+        Ok(output) => Ok(to_json(&output.data.value)
+            .get("allowIncoming")
+            .and_then(Value::as_str)
+            .unwrap_or("following")
+            .to_owned()),
+        Err(error) if error.to_string().contains("RecordNotFound") => Ok("following".to_owned()),
+        Err(error) => Err(request_failed(error)),
+    }
+}
+
+/// Enregistre qui peut m'écrire.
+pub async fn set_allow_incoming(session: Arc<Session>, value: String) -> Result<(), ApiError> {
+    use atrium_api::com::atproto::repo::put_record;
+    use atrium_api::types::string::{Nsid, RecordKey};
+    let api = session.api().await?;
+    let record = serde_json::json!({"$type": DECLARATION, "allowIncoming": value});
+    api.api
+        .com
+        .atproto
+        .repo
+        .put_record(
+            put_record::InputData {
+                collection: Nsid::new(DECLARATION.to_owned()).expect("NSID"),
+                record: serde_json::from_value(record).map_err(|_| api::invalid_actor())?,
+                repo: session
+                    .account
+                    .did
+                    .parse()
+                    .map_err(|_| api::invalid_actor())?,
+                rkey: RecordKey::new("self".to_owned()).expect("clé"),
+                swap_commit: None,
+                swap_record: None,
+                validate: None,
+            }
+            .into(),
+        )
+        .await
+        .map_err(request_failed)?;
+    Ok(())
+}
+
 /// Marque la conversation comme lue.
 pub async fn mark_read(session: Arc<Session>, convo_id: String) -> Result<(), ApiError> {
     use atrium_api::chat::bsky::convo::update_read;
@@ -533,6 +651,7 @@ pub fn demo_convos() -> (Vec<Convo>, Vec<Convo>) {
             last_time: time.to_owned(),
             unread,
             request: false,
+            muted: false,
         };
     let accepted = vec![
         convo(
@@ -623,6 +742,7 @@ pub fn demo_messages(convo_id: &str) -> Vec<Message> {
             messages[4].shared = Some((
                 "Aya Koné".into(),
                 "Lever de soleil sur le Vercors ce matin, 6 h 40, moins 3 degrés.".into(),
+                String::new(),
             ));
             messages[3].reactions = vec![Reaction {
                 value: "👍".into(),
@@ -732,6 +852,7 @@ mod tests {
             "id": "m1", "text": "", "sender": {"did": "did:plc:lucie"},
             "embed": {"$type": "app.bsky.embed.record#view", "record": {
                 "$type": "app.bsky.embed.record#viewRecord",
+                "uri": "at://did:plc:a/app.bsky.feed.post/1",
                 "author": {"did": "did:plc:a", "handle": "aya.example.social", "displayName": "Aya"},
                 "value": {"text": "Lever de soleil"}
             }}
@@ -739,7 +860,11 @@ mod tests {
         let message = message_from_json(&message, "did:plc:moi", now()).unwrap();
         assert_eq!(
             message.shared,
-            Some(("Aya".into(), "Lever de soleil".into()))
+            Some((
+                "Aya".into(),
+                "Lever de soleil".into(),
+                "at://did:plc:a/app.bsky.feed.post/1".into()
+            ))
         );
     }
 

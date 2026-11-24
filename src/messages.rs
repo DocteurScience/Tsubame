@@ -30,6 +30,8 @@ pub struct MessagesPage {
     /// Conversations affichées dans la liste, dans l'ordre des rangées.
     shown: RefCell<Vec<Convo>>,
     title: adw::WindowTitle,
+    /// Menu de la conversation ouverte.
+    convo_menu: gtk::MenuButton,
     convo_stack: gtk::Stack,
     bubbles: gtk::Box,
     scroll: gtk::ScrolledWindow,
@@ -239,7 +241,7 @@ fn bubble(message: &Message, react: Option<&React>) -> gtk::Box {
         "{who}{}",
         message.text
     ))]);
-    if let Some((author, text)) = &message.shared {
+    if let Some((author, text, uri)) = &message.shared {
         // Post partagé : petite carte sous le texte (ou seule).
         let card = gtk::Box::builder()
             .orientation(gtk::Orientation::Vertical)
@@ -274,7 +276,26 @@ fn bubble(message: &Message, react: Option<&React>) -> gtk::Box {
         if !message.text.is_empty() {
             holder.append(&label);
         }
-        holder.append(&card);
+        if uri.is_empty() {
+            holder.append(&card);
+        } else {
+            // Un clic ouvre la discussion du post.
+            let open = gtk::Button::builder()
+                .child(&card)
+                .tooltip_text(gettext("Ouvrir le post"))
+                .css_classes(["flat", "shared-post-button"])
+                .build();
+            open.update_property(&[gtk::accessible::Property::Label(
+                &gettext("Ouvrir le post de {} : {}")
+                    .replacen("{}", author, 1)
+                    .replacen("{}", text, 1),
+            )]);
+            let uri = uri.clone();
+            open.connect_clicked(move |button| {
+                let _ = button.activate_action("win.open-post-uri", Some(&uri.to_variant()));
+            });
+            holder.append(&open);
+        }
         return bubble_line(message, holder.upcast(), react);
     }
     bubble_line(message, label.upcast(), react)
@@ -505,7 +526,18 @@ impl MessagesPage {
         convo_stack.add_named(&spinner(), Some("loading"));
         convo_stack.add_named(&convo_box, Some("convo"));
         let convo_view = adw::ToolbarView::builder().content(&convo_stack).build();
-        convo_view.add_top_bar(&adw::HeaderBar::builder().title_widget(&title).build());
+        // Menu de la conversation ouverte : notifications, quitter.
+        let convo_menu = gtk::MenuButton::builder()
+            .icon_name("view-more-symbolic")
+            .tooltip_text(gettext("Options de la conversation"))
+            .visible(false)
+            .build();
+        convo_menu.update_property(&[gtk::accessible::Property::Label(&gettext(
+            "Options de la conversation",
+        ))]);
+        let convo_header = adw::HeaderBar::builder().title_widget(&title).build();
+        convo_header.pack_end(&convo_menu);
+        convo_view.add_top_bar(&convo_header);
         let content = adw::NavigationPage::builder()
             .title(gettext("Conversation"))
             .child(&convo_view)
@@ -531,6 +563,7 @@ impl MessagesPage {
             requests: RefCell::default(),
             shown: RefCell::default(),
             title,
+            convo_menu,
             convo_stack,
             bubbles,
             scroll,
@@ -558,6 +591,19 @@ impl MessagesPage {
             }
         });
         actions.add_action(&report);
+        for (name, handler) in [
+            ("mute-convo", Self::toggle_convo_mute as fn(&Rc<Self>)),
+            ("leave-convo", Self::confirm_leave),
+        ] {
+            let action = gio::SimpleAction::new(name, None);
+            let weak = Rc::downgrade(&page);
+            action.connect_activate(move |_, _| {
+                if let Some(page) = weak.upgrade() {
+                    handler(&page);
+                }
+            });
+            actions.add_action(&action);
+        }
         page.root.insert_action_group("messages", Some(&actions));
         let weak = Rc::downgrade(&page);
         new_message.connect_clicked(move |button| {
@@ -734,6 +780,7 @@ impl MessagesPage {
                 .unwrap_or_default(),
         );
         self.banner.set_revealed(convo.request);
+        self.update_convo_menu(&convo);
         self.current.replace(Some(convo.clone()));
         self.root.set_show_content(true);
         let generation = self.generation.get() + 1;
@@ -796,6 +843,99 @@ impl MessagesPage {
                 .append(&bubble(message, Some(&self.react_handler())));
         }
         self.older_button.set_visible(self.older.borrow().is_some());
+    }
+
+    /// Menu de la conversation : « Couper les notifications » (ou les
+    /// rétablir), « Quitter la conversation… ».
+    fn update_convo_menu(&self, convo: &Convo) {
+        let menu = gio::Menu::new();
+        menu.append(
+            Some(&if convo.muted {
+                gettext("Rétablir les notifications")
+            } else {
+                gettext("Couper les notifications")
+            }),
+            Some("messages.mute-convo"),
+        );
+        menu.append(
+            Some(&gettext("Quitter la conversation…")),
+            Some("messages.leave-convo"),
+        );
+        self.convo_menu.set_menu_model(Some(&menu));
+        self.convo_menu.set_visible(true);
+    }
+
+    fn toggle_convo_mute(self: &Rc<Self>) {
+        let Some(mut convo) = self.current.borrow().clone() else {
+            return;
+        };
+        convo.muted = !convo.muted;
+        for list in [&self.accepted, &self.requests] {
+            for c in list.borrow_mut().iter_mut().filter(|c| c.id == convo.id) {
+                c.muted = convo.muted;
+            }
+        }
+        self.current.replace(Some(convo.clone()));
+        self.update_convo_menu(&convo);
+        self.host.toasts.add_toast(adw::Toast::new(&if convo.muted {
+            gettext("Notifications de la conversation coupées.")
+        } else {
+            gettext("Notifications de la conversation rétablies.")
+        }));
+        let Some(session) = self.host.session.clone() else {
+            return;
+        };
+        let task = runtime().spawn(chat::set_convo_muted(session, convo.id, convo.muted));
+        let toasts = self.host.toasts.clone();
+        glib::spawn_future_local(async move {
+            if let Ok(Err(error)) = task.await {
+                toasts.add_toast(adw::Toast::new(&error.message));
+            }
+        });
+    }
+
+    /// Quitter la conversation, après confirmation : elle disparaît de la
+    /// liste, pour soi seulement.
+    fn confirm_leave(self: &Rc<Self>) {
+        let Some(convo) = self.current.borrow().clone() else {
+            return;
+        };
+        let dialog = adw::AlertDialog::new(
+            Some(&gettext("Quitter la conversation ?")),
+            Some(&gettext(
+                "Elle disparaîtra de votre liste. Les autres membres gardent leurs messages.",
+            )),
+        );
+        dialog.add_responses(&[
+            ("cancel", &gettext("Annuler")),
+            ("leave", &gettext("Quitter")),
+        ]);
+        dialog.set_response_appearance("leave", adw::ResponseAppearance::Destructive);
+        dialog.set_default_response(Some("cancel"));
+        dialog.set_close_response("cancel");
+        let weak = Rc::downgrade(self);
+        dialog.connect_response(Some("leave"), move |_, _| {
+            let Some(page) = weak.upgrade() else { return };
+            for list in [&page.accepted, &page.requests] {
+                list.borrow_mut().retain(|c| c.id != convo.id);
+            }
+            page.current.replace(None);
+            page.convo_menu.set_visible(false);
+            page.convo_stack.set_visible_child_name("empty");
+            page.root.set_show_content(false);
+            page.fill_list();
+            page.report_unread();
+            if let Some(session) = page.host.session.clone() {
+                let task = runtime().spawn(chat::leave(session, convo.id.clone()));
+                let toasts = page.host.toasts.clone();
+                glib::spawn_future_local(async move {
+                    if let Ok(Err(error)) = task.await {
+                        toasts.add_toast(adw::Toast::new(&error.message));
+                    }
+                });
+            }
+        });
+        dialog.present(Some(&self.root));
     }
 
     fn report_message(&self, sender: &str, message_id: &str) {
@@ -1108,6 +1248,7 @@ impl MessagesPage {
                 last_time: String::new(),
                 unread: 0,
                 request: false,
+                muted: false,
             };
             self.add_and_open(convo);
             return;

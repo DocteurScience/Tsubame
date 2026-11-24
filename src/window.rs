@@ -1080,6 +1080,24 @@ impl State {
 
     /// Empile la discussion d'un post (ouvert depuis un profil) et charge
     /// ses réponses.
+    fn open_post_uri(self: &Rc<Self>, uri: &str) {
+        let Some(session) = self.session.borrow().clone() else {
+            return;
+        };
+        let task = runtime().spawn(api::post(session, uri.to_owned()));
+        let weak = Rc::downgrade(self);
+        glib::spawn_future_local(async move {
+            let result = task
+                .await
+                .unwrap_or_else(|_| Err(api::ApiError::new(gettext("Chargement interrompu."))));
+            let Some(state) = weak.upgrade() else { return };
+            match result {
+                Ok(post) => state.open_post_page(post),
+                Err(error) => state.toasts.add_toast(adw::Toast::new(&error.message)),
+            }
+        });
+    }
+
     fn open_post_page(self: &Rc<Self>, post: Post) {
         let view = Rc::new(ThreadView::new());
         view.set_selector_visible(false);
@@ -2063,6 +2081,15 @@ fn install_actions(window: &adw::ApplicationWindow, state: &Rc<State>) {
         }
     });
     window.add_action(&open_post);
+    // Post connu par sa seule adresse (post partagé dans un message).
+    let open_post_uri = gio::SimpleAction::new("open-post-uri", Some(glib::VariantTy::STRING));
+    let weak = Rc::downgrade(state);
+    open_post_uri.connect_activate(move |_, param| {
+        if let (Some(state), Some(uri)) = (weak.upgrade(), param.and_then(|p| p.str())) {
+            state.open_post_uri(uri);
+        }
+    });
+    window.add_action(&open_post_uri);
 
     for (name, which) in [
         ("toggle-like", Interaction::Like),

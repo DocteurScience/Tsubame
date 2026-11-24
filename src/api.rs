@@ -645,6 +645,16 @@ async fn posts_by_uri(
     Ok(posts)
 }
 
+/// Un post, par son adresse (`getPosts`).
+pub async fn post(session: Arc<Session>, uri: String) -> Result<Post, ApiError> {
+    let api = session.api().await?;
+    let mut posts = posts_by_uri(&api, vec![uri.clone()]).await?;
+    let view = posts
+        .remove(&uri)
+        .ok_or_else(|| ApiError::new(gettext("Ce post n'est plus disponible.")))?;
+    Ok(post_from_view(&view, Utc::now()))
+}
+
 /// Raisons de notification gardées par le filtre « Mentions ».
 pub const MENTION_REASONS: &[&str] = &["mention", "reply", "quote"];
 

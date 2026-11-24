@@ -35,7 +35,7 @@ Logiciels et Flathub).
 
 - Langue proposée pour les posts, filtre des posts par langue, « Traduire » dans le menu d'un post.
 - Profils : « Suivi par … » (comptes que vous suivez), notifications d'activité d'un compte, onglets Vidéos, Flux, Listes et Starter packs.
-- Messages : actualisation automatique, messages plus anciens, nouvelle conversation, réactions, partage de posts, bouton « Envoyer un message » sur les profils.
+- Messages : actualisation automatique, messages plus anciens, nouvelle conversation, réactions, partage de posts (qui s'ouvrent d'un clic), couper les notifications d'une conversation ou la quitter, choisir qui peut vous écrire, bouton « Envoyer un message » sur les profils.
 - Listes : créer, modifier, supprimer, ajouter ou retirer des comptes ; masquer ou bloquer les comptes d'une liste de modération.
 - Starter packs dans Explorer : voir leurs comptes et leurs flux, tout suivre.
 - Recherche de flux dans Explorer.
