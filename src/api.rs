@@ -1642,49 +1642,145 @@ pub async fn delete(session: Arc<Session>, record_uri: String) -> Result<(), Api
         .map_err(request_failed)
 }
 
-/// Qui peut répondre à un nouveau post (`app.bsky.feed.threadgate`).
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub enum ReplyRule {
-    #[default]
+/// Qui peut répondre à un nouveau post (`app.bsky.feed.threadgate`) :
+/// tout le monde, ou seulement les groupes choisis (aucun : personne).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReplyRule {
+    pub everyone: bool,
+    pub following: bool,
+    pub followers: bool,
+    pub mentioned: bool,
+    /// Listes de comptes autorisées (adresses).
+    pub lists: Vec<String>,
+}
+
+impl Default for ReplyRule {
+    fn default() -> Self {
+        Self {
+            everyone: true,
+            following: false,
+            followers: false,
+            mentioned: false,
+            lists: Vec::new(),
+        }
+    }
+}
+
+/// Un choix du menu « Qui peut répondre ».
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ReplyChoice {
     Everyone,
     Following,
     Followers,
     Mentioned,
+    List(String),
     Nobody,
 }
 
 impl ReplyRule {
-    pub const ALL: [ReplyRule; 5] = [
-        ReplyRule::Everyone,
-        ReplyRule::Following,
-        ReplyRule::Followers,
-        ReplyRule::Mentioned,
-        ReplyRule::Nobody,
-    ];
-
-    pub fn id(self) -> &'static str {
-        match self {
-            ReplyRule::Everyone => "everyone",
-            ReplyRule::Following => "following",
-            ReplyRule::Followers => "followers",
-            ReplyRule::Mentioned => "mentioned",
-            ReplyRule::Nobody => "nobody",
+    pub fn nobody() -> Self {
+        Self {
+            everyone: false,
+            ..Self::default()
         }
     }
 
-    pub fn from_id(id: &str) -> Option<Self> {
-        Self::ALL.into_iter().find(|rule| rule.id() == id)
+    fn groups(&self) -> usize {
+        [self.following, self.followers, self.mentioned]
+            .iter()
+            .filter(|on| **on)
+            .count()
+            + self.lists.len()
     }
 
-    /// Libellé court, pour le menu et le bouton.
-    pub fn title(self) -> String {
-        match self {
-            ReplyRule::Everyone => gettext("Tout le monde"),
-            ReplyRule::Following => gettext("Comptes que vous suivez"),
-            ReplyRule::Followers => gettext("Vos abonnés"),
-            ReplyRule::Mentioned => gettext("Comptes mentionnés"),
-            ReplyRule::Nobody => gettext("Personne"),
+    pub fn is_nobody(&self) -> bool {
+        !self.everyone && self.groups() == 0
+    }
+
+    /// Le choix est-il coché ?
+    pub fn has(&self, choice: &ReplyChoice) -> bool {
+        match choice {
+            ReplyChoice::Everyone => self.everyone,
+            ReplyChoice::Nobody => self.is_nobody(),
+            ReplyChoice::Following => !self.everyone && self.following,
+            ReplyChoice::Followers => !self.everyone && self.followers,
+            ReplyChoice::Mentioned => !self.everyone && self.mentioned,
+            ReplyChoice::List(uri) => !self.everyone && self.lists.contains(uri),
         }
+    }
+
+    /// Coche ou décoche un choix. « Tout le monde » et « Personne »
+    /// effacent les groupes ; cocher un groupe retire « Tout le monde » ;
+    /// décocher le dernier groupe revient à « Tout le monde ».
+    pub fn toggle(&self, choice: &ReplyChoice) -> Self {
+        let mut rule = if self.everyone {
+            Self::nobody()
+        } else {
+            self.clone()
+        };
+        match choice {
+            ReplyChoice::Everyone => return Self::default(),
+            ReplyChoice::Nobody => return Self::nobody(),
+            ReplyChoice::Following => rule.following = !self.has(choice),
+            ReplyChoice::Followers => rule.followers = !self.has(choice),
+            ReplyChoice::Mentioned => rule.mentioned = !self.has(choice),
+            ReplyChoice::List(uri) => {
+                if self.has(choice) {
+                    rule.lists.retain(|l| l != uri);
+                } else {
+                    rule.lists.push(uri.clone());
+                }
+            }
+        }
+        if rule.groups() == 0 {
+            return Self::default();
+        }
+        rule
+    }
+
+    /// Libellé court, pour le bouton.
+    pub fn title(&self) -> String {
+        if self.everyone {
+            return gettext("Tout le monde");
+        }
+        let mut parts = Vec::new();
+        if self.following {
+            parts.push(gettext("Comptes que vous suivez"));
+        }
+        if self.followers {
+            parts.push(gettext("Vos abonnés"));
+        }
+        if self.mentioned {
+            parts.push(gettext("Comptes mentionnés"));
+        }
+        match (parts.len(), self.lists.len()) {
+            (0, 0) => gettext("Personne"),
+            (1, 0) => parts.remove(0),
+            (0, 1) => gettext("Une liste"),
+            (_, _) => gettext("Réponses limitées"),
+        }
+    }
+
+    /// Règles `allow` du threadgate, ou `None` pour tout le monde.
+    fn allow(&self) -> Option<Vec<serde_json::Value>> {
+        use serde_json::json;
+        if self.everyone {
+            return None;
+        }
+        let mut allow = Vec::new();
+        if self.following {
+            allow.push(json!({"$type": "app.bsky.feed.threadgate#followingRule"}));
+        }
+        if self.followers {
+            allow.push(json!({"$type": "app.bsky.feed.threadgate#followerRule"}));
+        }
+        if self.mentioned {
+            allow.push(json!({"$type": "app.bsky.feed.threadgate#mentionRule"}));
+        }
+        for list in &self.lists {
+            allow.push(json!({"$type": "app.bsky.feed.threadgate#listRule", "list": list}));
+        }
+        Some(allow)
     }
 }
 
@@ -1692,25 +1788,13 @@ impl ReplyRule {
 /// qui peut répondre, et l'interdiction de le citer.
 pub fn gate_records(
     post_uri: &str,
-    rule: ReplyRule,
+    rule: &ReplyRule,
     no_quotes: bool,
     created_at: &str,
 ) -> Vec<(&'static str, serde_json::Value)> {
     use serde_json::json;
     let mut records = Vec::new();
-    let allow = match rule {
-        ReplyRule::Everyone => None,
-        ReplyRule::Following => Some(vec![
-            json!({"$type": "app.bsky.feed.threadgate#followingRule"}),
-        ]),
-        ReplyRule::Followers => Some(vec![
-            json!({"$type": "app.bsky.feed.threadgate#followerRule"}),
-        ]),
-        ReplyRule::Mentioned => Some(vec![
-            json!({"$type": "app.bsky.feed.threadgate#mentionRule"}),
-        ]),
-        ReplyRule::Nobody => Some(Vec::new()),
-    };
+    let allow = rule.allow();
     if let Some(allow) = allow {
         records.push((
             "app.bsky.feed.threadgate",
@@ -2023,14 +2107,14 @@ pub async fn publish(session: Arc<Session>, mut post: NewPost) -> Result<Publish
     };
     // Une réponse suit les réglages du début de la discussion.
     let rule = if post.reply.is_some() {
-        ReplyRule::Everyone
+        ReplyRule::default()
     } else {
-        post.reply_rule
+        post.reply_rule.clone()
     };
     let rkey = parse_record_uri(&published.uri).map(|(_, _, rkey)| rkey.to_owned());
     let mut gates_failed = false;
     for (collection, record) in
-        gate_records(&published.uri, rule, post.no_quotes, created_at.as_str())
+        gate_records(&published.uri, &rule, post.no_quotes, created_at.as_str())
     {
         let (Some(rkey), Ok(record)) = (rkey.clone(), serde_json::from_value(record)) else {
             gates_failed = true;
@@ -2771,7 +2855,7 @@ mod tests {
             langs: Vec::new(),
             reply: None,
             quote: None,
-            reply_rule: ReplyRule::Everyone,
+            reply_rule: ReplyRule::default(),
             no_quotes: false,
             self_label: Some("graphic-media"),
             video: None,
@@ -2790,7 +2874,7 @@ mod tests {
             langs: Vec::new(),
             reply: None,
             quote: None,
-            reply_rule: ReplyRule::Everyone,
+            reply_rule: ReplyRule::default(),
             no_quotes: false,
             self_label: None,
             video: Some(NewVideo {
@@ -2853,7 +2937,7 @@ mod tests {
             langs: vec!["fr".into()],
             reply: Some((root, parent)),
             quote: None,
-            reply_rule: ReplyRule::Everyone,
+            reply_rule: ReplyRule::default(),
             no_quotes: false,
             self_label: None,
             video: None,
@@ -2899,7 +2983,7 @@ mod tests {
             langs: vec!["fr".into()],
             reply: None,
             quote: None,
-            reply_rule: ReplyRule::Everyone,
+            reply_rule: ReplyRule::default(),
             no_quotes: false,
             self_label: None,
             video: None,
@@ -2932,8 +3016,8 @@ mod tests {
     fn reply_and_quote_rules_become_gates() {
         let uri = "at://did:plc:moi/app.bsky.feed.post/3k";
         let at = "2026-11-20T15:00:00.000Z";
-        assert!(gate_records(uri, ReplyRule::Everyone, false, at).is_empty());
-        let gates = gate_records(uri, ReplyRule::Nobody, true, at);
+        assert!(gate_records(uri, &ReplyRule::default(), false, at).is_empty());
+        let gates = gate_records(uri, &ReplyRule::nobody(), true, at);
         assert_eq!(gates.len(), 2);
         assert_eq!(gates[0].0, "app.bsky.feed.threadgate");
         assert_eq!(gates[0].1["allow"], serde_json::json!([]));
@@ -2943,26 +3027,48 @@ mod tests {
             gates[1].1["embeddingRules"][0]["$type"],
             "app.bsky.feed.postgate#disableRule"
         );
-        let gates = gate_records(uri, ReplyRule::Followers, false, at);
-        assert_eq!(
-            gates[0].1["allow"][0]["$type"],
-            "app.bsky.feed.threadgate#followerRule"
-        );
-        for rule in ReplyRule::ALL {
-            assert_eq!(ReplyRule::from_id(rule.id()), Some(rule));
-            for (collection, record) in gate_records(uri, rule, true, at) {
-                match collection {
-                    "app.bsky.feed.threadgate" => {
-                        let _: atrium_api::app::bsky::feed::threadgate::Record =
-                            serde_json::from_value(record).unwrap();
-                    }
-                    _ => {
-                        let _: atrium_api::app::bsky::feed::postgate::Record =
-                            serde_json::from_value(record).unwrap();
-                    }
+        // Plusieurs groupes à la fois, dont une liste.
+        let list = "at://did:plc:moi/app.bsky.graph.list/amis".to_owned();
+        let rule = ReplyRule::default()
+            .toggle(&ReplyChoice::Followers)
+            .toggle(&ReplyChoice::Mentioned)
+            .toggle(&ReplyChoice::List(list.clone()));
+        let gates = gate_records(uri, &rule, false, at);
+        let allow = gates[0].1["allow"].as_array().unwrap();
+        assert_eq!(allow.len(), 3);
+        assert_eq!(allow[0]["$type"], "app.bsky.feed.threadgate#followerRule");
+        assert_eq!(allow[2]["list"], list.as_str());
+        for (collection, record) in gate_records(uri, &rule, true, at) {
+            match collection {
+                "app.bsky.feed.threadgate" => {
+                    let _: atrium_api::app::bsky::feed::threadgate::Record =
+                        serde_json::from_value(record).unwrap();
+                }
+                _ => {
+                    let _: atrium_api::app::bsky::feed::postgate::Record =
+                        serde_json::from_value(record).unwrap();
                 }
             }
         }
+    }
+
+    #[test]
+    fn reply_choices_combine() {
+        let rule = ReplyRule::default().toggle(&ReplyChoice::Following);
+        assert!(!rule.everyone && rule.following);
+        assert!(rule.has(&ReplyChoice::Following));
+        assert!(!rule.has(&ReplyChoice::Everyone));
+        let both = rule.toggle(&ReplyChoice::Followers);
+        assert_eq!(both.title(), "Réponses limitées");
+        // Décocher le dernier groupe : retour à « Tout le monde ».
+        let back = rule.toggle(&ReplyChoice::Following);
+        assert_eq!(back, ReplyRule::default());
+        assert!(
+            ReplyRule::default()
+                .toggle(&ReplyChoice::Nobody)
+                .is_nobody()
+        );
+        assert_eq!(both.toggle(&ReplyChoice::Everyone), ReplyRule::default());
     }
 
     #[test]
@@ -2972,7 +3078,7 @@ mod tests {
             langs: vec!["fr".into()],
             reply: None,
             quote: None,
-            reply_rule: ReplyRule::Everyone,
+            reply_rule: ReplyRule::default(),
             no_quotes: false,
             self_label: None,
             video: None,
@@ -3014,7 +3120,7 @@ mod tests {
             langs: vec!["fr".into()],
             reply: None,
             quote: Some(quoted),
-            reply_rule: ReplyRule::Everyone,
+            reply_rule: ReplyRule::default(),
             no_quotes: false,
             self_label: None,
             video: None,
@@ -3135,7 +3241,7 @@ mod tests {
             langs: Vec::new(),
             reply: None,
             quote: None,
-            reply_rule: ReplyRule::Everyone,
+            reply_rule: ReplyRule::default(),
             no_quotes: false,
             self_label: None,
             video: None,

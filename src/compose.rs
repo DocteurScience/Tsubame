@@ -169,6 +169,9 @@ fn track_focus(view: &gtk::TextView, last: &Rc<RefCell<glib::WeakRef<gtk::TextVi
     view.add_controller(focus);
 }
 
+/// Ajoute une case au menu « Qui peut répondre » : nom d'action, choix.
+type AddReplyChoice = Rc<dyn Fn(&str, api::ReplyChoice)>;
+
 /// Posts ajoutés au fil, au plus, après le premier.
 const MAX_FOLLOWUPS: usize = 9;
 
@@ -501,17 +504,25 @@ pub fn present(
     ))]);
     // Qui peut répondre, et citations : pour un nouveau post seulement (une
     // réponse suit les réglages du début de la discussion).
-    let reply_rule = Rc::new(Cell::new(api::ReplyRule::Everyone));
+    let reply_rule: Rc<RefCell<api::ReplyRule>> = Rc::default();
     let no_quotes = Rc::new(Cell::new(false));
     let gate_menu = gio::Menu::new();
     let rules = gio::Menu::new();
-    for rule in api::ReplyRule::ALL {
-        rules.append(
-            Some(&rule.title()),
-            Some(&format!("compose.replies::{}", rule.id())),
-        );
+    // Choix combinables : une case par groupe, et mes listes ensuite.
+    for (title, action) in [
+        (gettext("Tout le monde"), "compose.reply-everyone"),
+        (
+            gettext("Comptes que vous suivez"),
+            "compose.reply-following",
+        ),
+        (gettext("Vos abonnés"), "compose.reply-followers"),
+        (gettext("Comptes mentionnés"), "compose.reply-mentioned"),
+        (gettext("Personne"), "compose.reply-nobody"),
+    ] {
+        rules.append(Some(&title), Some(action));
     }
     gate_menu.append_section(Some(&gettext("Qui peut répondre")), &rules);
+    let list_rules = gio::Menu::new();
     let quotes_section = gio::Menu::new();
     quotes_section.append(
         Some(&gettext("Autoriser les citations")),
@@ -521,7 +532,7 @@ pub fn present(
     let gate_content = adw::ButtonContent::builder()
         .can_shrink(true)
         .icon_name("mail-reply-sender-symbolic")
-        .label(api::ReplyRule::Everyone.title())
+        .label(api::ReplyRule::default().title())
         .build();
     let gate_button = gtk::MenuButton::builder()
         .child(&gate_content)
@@ -600,25 +611,74 @@ pub fn present(
         });
     }
     actions.add_action(&language_action);
-    let replies_action = gio::SimpleAction::new_stateful(
-        "replies",
-        Some(glib::VariantTy::STRING),
-        &api::ReplyRule::Everyone.id().to_variant(),
-    );
-    {
-        let (reply_rule, gate_content) = (reply_rule.clone(), gate_content.clone());
-        replies_action.connect_change_state(move |action, value| {
-            if let Some(rule) = value
-                .and_then(|v| v.str())
-                .and_then(api::ReplyRule::from_id)
-            {
-                reply_rule.set(rule);
-                gate_content.set_label(&rule.title());
-                action.set_state(&rule.id().to_variant());
+    // Une action à état booléen par choix ; chaque changement recalcule
+    // toutes les cases et le libellé du bouton.
+    let reply_actions: Rc<RefCell<Vec<(api::ReplyChoice, gio::SimpleAction)>>> = Rc::default();
+    let add_reply_choice: AddReplyChoice = {
+        let (actions, reply_actions, reply_rule, gate_content) = (
+            actions.clone(),
+            reply_actions.clone(),
+            reply_rule.clone(),
+            gate_content.clone(),
+        );
+        Rc::new(move |name: &str, choice: api::ReplyChoice| {
+            let action = gio::SimpleAction::new_stateful(
+                name,
+                None,
+                &reply_rule.borrow().has(&choice).to_variant(),
+            );
+            let (registered, reply_rule, gate_content, choice_for) = (
+                reply_actions.clone(),
+                reply_rule.clone(),
+                gate_content.clone(),
+                choice.clone(),
+            );
+            action.connect_activate(move |_, _| {
+                let next = reply_rule.borrow().toggle(&choice_for);
+                for (choice, action) in registered.borrow().iter() {
+                    action.set_state(&next.has(choice).to_variant());
+                }
+                gate_content.set_label(&next.title());
+                reply_rule.replace(next);
+            });
+            actions.add_action(&action);
+            reply_actions.borrow_mut().push((choice, action));
+        })
+    };
+    for (name, choice) in [
+        ("reply-everyone", api::ReplyChoice::Everyone),
+        ("reply-following", api::ReplyChoice::Following),
+        ("reply-followers", api::ReplyChoice::Followers),
+        ("reply-mentioned", api::ReplyChoice::Mentioned),
+        ("reply-nobody", api::ReplyChoice::Nobody),
+    ] {
+        add_reply_choice(name, choice);
+    }
+    // Mes listes de comptes (pas celles de modération).
+    if let (Some(session), false) = (session.clone(), replying) {
+        let me = session.account.did.clone();
+        let task = runtime().spawn(api::lists(session, me));
+        let (list_rules, add_reply_choice, gate_menu) = (
+            list_rules.clone(),
+            add_reply_choice.clone(),
+            gate_menu.clone(),
+        );
+        glib::spawn_future_local(async move {
+            let Ok(Ok(lists)) = task.await else { return };
+            let lists: Vec<_> = lists.into_iter().filter(|l| !l.moderation).collect();
+            if lists.is_empty() {
+                return;
+            }
+            // Section ajoutée seulement s'il y a des listes, après les
+            // groupes.
+            gate_menu.insert_section(1, Some(&gettext("Membres d'une liste")), &list_rules);
+            for (i, list) in lists.iter().enumerate() {
+                let name = format!("reply-list-{i}");
+                add_reply_choice(&name, api::ReplyChoice::List(list.uri.clone()));
+                list_rules.append(Some(&list.name), Some(&format!("compose.{name}")));
             }
         });
     }
-    actions.add_action(&replies_action);
     let quotes_action = gio::SimpleAction::new_stateful("quotes", None, &true.to_variant());
     {
         let no_quotes = no_quotes.clone();
@@ -1253,7 +1313,7 @@ pub fn present(
                 images: Vec::new(),
                 quote: quote_ref.clone(),
                 link: link_state.preview.borrow().clone(),
-                reply_rule: reply_rule.get(),
+                reply_rule: reply_rule.borrow().clone(),
                 no_quotes: no_quotes.get(),
                 self_label: *self_label.borrow(),
                 video,
@@ -1293,7 +1353,7 @@ pub fn present(
                         reply: Some((root.clone(), parent.clone())),
                         images,
                         quote: None,
-                        reply_rule: api::ReplyRule::Everyone,
+                        reply_rule: api::ReplyRule::default(),
                         no_quotes: false,
                         self_label: label.filter(|_| has_images),
                         video,

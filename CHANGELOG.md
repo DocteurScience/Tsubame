@@ -27,6 +27,7 @@ Logiciels et Flathub).
 
 ### Écrire
 
+- Qui peut répondre : plusieurs groupes à la fois, et les membres de vos listes.
 - Vidéo : avancement de l'envoi et de la conversion, limites du compte vérifiées avant l'envoi.
 - Émojis, coller une image (Ctrl+V) ou la déposer sur la boîte de rédaction.
 - Étiquette de contenu sur les images (nudité, contenu sexuel, violence).
